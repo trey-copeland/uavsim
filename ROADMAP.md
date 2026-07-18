@@ -48,8 +48,8 @@ Ship when SPEC §17 holds, especially:
 | Product SPEC v0.2 | **Done** |
 | Architecture v0.4 | **Done** |
 | License / README / git baseline | **Done** |
-| Repo code skeleton (`uv`, `src/uavsim`, tests, CI) | **Not started** ← **now** |
-| SIL / guidance / MC / systems / export / HIL | **Not started** |
+| Repo code skeleton (`uv`, `src/uavsim`, tests, CI) | **Done** (Phase 0) |
+| SIL / guidance / MC / systems / export / HIL | **Not started** ← **now Phase 1** |
 
 ---
 
@@ -75,13 +75,12 @@ Detail and MoSCoW: SPEC §6, §19. Module map: ARCH §3, §16.
 ## 5. Now / next / later
 
 ### Now
-1. Phase 0 skeleton against ARCH layout (`src/uavsim/…` packages as stubs OK).  
-2. Language conventions in `GROK.md` or `.grok/rules/` once Python tools exist.  
-3. Keep SPEC/ARCH/ROADMAP in sync when decisions change.
+1. **Phase 1** — vehicle, dynamics, LQR, trivial reference, SIL adapter, `uavsim simulate`, run artifacts.  
+2. Keep SPEC/ARCH/ROADMAP in sync when decisions change.
 
 ### Next
-1. Phase 1 closed-loop hover/square SIL.  
-2. Freeze timeseries format lean (Parquet) in practice when first artifacts land.  
+1. Phase 2 waypoint guidance (interp / min-snap / feasibility).  
+2. Freeze timeseries format lean (Parquet) when first artifacts land.  
 3. Pick alternate controller type (PID cascade vs geometric) before Phase 2 ends.
 
 ### Later (post-core, prioritize by portfolio need)
@@ -97,10 +96,10 @@ Detail and MoSCoW: SPEC §6, §19. Module map: ARCH §3, §16.
 Use as a living board (check off in PRs or edit this file).
 
 ### M0 — Skeleton
-- [ ] `pyproject.toml` + `src/uavsim` installable  
-- [ ] `pytest` + `ruff` (+ CI workflow stub)  
-- [ ] `uavsim --help` (or equivalent)  
-- [ ] Empty package modules match ARCH names  
+- [x] `pyproject.toml` + `src/uavsim` installable  
+- [x] `pytest` + `ruff` (+ CI workflow stub)  
+- [x] `uavsim --help` (or equivalent)  
+- [x] Empty package modules match ARCH names  
 
 ### M1 — First SIL demo
 - [ ] Default vehicle config  
@@ -196,3 +195,4 @@ Per `GROK.md` GSD: non-trivial work gets a SPEC note before a large implementati
 | Date | Notes |
 |------|--------|
 | 2026-07-18 | Initial roadmap from SPEC v0.2 / ARCH v0.4; M0–M7 checklist |
+| 2026-07-18 | Phase 0 / M0 complete; next is Phase 1 SIL |

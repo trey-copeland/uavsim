@@ -187,12 +187,20 @@ Prefer implementing against `docs/ARCHITECTURE.md`; if reality forces a change, 
 
 ---
 
-## 8. Extending this file
+## 8. Python conventions (Phase 0+)
+
+- **Layout:** `src/uavsim/` only; configs under `configs/`; tests under `tests/unit` and `tests/integration`.
+- **Tooling:** `uv sync --extra dev` · `uv run pytest` · `uv run ruff check src tests` · `uv run ruff format src tests`.
+- **Style:** Ruff lint + format (see `pyproject.toml`); target Python 3.11+.
+- **Types:** Prefer type hints on public APIs; `mypy` optional until types stabilize.
+- **CLI:** Thin wrappers in `uavsim.cli` — no business logic.
+- **Imports:** Honor ARCH §3.2 DAG (`control` ↛ `guidance`, `viz` ↛ `sim` internals).
+
+## 9. Extending this file
 
 Add sections when they earn their keep:
 
-- Language-specific conventions (formatters, type checking, project layout idioms)
-- CLI and config style guide
+- CLI and config style guide (deeper)
 - Numerical tolerance policy
 - CI matrix and performance budgets
 

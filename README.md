@@ -2,7 +2,7 @@
 
 Modern **quadrotor simulation and GNC analysis** framework for portfolio-quality demos: flight dynamics (NED), guidance, control, Monte Carlo robustness, and reproducible study pipelines — including containerized and sharded execution.
 
-**Status:** Design / stand-up (SPEC v0.2, ARCH v0.4).  
+**Status:** Phase 0 complete — installable package + CLI stubs. Phase 1 (SIL loop) is next.  
 
 **Intended workflow:** configure vehicle → inject dynamics → design/analyze control in SIL → export controller → (later) HIL → compare runs. Implementation follows `docs/ARCHITECTURE.md`.
 
@@ -28,11 +28,20 @@ Domain reference: ME590 MATLAB research (private). This repo is a **redesign**, 
 
 ## Quickstart
 
-Packaging and CLI land in Phase 0 stand-up. Intended surface:
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.11+.
 
 ```bash
-# after stand-up
-uv sync
-uavsim simulate configs/studies/hover_nominal.yaml
-uavsim study configs/studies/square_mc.yaml
+uv sync --extra dev
+uv run uavsim --help
+uv run pytest
+uv run ruff check src tests
+```
+
+Simulation commands are stubbed until Phase 1+:
+
+```bash
+# Phase 1+
+uv run uavsim simulate configs/studies/hover_nominal.yaml
+# Phase 3+
+uv run uavsim study configs/studies/square_mc.yaml
 ```
