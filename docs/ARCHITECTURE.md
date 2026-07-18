@@ -1,6 +1,6 @@
 # Architecture — `uavsim` / quadrotor-sim
 
-**Status:** v0 (stand-up map)  
+**Status:** v0.3 (stand-up map)  
 **Last updated:** 2026-07-18  
 **Normative product intent:** [`SPEC.md`](../SPEC.md)  
 **Working agreements:** [`GROK.md`](../GROK.md)
@@ -17,6 +17,10 @@ This document is the **implementation map**: packages, interfaces, data flow, re
 4. Support **systems-heavy core**: local MC, containers, sharded workers.
 5. Keep **Python** as the public CLI/orchestration surface with **explicit polyglot boundaries**.
 6. Plan for **navigation beyond waypoints → min-snap** without implementing every mode in core.
+7. Support the product workflow in SPEC §1.3–1.4:  
+   **vehicle → dynamics → SIL control design/analysis → controller export → HIL → fast SIL↔HIL compare.**
+
+User stories (SPEC §1.4) are the acceptance voice for these goals. Architecture supplies the seams; phasing decides when each story ships.
 
 Non-goals here: freezing every numerical library version, or specifying line-level algorithms (see theory notes later).
 
@@ -50,48 +54,91 @@ quadrotor-sim/
   AGENTS.md
   pyproject.toml              # Phase 0
   configs/
-    vehicles/
-    controllers/
-    guidance/                 # mission + backend configs (or nested under studies)
-    studies/
-    trajectories/             # waypoint files (*.yaml / *.wpt-compatible)
+    vehicles/                 # mass, inertia, limits, geometry defaults
+    controllers/              # optional shared Q/R / gains snippets
+    missions/                 # waypoint files, geometric mission params, …
+    studies/                  # composes vehicle + controller + guidance + MC
   src/uavsim/
     __init__.py
-    cli/                      # uavsim entrypoints
-    vehicles/
-    dynamics/
-    guidance/
+    cli/                      # thin entrypoints only
+    vehicles/                 # params, actuator limits, factories/loaders
+    dynamics/                 # f(x,u,p), linearize, trim helpers for plant
+    reference/                # ReferenceTrajectory, evaluate, feasibility, export
+    guidance/                 # planners only (no reference type ownership)
       base.py                 # protocol + registry
-      waypoints/              # load, interp, minsnap, auto-select
+      waypoints/              # load mission, interp, minsnap, auto-select
       # geometric/ …          # post-core
-    trajectory/               # ReferenceTrajectory, evaluation, feasibility
     control/
       base.py
-      lqr.py
+      lqr.py                  # design uses dynamics.linearize + vehicle params
       # alternate.py          # Should
-    sim/
+    sim/                      # ClosedLoopSim / ODE wiring
     metrics/
+    studies/                  # load/resolve study → plan → sim → write run
     monte_carlo/
       engine.py
       shard.py
       merge.py
     results/                  # run dir I/O, manifest
-    viz/                      # consumers only
+    viz/                      # consumers of run dirs only
   containers/
   tests/
     unit/
     integration/
   docs/
-    ARCHITECTURE.md           # this file
-    # theory.md, results_schema.md, …
+    ARCHITECTURE.md
   runs/                       # gitignored local outputs
 ```
 
-**Rules**
+### 3.1 Module responsibilities (pinned)
 
+| Package | Owns | Does **not** own |
+|---------|------|------------------|
+| `uavsim.vehicles` | Physical params, actuator limits, load/factory from config | Equations of motion |
+| `uavsim.dynamics` | `f(x, u, p) → xdot`, linearization, hover/trim helpers for the plant | Controller gains, mission files |
+| `uavsim.reference` | Reference trajectory types, `evaluate(t)`, feasibility checks, reference serialization | Planners / waypoint algorithms |
+| `uavsim.guidance` | Guidance backends (`plan` / `update`), mission→reference algorithms | Sim loop, metrics, controller internals |
+| `uavsim.control` | Controller protocol, LQR (and alternate), gain design | Plant ODEs, guidance backends |
+| `uavsim.sim` | Closed-loop integration, plant step, SIL adapter | Config loading, run-dir layout policy, device drivers |
+| `uavsim.interfaces` (or `plant_io`) | `ActuatorCommand`, `MeasurementBus`, shared I/O schemas | Transport/drivers |
+| `uavsim.hil` | Post-core: link adapters, pacing, HIL fixtures | Control law math, guidance |
+| `uavsim.studies` | Study resolve + nominal pipeline orchestration | Low-level numerics |
+| `uavsim.monte_carlo` | Trial loops, sharding, merge | Duplicate dynamics |
+| `uavsim.results` | Manifests, artifact paths, schema-versioned I/O | Plotting |
+| `uavsim.viz` | Plots/reports from artifacts | Live sim state |
+| `uavsim.cli` | Argument parsing → library calls | Business logic |
+
+**Config rule:** studies **compose**; missions **describe what to fly**.  
+Waypoint/mission files live under `configs/missions/`. Studies under `configs/studies/` point at vehicles, controllers, and missions. Do not maintain a parallel `configs/guidance/` or `configs/trajectories/` tree.
+
+### 3.2 Import dependency direction
+
+Allowed edges only (lower must not import upper):
+
+```text
+cli → studies → monte_carlo
+              → sim → control → reference
+              │         ↘ dynamics ← vehicles
+              │         ↘ vehicles
+              │         ↘ interfaces   (commands / measurements)
+              → guidance → reference
+              │          → vehicles   (limits for planning)
+              → metrics
+              → results
+hil (post-core) → interfaces, sim.plant   # not → guidance.waypoints
+viz → results
+```
+
+**Hard rules**
+
+- `control` must not import `guidance` or `guidance.waypoints`.
+- `control` must not import `hil` or transport drivers.
+- `sim` may depend on the **guidance protocol** only for optional `update`, never on a concrete backend.
+- `hil` adapters depend on **interfaces + plant step**, not on a specific LQR module.
+- `metrics` depends on timeseries + config thresholds, not on planners.
+- `viz` reads run directories via `results` (or raw files); no imports from `sim` internals.
 - Application code lives under `src/uavsim/`.
 - `configs/` is data, not Python.
-- `viz` and `report` never import private sim internals to “reach in” for state; they read run directories.
 - No imports from heritage MATLAB paths.
 
 ---
@@ -101,32 +148,35 @@ quadrotor-sim/
 ```text
                     ┌─────────────────┐
                     │  Study config   │
+                    │  (uavsim.studies)│
                     └────────┬────────┘
-           vehicle, controller, guidance, MC, seeds
+     vehicle, controller, guidance, mission, MC, seeds
                              │
          ┌───────────────────┼───────────────────┐
          v                   v                   v
    VehicleParams      GuidanceBackend      Controller
+   (vehicles)         (guidance)           (control)
          │                   │                   │
          │            plan(mission, vehicle)     │
          │                   v                   │
-         │           ReferenceTrajectory         │
-         │           + FeasibilityReport         │
+         │         ReferenceTrajectory           │
+         │         + FeasibilityReport           │
+         │         (reference package)           │
          │                   │                   │
          └───────────────────┼───────────────────┘
                              v
-                    ClosedLoopSim
-                    (optional guidance.update)
+                    ClosedLoopSim (sim)
+                    dynamics.f / optional guidance.update
                              │
               timeseries + per-run metrics
                              │
               ┌──────────────┼──────────────┐
               v              v              v
-           results/        MC engine     viz/report
+           results         MC engine      viz/report
                          (local|shards)
 ```
 
-**Core path:** pre-sim `guidance.plan` only.  
+**Core path:** `studies` runs pre-sim `guidance.plan` only.  
 **Reserved:** in-loop `guidance.update` for post-core online nav (sim must not assume guidance is static forever).
 
 ---
@@ -139,7 +189,7 @@ Frames and vectors are defined in SPEC §5. Summarized:
 - Control `u ∈ R⁴`: thrust `F`, body torques  
 - NED / FRD / thrust along −body-z  
 
-Implementation types should name fields explicitly (or document index maps once in `uavsim.trajectory` / `uavsim.dynamics`).
+Implementation types should name fields explicitly (or document index maps once in `uavsim.reference` / `uavsim.dynamics`).
 
 ---
 
@@ -156,7 +206,9 @@ Implementation types should name fields explicitly (or document index maps once 
 
 Sim, control, metrics, and MC **must not** depend on waypoint structs or min-snap solver types.
 
-### 6.2 Reference trajectory contract
+### 6.2 Reference trajectory contract (`uavsim.reference`)
+
+Types and feasibility live in **`uavsim.reference`**, not under `guidance`. Guidance backends *produce* references; they do not redefine the contract.
 
 Minimum capabilities (names illustrative):
 
@@ -207,7 +259,7 @@ Study YAML shape (illustrative):
 ```yaml
 guidance:
   type: waypoints          # discriminator
-  waypoints_file: configs/trajectories/simple_square.yaml
+  mission_file: configs/missions/simple_square.yaml
   method: auto             # auto | interp | minsnap
   yaw_mode: constant       # constant | path_tangent | from_waypoints
   # type-specific fields only under this block
@@ -218,8 +270,8 @@ Future:
 ```yaml
 guidance:
   type: geometric
-  path: helix
-  # …
+  mission_file: configs/missions/helix.yaml
+  # or inline path params
 ```
 
 Unknown `type` → hard error at config load (fail fast).
@@ -234,18 +286,18 @@ Unknown `type` → hard error at config load (fail fast).
 
 ### 6.6 Feasibility
 
-- Operates on **`ReferenceTrajectory`**, not only waypoint pipelines.
+- Implemented in **`uavsim.reference`** (or a submodule thereof); operates on `ReferenceTrajectory`.
 - Warn vs fail thresholds from config (SPEC §12).
-- Stored under `runs/.../guidance/`.
+- Stored under `runs/.../guidance/` (provenance) and/or alongside reference artifacts.
 
 ### 6.7 How to add a guidance backend
 
 1. Define mission schema (Pydantic) with new `type` discriminator.  
-2. Implement `GuidanceBackend` (`plan`; `update` if online).  
+2. Implement `GuidanceBackend` (`plan`; `update` if online) under `uavsim.guidance`.  
 3. Register in the guidance registry.  
-4. Emit a standard `ReferenceTrajectory`.  
+4. Emit a standard `uavsim.reference.ReferenceTrajectory`.  
 5. Add unit tests for the backend + one integration test that drives `ClosedLoopSim` without control changes.  
-6. Document config example under `configs/` and “Study authoring.”
+6. Add example under `configs/missions/` + study under `configs/studies/`.
 
 ### 6.8 Post-core navigation (planned, not core-complete)
 
@@ -266,15 +318,16 @@ Controller
 # LQR specialization
 LqrController
   K, u_hover, x_eq from design(vehicle, Q, R)
+  # design calls dynamics.linearize / trim; does not own plant ODEs
 ```
 
 Core loop (conceptual):
 
 ```text
-ref = reference.evaluate(t)
+ref = reference.evaluate(t)          # uavsim.reference
 u = controller.compute(t, x, ref)
-u = saturate(u, vehicle.limits)
-xdot = dynamics.f(x, u, vehicle)
+u = saturate(u, vehicle.limits)      # limits from uavsim.vehicles
+xdot = dynamics.f(x, u, vehicle)     # uavsim.dynamics
 ```
 
 ### 7.2 Implementations
@@ -292,28 +345,222 @@ xdot = dynamics.f(x, u, vehicle)
 3. Unit test interface + integration smoke on a gentle mission.  
 4. Optional comparison study config (same mission, two controllers).
 
+### 7.4 Control-law refinement path (SIL)
+
+Primary workflow for designing and testing laws stays **in-process software-in-the-loop** (SPEC US-C*):
+
+1. Author `vehicles` config; inject `dynamics`.  
+2. Implement / tune a `Controller` (pure compute).  
+3. Run studies against `reference` (fast iteration, metrics, MC, CI).  
+4. **Export** controller artifact (US-D1) when ready for target or HIL.  
+5. Optionally bind the same *command/measurement contracts* to external targets (HIL, US-E*).  
+6. **Compare** run dirs in `viz` (SIL vs HIL or baseline vs candidate).
+
+Do **not** route every SIL step through a network or device HAL — that slows control design and pollutes unit tests.
+
+### 7.5 Controller export (write-out)
+
+Before HIL is real, define a **versioned export** produced from a design/SIL run:
+
+```text
+ControllerArtifact (illustrative)
+  schema_version
+  controller_id / type
+  sample_rate_hz (if discrete)
+  u_hover / trim
+  gains (e.g. K for LQR) or structured params
+  state/measurement convention ids
+  vehicle_id / config hash used for design
+  code_identity, created_at
+```
+
+- SIL can re-load the artifact to prove round-trip.  
+- HIL transport maps artifact → on-target tables or streams setpoints/gains as the protocol requires.  
+- Export is **not** a substitute for the in-process `Controller` during rapid SIL iteration.
+
 ---
 
-## 8. Plant, sim, metrics
+## 7A. Execution modes, I/O contracts, and HIL readiness
 
-### 8.1 Dynamics
+HIL is **post-core to implement**, **in-scope to design**. The goal is: refine laws in sim now; later attach real flight computers / boards without rewriting plant, guidance, or metrics.
 
-- Pure functions where practical: `f(x, u, vehicle) -> xdot`.
-- Saturation applied **before** dynamics (SPEC).
-- Linearization + hover trim live in `vehicles` / `dynamics` as pure design helpers for LQR.
+### 7A.1 Do not use one mega-HAL for “all controllers”
 
-### 8.2 Simulation
+Two different problems get conflated:
+
+| Problem | Right seam | Examples |
+|---------|------------|----------|
+| **Different control laws** | `Controller` protocol (algorithm) | LQR, PID cascade, geometric |
+| **Different execution targets / hardware** | **Plant I/O + transport adapters** | In-process Python, UDP peer, serial MCU, future PX4/MAVLink bridge |
+
+A single “hardware abstraction that wraps every controller” usually becomes a god-object. Prefer **layered contracts**:
+
+```text
+  Guidance → Reference
+       ↓
+  Control law  (Controller.compute)     ← algorithm, unit-testable
+       ↓
+  Actuator command (u or mixer channels)← plant input contract
+       ↑
+  Measurements / state estimate         ← plant output contract
+       ↑
+  Plant step (dynamics + optional sensors)
+```
+
+For HIL, **something outside the pure control law** owns timing, bytes, and drivers.
+
+### 7A.2 Execution modes (product vocabulary)
+
+| Mode | Plant | Control law | Typical use |
+|------|--------|-------------|-------------|
+| **SIL** (core) | `uavsim.dynamics` in-process | In-process `Controller` | Design, MC, CI |
+| **PIL** (later) | Sim plant | Law on target MCU/processor (or compiled twin) | Timing, fixed-point, CPU budget |
+| **HIL** (later) | Sim plant (+ optional real sensors/actuators later) | Real FC / board closes loop over a link | Integration with flight hardware |
+| **Open-loop / log replay** | Optional | Optional | Validation, regression |
+
+Core implements **SIL** only. Architecture must not hard-wire “controller is always a Python object in the ODE RHS” without an indirection for *who provides `u` each step*.
+
+### 7A.3 Plant step interface (the important seam)
+
+Factor the sim loop so the plant does not call a concrete Python controller class forever:
+
+```text
+PlantSession / SimPlant
+  reset(x0, vehicle)
+  apply_command(command: ActuatorCommand, t, dt)   # or set_hold
+  step(dt) -> PlantOutput
+  # or combined step(command, dt) -> PlantOutput
+
+PlantOutput
+  t, x_true                     # full state for metrics / logging
+  measurements: MeasurementBus  # what a controller is *allowed* to see
+  status flags
+
+ActuatorCommand
+  # core: body wrench u = [F, τφ, τθ, τψ]
+  # future: motor RPMs, PWM, allocation channels — via versioned schema
+```
+
+**SIL adapter:** `InProcessControllerAdapter` calls `controller.compute` each step and fills `ActuatorCommand`.
+
+**HIL adapter:** `HilTransportAdapter` sends `MeasurementBus` (and time/ref) to hardware, waits/receives `ActuatorCommand` with timeout policy, feeds plant.
+
+Same plant, metrics, and run artifacts; different **command sources**.
+
+### 7A.4 What belongs in a “HAL” (and what does not)
+
+| Layer | Package (target) | Responsibility |
+|-------|------------------|----------------|
+| Control law | `uavsim.control` | Math: `compute` → `u` |
+| Plant / sensors | `uavsim.dynamics` (+ future `uavsim.sensors`) | Truth state, optional measurement models |
+| I/O contracts | `uavsim.plant_io` or `uavsim.interfaces` | `ActuatorCommand`, `MeasurementBus`, schemas, units |
+| Transport / HAL | `uavsim.hil` (post-core) | Serial/UDP/MAVLink/…, clock sync, timeouts, packing |
+| In-process binding | `uavsim.sim` | Wire SIL adapter + plant + ODE |
+
+**HAL (HIL transport) responsibilities:**
+
+- Byte packing / protocol (versioned)
+- Link bring-up and health
+- Real-time or soft-real-time pacing (`wall_dt` vs `sim_dt`)
+- Watchdog: late/missing packets → fail-safe command or study failure
+- **Not** LQR math, not trajectory generation, not metrics definitions
+
+Different boards ⇒ different **transport adapters** behind one plant I/O contract — not different copies of the plant.
+
+### 7A.5 Full-state vs measurements (design rule)
+
+Heritage SIL often assumes full-state feedback (`x` into LQR). That is fine for core LQR.
+
+For HIL-ready design:
+
+- Define **`MeasurementBus`** early even if SIL fills it from full state (`x` → ideal measurements).
+- Controllers that need full state can take a “state from measurements” helper; EKF stays post-core.
+- Avoid baking `compute(t, x, …)` as the *only* possible signature forever — prefer:
+
+```text
+compute(t, measurements, reference_ctx) -> ActuatorCommand
+# SIL convenience: measurements derived from x_true
+```
+
+Exact Python protocol can keep a thin full-state wrapper for LQR ergonomics, implemented on top of the measurement-oriented contract.
+
+### 7A.6 Timing and determinism
+
+| Concern | SIL (core) | HIL (later) |
+|---------|------------|-------------|
+| Clock | Sim time | Sim time paced to wall clock or free-run with logged jitter |
+| Step | Variable-step ODE OK | Prefer **fixed-step** plant option for hardware rates |
+| Repro | Seeded, deterministic | Log link latency; not bit-identical to SIL |
+| Safety | N/A | Timeouts, saturations, estop policy in transport adapter |
+
+Architecture: support a **fixed-step sim mode** (even if default remains `solve_ivp`) so HIL and SIL share the same discrete plant step function.
+
+### 7A.7 Suggested package hooks (no need to implement in Phase 0–1)
+
+```text
+src/uavsim/
+  interfaces/          # or plant_io/ — ActuatorCommand, MeasurementBus, schemas
+  sim/
+    plant.py           # step interface over dynamics
+    adapters/
+      inprocess.py     # Controller → commands (SIL)
+      # hil_udp.py     # post-core
+  hil/                 # post-core: transports, pacing, fixtures
+```
+
+Phase 1 may keep a simple closed-loop function **if** plant step + command application are still separable functions (easy to extract). Reject designs where dynamics, LQR, and UDP are one nested function.
+
+### 7A.8 How to add a HIL target (checklist, post-core)
+
+1. Freeze `MeasurementBus` + `ActuatorCommand` schema version.  
+2. Implement transport adapter (link + pack/unpack + timeout).  
+3. Run fixed-step plant; log both truth state and bus traffic.  
+4. Compare SIL vs HIL metrics on a gentle mission (soft tolerances).  
+5. Document wiring, rates, and safety limits; never claim flight certification.
+
+### 7A.9 Non-goals for HIL in this project (unless explicitly promoted)
+
+- Certifying flight software  
+- Supporting every autopilot vendor on day one  
+- Real motors/props as required core path  
+- Replacing SIL as the default design loop  
+
+---
+
+## 8. Vehicles, plant, sim, metrics
+
+### 8.1 Vehicles (`uavsim.vehicles`)
+
+- **Params:** mass, inertia, arm length, gravity, etc.
+- **Limits:** thrust/torque saturation bounds (and related envelopes used by sim/control).
+- **Factory/loaders:** YAML → validated `VehicleParams` (immutable-ish value objects preferred).
+- Does **not** implement `f(x,u,p)` or linearization.
+
+### 8.2 Dynamics (`uavsim.dynamics`)
+
+- Pure functions where practical: `f(x, u, p) -> xdot`.
+- `linearize(p, equilibrium) -> (A, B)` and hover/trim helpers used by LQR design.
+- Saturation applied **before** dynamics in the sim loop (SPEC), using limits from `vehicles`.
+- Does **not** load configs or own controller gains.
+
+### 8.3 Simulation (`uavsim.sim`)
 
 - `ClosedLoopSim` owns time stepping / ODE interface only.
-- Inputs: vehicle, controller, reference (and optional guidance for `update`).
+- Inputs: vehicle params, controller, reference (and optional guidance protocol for `update`).
 - Outputs: timeseries structure + flags (success, NaN stop, etc.).
 - **No global mutable sim state.**
 
-### 8.3 Metrics
+### 8.4 Metrics
 
 - Pure functions: timeseries + config thresholds → metrics dict / model.
 - Same metric code for nominal and each MC trial.
 - Success criteria from config (SPEC §11).
+
+### 8.5 Studies pipeline (`uavsim.studies`)
+
+- Resolve study config (paths, seeds, backend selection).
+- Nominal path: load vehicle → build controller → `guidance.plan` → feasibility → `ClosedLoopSim` → metrics → `results` write.
+- CLI and MC call into this layer rather than re-orchestrating ad hoc.
 
 ---
 
@@ -333,12 +580,12 @@ controller:
   R: ...
 guidance:
   type: waypoints
-  waypoints_file: configs/trajectories/simple_square.yaml
+  mission_file: configs/missions/simple_square.yaml
   method: auto
   yaw_mode: constant
 
 sim:
-  t_end: null            # or override; else from trajectory
+  t_end: null            # or override; else from reference horizon
   solver: rk45
   rtol: 1.0e-6
 
@@ -369,8 +616,8 @@ runs/<study_id>_<timestamp>/
     backend.json
     feasibility.json
     mission_snapshot.yaml
-  trajectory/                 # or trajectory.parquet + meta.json
-    reference.*
+  reference/                  # backend-agnostic reference artifacts
+    reference.*               # e.g. parquet + meta.json
   nominal/
     timeseries.*
     metrics.json
@@ -461,9 +708,14 @@ Default heritage posture: **nominal controller design**, **perturbed plant** par
 uavsim simulate <study.yaml> [--output runs/...]
 uavsim study <study.yaml> [--backend local|docker] [--shards N]
 uavsim report <run_dir> [--figures]
+uavsim export-controller <run_dir|design.yaml> [--out path]
+uavsim compare <run_a> <run_b> [--figures]     # SIL↔SIL or SIL↔HIL
+uavsim hil <study.yaml> --transport ...        # post-core
 ```
 
-Thin wrappers over library functions in `uavsim.sim`, `uavsim.monte_carlo`, `uavsim.results`, `uavsim.viz`.
+Thin wrappers over `uavsim.studies`, `uavsim.monte_carlo`, `uavsim.results`, `uavsim.viz` (not ad-hoc re-wiring of sim internals).
+
+**Viz rule:** `report` / `compare` only read run artifacts (+ optional controller artifacts). Comparison overlays assume shared metric schema and documented time alignment (same mission dt or resample policy).
 
 ---
 
@@ -471,8 +723,8 @@ Thin wrappers over library functions in `uavsim.sim`, `uavsim.monte_carlo`, `uav
 
 | Layer | Location | Focus |
 |-------|----------|-------|
-| Unit | `tests/unit/` | dynamics invariants, LQR poles, schema, metrics, feasibility |
-| Integration | `tests/integration/` | config → guidance → sim → metrics; MC N=2 seed; shard merge |
+| Unit | `tests/unit/` | dynamics invariants, vehicle loaders, LQR poles, schema, metrics, reference feasibility |
+| Integration | `tests/integration/` | study pipeline → guidance → sim → metrics; MC N=2 seed; shard merge |
 | Contract | either | mock guidance backend drives sim; second controller satisfies protocol |
 | Systems | optional/CI | container entrypoint smoke |
 
@@ -497,8 +749,8 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 ## 16. Implementation order (maps to SPEC phases)
 
 0. Skeleton: `pyproject`, package `uavsim`, pytest, ruff, CI stub, empty CLI  
-1. Vehicle + dynamics + LQR + trivial reference + `simulate` + run dir  
-2. Waypoint guidance (interp/minsnap/auto) + feasibility + controller protocol + registry  
+1. `vehicles` + `dynamics` + LQR + trivial `reference` + `studies` pipeline + `simulate` + run dir  
+2. Waypoint `guidance` (interp/minsnap/auto) + reference feasibility + controller protocol + registry  
 3. Metrics polish + MC local + `study`  
 4. Docker + shards + assemble  
 5. Polish docs/plots; optional alternate controller if not done  
@@ -511,10 +763,16 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | Date | Decision |
 |------|----------|
 | 2026-07-18 | Import package name **`uavsim`** aligned with CLI |
-| 2026-07-18 | Layout: `src/uavsim/` with `guidance/` + `trajectory/` split |
 | 2026-07-18 | Guidance protocol + reference contract mandatory before expanding nav modes |
 | 2026-07-18 | Timeseries lean default Parquet; freeze later in results schema doc |
 | 2026-07-18 | Shard failure fails the study by default |
+| 2026-07-18 | **`uavsim.reference`** owns reference types/feasibility; **`guidance`** owns planners only |
+| 2026-07-18 | **`vehicles`** = params, limits, factory; **`dynamics`** = `f(x,u,p)`, linearize/trim |
+| 2026-07-18 | Config: `configs/missions/` + `configs/studies/` (no parallel trajectories/guidance config trees) |
+| 2026-07-18 | **`uavsim.studies`** owns nominal pipeline orchestration; CLI stays thin |
+| 2026-07-18 | Import DAG pinned (§3.2); control must not import guidance backends |
+| 2026-07-18 | HIL readiness via plant I/O + transport adapters — not a mega-HAL over control laws (§7A) |
+| 2026-07-18 | SIL remains default design loop; fixed-step plant option reserved for HIL/PIL |
 
 ---
 
@@ -523,6 +781,9 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | Version | Date | Notes |
 |---------|------|-------|
 | v0 | 2026-07-18 | Initial architecture map for stand-up; aligns with SPEC v0.1.1 |
+| v0.1 | 2026-07-18 | Layout pin: `reference` vs `guidance`; vehicles/dynamics split; missions config; studies pipeline; import DAG |
+| v0.2 | 2026-07-18 | §7A SIL/PIL/HIL modes; plant step + MeasurementBus/ActuatorCommand; hil package hooks |
+| v0.3 | 2026-07-18 | Workflow goal §1.7; controller export §7.5; compare CLI; ties to SPEC user stories |
 
 ---
 
