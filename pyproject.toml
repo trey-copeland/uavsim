@@ -30,9 +30,6 @@ dev = [
 [project.scripts]
 uavsim = "uavsim.cli.main:main"
 
-[project.urls]
-# Remote origin TBD (SPEC open decision)
-Repository = "https://github.com/example/quadrotor-sim"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
