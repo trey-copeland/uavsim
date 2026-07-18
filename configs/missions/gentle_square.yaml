@@ -1,0 +1,11 @@
+# Gentle 2 m square at z=1 m (NED). ~5 s per leg — auto selects minsnap.
+schema_version: 1
+name: gentle_square
+description: Slow square for closed-loop tracking demos
+frame: NED
+waypoints:
+  - {label: start, time: 0.0, x: 0.0, y: 0.0, z: 1.0, yaw: 0.0}
+  - {label: right, time: 5.0, x: 2.0, y: 0.0, z: 1.0, yaw: 0.0}
+  - {label: forward, time: 10.0, x: 2.0, y: 2.0, z: 1.0, yaw: 0.0}
+  - {label: left, time: 15.0, x: 0.0, y: 2.0, z: 1.0, yaw: 0.0}
+  - {label: back, time: 20.0, x: 0.0, y: 0.0, z: 1.0, yaw: 0.0}

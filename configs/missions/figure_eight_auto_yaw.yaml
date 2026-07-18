@@ -1,0 +1,18 @@
+# Figure-eight with path-tangent yaw (null/auto) — known high yaw-rate case.
+# Used for feasibility unit tests; not a default closed-loop demo.
+schema_version: 1
+name: figure_eight_auto_yaw
+description: Figure-eight with auto yaw from path tangent (feasibility stress)
+frame: NED
+waypoints:
+  - {label: start_rest, time: 0.0, x: 0.0, y: 0.0, z: 1.5, yaw: 0.0}
+  - {label: accelerate, time: 2.0, x: 0.5, y: 0.0, z: 1.5, yaw: null}
+  - {label: right_lobe_top, time: 4.0, x: 1.5, y: 0.866, z: 1.5, yaw: null}
+  - {label: right_peak, time: 6.0, x: 2.0, y: 0.0, z: 1.5, yaw: null}
+  - {label: right_lobe_bottom, time: 8.0, x: 1.5, y: -0.866, z: 1.5, yaw: null}
+  - {label: center_cross, time: 10.0, x: 0.0, y: 0.0, z: 1.5, yaw: null}
+  - {label: left_lobe_bottom, time: 12.0, x: -1.5, y: -0.866, z: 1.5, yaw: null}
+  - {label: left_peak, time: 14.0, x: -2.0, y: 0.0, z: 1.5, yaw: null}
+  - {label: left_lobe_top, time: 16.0, x: -1.5, y: 0.866, z: 1.5, yaw: null}
+  - {label: decelerate, time: 18.0, x: -0.5, y: 0.0, z: 1.5, yaw: null}
+  - {label: end_rest, time: 20.0, x: 0.0, y: 0.0, z: 1.5, yaw: 0.0}

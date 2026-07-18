@@ -1,0 +1,11 @@
+# Aggressive square — short segments force auto→interp; stress tracking/feasibility.
+schema_version: 1
+name: aggressive_square
+description: Fast square with ~1.5 s legs (aggressive for LQR hover linearization)
+frame: NED
+waypoints:
+  - {label: start, time: 0.0, x: 0.0, y: 0.0, z: 1.0, yaw: 0.0}
+  - {label: right, time: 1.5, x: 2.0, y: 0.0, z: 1.0, yaw: 0.0}
+  - {label: forward, time: 3.0, x: 2.0, y: 2.0, z: 1.0, yaw: 0.0}
+  - {label: left, time: 4.5, x: 0.0, y: 2.0, z: 1.0, yaw: 0.0}
+  - {label: back, time: 6.0, x: 0.0, y: 0.0, z: 1.0, yaw: 0.0}

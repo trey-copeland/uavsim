@@ -1,0 +1,9 @@
+# Stationary hover mission (NED, z positive down)
+schema_version: 1
+name: hover_hold
+description: Stationary hover for validating trajectory I/O and zero-motion control
+frame: NED
+waypoints:
+  - {label: start, time: 0.0, x: 0.0, y: 0.0, z: 1.0, yaw: 0.0}
+  - {label: mid, time: 5.0, x: 0.0, y: 0.0, z: 1.0, yaw: 0.0}
+  - {label: end, time: 10.0, x: 0.0, y: 0.0, z: 1.0, yaw: 0.0}

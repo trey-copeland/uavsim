@@ -50,7 +50,8 @@ Ship when SPEC §17 holds, especially:
 | License / README / git baseline | **Done** |
 | Repo code skeleton (`uv`, `src/uavsim`, tests, CI) | **Done** (Phase 0) |
 | Phase 1 SIL physics loop | **Done** |
-| Guidance / MC / systems / export / HIL | **Not started** ← **now Phase 2** |
+| Phase 2 Guidance + control interface | **Done** |
+| MC / systems / export / HIL | **Not started** ← **now Phase 3** |
 
 ---
 
@@ -76,13 +77,13 @@ Detail and MoSCoW: SPEC §6, §19. Module map: ARCH §3, §16.
 ## 5. Now / next / later
 
 ### Now
-1. **Phase 2** — waypoint guidance (interp / min-snap / feasibility), registries, ≥3 missions.  
+1. **Phase 3** — local Monte Carlo + `uavsim study`, seed-stable smoke, trial table.  
 2. Keep SPEC/ARCH/ROADMAP in sync when decisions change.
 
 ### Next
-1. Phase 3 local MC + `uavsim study`.  
-2. Freeze timeseries format lean (Parquet) when MC artifacts need it (Phase 1 uses NPZ).  
-3. Pick alternate controller type (PID cascade vs geometric) before Phase 2 ends.
+1. Phase 4 containers + sharded MC assemble.  
+2. Freeze timeseries format lean (Parquet) when MC artifacts need it (NPZ today).  
+3. Pick alternate controller type (PID cascade vs geometric) before Phase 5.
 
 ### Later (post-core, prioritize by portfolio need)
 1. Phase 6 non-waypoint guidance (geometric is a likely first step).  
@@ -110,10 +111,10 @@ Use as a living board (check off in PRs or edit this file).
 - [x] Unit tests: trim / basic invariants  
 
 ### M2 — Guidance portfolio path
-- [ ] Waypoint missions (hover, gentle, aggressive)  
-- [ ] Interp + min-snap (+ auto policy Should)  
-- [ ] Feasibility warnings on bad auto-yaw case  
-- [ ] Guidance stub backend test (non-waypoint shape)  
+- [x] Waypoint missions (hover, gentle, aggressive)  
+- [x] Interp + min-snap (+ auto policy Should)  
+- [x] Feasibility warnings on bad auto-yaw case  
+- [x] Guidance stub backend test (non-waypoint shape)  
 
 ### M3 — MC + study CLI
 - [ ] `uavsim study` with seed reproducibility  
@@ -198,3 +199,4 @@ Per `GROK.md` GSD: non-trivial work gets a SPEC note before a large implementati
 | 2026-07-18 | Initial roadmap from SPEC v0.2 / ARCH v0.4; M0–M7 checklist |
 | 2026-07-18 | Phase 0 / M0 complete; next is Phase 1 SIL |
 | 2026-07-18 | Phase 1 / M1 complete: hover SIL, LQR, run artifacts, `uavsim simulate` |
+| 2026-07-18 | Phase 2 / M2 complete: waypoints, Akima interp, min-snap, auto, feasibility, registries |

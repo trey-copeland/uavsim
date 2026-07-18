@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Any, Literal
 
 import numpy as np
 import yaml
@@ -28,6 +28,23 @@ class HoldGuidanceConfig(BaseModel):
     position_ned_m: list[float] = Field(min_length=3, max_length=3)
     yaw_rad: float = 0.0
     duration_s: float = Field(gt=0, default=5.0)
+
+
+class WaypointsGuidanceConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["waypoints"] = "waypoints"
+    mission_file: str
+    method: Literal["auto", "interp", "minsnap"] = "auto"
+    yaw_mode: Literal["constant", "path_tangent", "from_waypoints"] = "constant"
+    sample_dt_s: float = Field(gt=0, default=0.01)
+    fail_on_infeasible: bool = False
+
+
+GuidanceConfig = Annotated[
+    HoldGuidanceConfig | WaypointsGuidanceConfig,
+    Field(discriminator="type"),
+]
 
 
 class SimConfig(BaseModel):
@@ -70,7 +87,7 @@ class StudyConfig(BaseModel):
     seed: int = 0
     vehicle: str
     controller: ControllerConfig
-    guidance: HoldGuidanceConfig
+    guidance: GuidanceConfig
     sim: SimConfig = Field(default_factory=SimConfig)
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
     initial_state: InitialStateConfig | None = None
@@ -87,12 +104,32 @@ def _resolve_path(path: str | Path, base: Path) -> Path:
     return (base / p).resolve()
 
 
-def load_study(path: str | Path) -> tuple[StudyConfig, Path, str]:
-    """Return (config, resolved vehicle path, config content hash)."""
+def load_study(path: str | Path) -> tuple[StudyConfig, Path, str, Path | None]:
+    """Return (config, vehicle path, config hash, resolved mission path or None)."""
     path = Path(path).resolve()
     raw = path.read_text(encoding="utf-8")
     data = yaml.safe_load(raw)
     cfg = StudyConfig.model_validate(data)
     vehicle_path = _resolve_path(cfg.vehicle, path.parent)
+    mission_path: Path | None = None
+    if isinstance(cfg.guidance, WaypointsGuidanceConfig):
+        mission_path = _resolve_path(cfg.guidance.mission_file, path.parent)
+        # Rewrite so pipeline can open a real path
+        cfg.guidance.mission_file = str(mission_path)
     cfg_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
-    return cfg, vehicle_path, cfg_hash
+    return cfg, vehicle_path, cfg_hash, mission_path
+
+
+def guidance_mission_dict(cfg: StudyConfig) -> dict[str, Any]:
+    """Build the mission dict passed to GuidanceBackend.plan."""
+    g = cfg.guidance
+    if isinstance(g, HoldGuidanceConfig):
+        return {
+            "position_ned_m": g.position_ned_m,
+            "yaw_rad": g.yaw_rad,
+            "duration_s": g.duration_s,
+        }
+    if isinstance(g, WaypointsGuidanceConfig):
+        return {"mission_file": g.mission_file}
+    msg = f"Unsupported guidance config type: {type(g)}"
+    raise TypeError(msg)

@@ -1,0 +1,26 @@
+schema_version: 1
+study_id: hover_waypoints
+seed: 0
+
+vehicle: configs/vehicles/default_quadrotor.yaml
+
+controller:
+  type: lqr_hover
+  Q_diag: [100, 100, 100, 10, 10, 1, 10, 10, 10, 1, 1, 0.1]
+  R_diag: [0.1, 1.0, 1.0, 1.0]
+
+guidance:
+  type: waypoints
+  mission_file: configs/missions/hover_hold.yaml
+  method: interp
+  yaw_mode: constant
+  sample_dt_s: 0.01
+
+sim:
+  dt_s: 0.01
+  method: rk45
+  rtol: 1.0e-6
+  atol: 1.0e-8
+
+metrics:
+  position_bound_m: 0.1

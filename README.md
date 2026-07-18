@@ -2,7 +2,7 @@
 
 Modern **quadrotor simulation and GNC analysis** framework for portfolio-quality demos: flight dynamics (NED), guidance, control, Monte Carlo robustness, and reproducible study pipelines — including containerized and sharded execution.
 
-**Status:** Phase 1 complete — closed-loop hover SIL with LQR. Phase 2 (waypoint guidance) is next.  
+**Status:** Phase 2 complete — waypoint guidance (interp / min-snap / auto), feasibility, closed-loop SIL demos. Phase 3 is local Monte Carlo.  
 
 **Intended workflow:** configure vehicle → inject dynamics → design/analyze control in SIL → export controller → (later) HIL → compare runs. Implementation follows `docs/ARCHITECTURE.md`.
 
@@ -41,6 +41,12 @@ uv run ruff check src tests
 # Closed-loop hover (Phase 1)
 uv run uavsim simulate configs/studies/hover_nominal.yaml
 uv run uavsim simulate configs/studies/hover_from_offset.yaml
+
+# Waypoint missions (Phase 2)
+uv run uavsim simulate configs/studies/hover_waypoints.yaml
+uv run uavsim simulate configs/studies/gentle_square.yaml
+uv run uavsim simulate configs/studies/gentle_square_interp.yaml
+uv run uavsim simulate configs/studies/aggressive_square.yaml
 
 # Phase 3+
 # uv run uavsim study configs/studies/square_mc.yaml

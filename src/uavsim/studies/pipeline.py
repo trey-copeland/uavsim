@@ -9,8 +9,9 @@ from typing import Any
 import numpy as np
 
 from uavsim.control import design_lqr_hover
+from uavsim.guidance import HoldGuidance, WaypointsGuidance
 from uavsim.metrics import compute_metrics
-from uavsim.reference import hold_at_ned
+from uavsim.reference import SampledReference
 from uavsim.results import (
     create_run_directory,
     write_json,
@@ -20,7 +21,13 @@ from uavsim.results import (
     write_yaml,
 )
 from uavsim.sim import InProcessControllerAdapter, SimPlant, simulate_closed_loop
-from uavsim.studies.config import StudyConfig, load_study
+from uavsim.studies.config import (
+    HoldGuidanceConfig,
+    StudyConfig,
+    WaypointsGuidanceConfig,
+    guidance_mission_dict,
+    load_study,
+)
 from uavsim.vehicles.params import load_vehicle
 
 
@@ -29,6 +36,22 @@ class StudyRunResult:
     run_dir: Path
     metrics: dict[str, Any]
     success: bool
+    feasibility: dict[str, Any] | None = None
+
+
+def _build_guidance(cfg: StudyConfig) -> Any:
+    g = cfg.guidance
+    if isinstance(g, HoldGuidanceConfig):
+        return HoldGuidance()
+    if isinstance(g, WaypointsGuidanceConfig):
+        return WaypointsGuidance(
+            method=g.method,
+            yaw_mode=g.yaw_mode,
+            sample_dt_s=g.sample_dt_s,
+            fail_on_infeasible=g.fail_on_infeasible,
+        )
+    msg = f"Unsupported guidance type: {type(g)}"
+    raise TypeError(msg)
 
 
 def run_nominal_study(
@@ -36,7 +59,7 @@ def run_nominal_study(
     *,
     output_root: str | Path = "runs",
 ) -> StudyRunResult:
-    cfg, vehicle_path, cfg_hash = load_study(study_path)
+    cfg, vehicle_path, cfg_hash, _mission_path = load_study(study_path)
     vehicle = load_vehicle(vehicle_path)
 
     controller = design_lqr_hover(
@@ -46,12 +69,10 @@ def run_nominal_study(
         controller_id=cfg.controller.type,
     )
 
-    g = cfg.guidance
-    reference = hold_at_ned(
-        position_ned_m=np.asarray(g.position_ned_m, dtype=float),
-        yaw_rad=g.yaw_rad,
-        duration_s=g.duration_s,
-    )
+    backend = _build_guidance(cfg)
+    plan = backend.plan(guidance_mission_dict(cfg), vehicle)
+    reference = plan.reference
+    feasibility = plan.feasibility
 
     if cfg.initial_state is not None:
         x0 = cfg.initial_state.to_array()
@@ -80,6 +101,7 @@ def run_nominal_study(
     )
     metrics["sim_success"] = sim_result.success
     metrics["sim_message"] = sim_result.message
+    metrics["feasibility_ok"] = feasibility.ok
     overall_ok = bool(sim_result.success and metrics.get("success", False))
 
     run_dir = create_run_directory(output_root, cfg.study_id)
@@ -89,17 +111,42 @@ def run_nominal_study(
         {
             "backend_id": reference.backend_id,
             "metadata": reference.metadata,
+            "diagnostics": plan.diagnostics,
             "t0": reference.t0,
             "tf": reference.tf,
         },
     )
-    write_json(
-        run_dir / "reference" / "hold.json",
-        {
-            "x_hold": reference.evaluate(reference.t0).x_ref.tolist(),
-            "backend_id": reference.backend_id,
-        },
-    )
+    write_json(run_dir / "guidance" / "feasibility.json", feasibility.to_dict())
+
+    # Reference artifact: hold or sampled grid summary
+    if isinstance(reference, SampledReference):
+        write_json(
+            run_dir / "reference" / "sampled.json",
+            {
+                "backend_id": reference.backend_id,
+                "t0": reference.t0,
+                "tf": reference.tf,
+                "n_samples": int(reference.t_grid.size),
+                "dt_s": float(np.mean(np.diff(reference.t_grid)))
+                if reference.t_grid.size > 1
+                else None,
+                "metadata": reference.metadata,
+            },
+        )
+        np.savez_compressed(
+            run_dir / "reference" / "grid.npz",
+            t=reference.t_grid,
+            x=reference.x_grid,
+        )
+    else:
+        write_json(
+            run_dir / "reference" / "hold.json",
+            {
+                "x_hold": reference.evaluate(reference.t0).x_ref.tolist(),
+                "backend_id": reference.backend_id,
+            },
+        )
+
     write_nominal_timeseries(run_dir, sim_result.t, sim_result.x, sim_result.u)
     write_json(run_dir / "nominal" / "metrics.json", metrics)
     write_json(
@@ -119,14 +166,17 @@ def run_nominal_study(
         config_hash=cfg_hash,
         execution_mode="sil",
         status="success" if overall_ok else "failed",
-        extra={"vehicle_id": vehicle.vehicle_id, "vehicle_path": str(vehicle_path)},
+        extra={
+            "vehicle_id": vehicle.vehicle_id,
+            "vehicle_path": str(vehicle_path),
+            "guidance_backend": reference.backend_id,
+            "feasibility_ok": feasibility.ok,
+        },
     )
 
-    return StudyRunResult(run_dir=run_dir, metrics=metrics, success=overall_ok)
-
-
-def run_study_from_config(cfg: StudyConfig, vehicle_path: Path, **kwargs: Any) -> StudyRunResult:
-    """Test helper: write cfg to temp is avoided; use path-based API in production."""
-    _ = cfg
-    _ = vehicle_path
-    raise NotImplementedError("Use run_nominal_study(path)")
+    return StudyRunResult(
+        run_dir=run_dir,
+        metrics=metrics,
+        success=overall_ok,
+        feasibility=feasibility.to_dict(),
+    )
