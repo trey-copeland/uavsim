@@ -30,6 +30,10 @@ dev = [
 [project.scripts]
 uavsim = "uavsim.cli.main:main"
 
+[project.urls]
+Repository = "https://github.com/trey-copeland/uavsim"
+Homepage = "https://github.com/trey-copeland/uavsim"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

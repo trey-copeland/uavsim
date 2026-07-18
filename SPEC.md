@@ -889,7 +889,7 @@ Refinement of numerics and exact orchestration tooling is expected during implem
 | First post-core guidance mode | Geometric paths vs corridor/MPC vs map-aware vs replan demo — **pick when roadmap prioritizes** |
 | Online guidance in sim | Reserve hook only vs implement minimal replan smoke in a late phase |
 | Compose vs other worker driver | Docker Compose first lean; k8s out of scope |
-| Remote origin | GitHub user/org and public timing |
+| Remote origin | **Closed:** `git@github.com:trey-copeland/uavsim.git` (public timing still open if desired) |
 | Package import name | **Closed lean:** `uavsim` (see ARCH); revisit only if packaging forces rename |
 | SPEC home | **Root `SPEC.md`** for now (with `docs/ARCHITECTURE.md`) |
 
