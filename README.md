@@ -2,7 +2,7 @@
 
 Modern **quadrotor simulation and GNC analysis** framework for portfolio-quality demos: flight dynamics (NED), guidance, control, Monte Carlo robustness, and reproducible study pipelines — including containerized and sharded execution.
 
-**Status:** Phase 2 complete — waypoint guidance (interp / min-snap / auto), feasibility, closed-loop SIL demos. Phase 3 is local Monte Carlo.  
+**Status:** Phase 3 complete — local Monte Carlo, `uavsim study` / `report`, seed-stable trial tables. Phase 4 is containers + sharded MC.  
 
 **Intended workflow:** configure vehicle → inject dynamics → design/analyze control in SIL → export controller → (later) HIL → compare runs. Implementation follows `docs/ARCHITECTURE.md`.
 
@@ -48,8 +48,10 @@ uv run uavsim simulate configs/studies/gentle_square.yaml
 uv run uavsim simulate configs/studies/gentle_square_interp.yaml
 uv run uavsim simulate configs/studies/aggressive_square.yaml
 
-# Phase 3+
-# uv run uavsim study configs/studies/square_mc.yaml
+# Monte Carlo robustness (Phase 3)
+uv run uavsim study configs/studies/hover_mc_smoke.yaml
+uv run uavsim study configs/studies/gentle_square_mc.yaml --n-trials 10
+uv run uavsim report runs/<study_id>_<timestamp>/
 ```
 
-Run artifacts land under `runs/<study_id>_<timestamp>/` (gitignored).
+Run artifacts land under `runs/<study_id>_<timestamp>/` (gitignored). Monte Carlo writes `monte_carlo/trials.csv`, `summary.json`. Figures need `uv sync --extra viz` (or `--extra dev`).

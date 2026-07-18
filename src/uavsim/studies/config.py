@@ -11,6 +11,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from uavsim.dynamics import STATE_DIM
+from uavsim.monte_carlo import PerturbationSpec
 
 
 class ControllerConfig(BaseModel):
@@ -79,6 +80,29 @@ class InitialStateConfig(BaseModel):
         return x
 
 
+class MonteCarloConfig(BaseModel):
+    """Local MC block. When enabled, ``uavsim study`` runs N perturbed trials."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    n_trials: int = Field(default=20, ge=1)
+    backend: Literal["local"] = "local"  # docker in Phase 4
+    shards: int = Field(default=1, ge=1)
+    # Heritage default: design controller on nominal; plant is perturbed
+    redesign_controller: bool = False
+    mass_rel_sigma: float = Field(default=0.05, ge=0)
+    inertia_rel_sigma: float = Field(default=0.075, ge=0)
+    arm_rel_sigma: float = Field(default=0.02, ge=0)
+
+    def perturbation_spec(self) -> PerturbationSpec:
+        return PerturbationSpec(
+            mass_rel_sigma=self.mass_rel_sigma,
+            inertia_rel_sigma=self.inertia_rel_sigma,
+            arm_rel_sigma=self.arm_rel_sigma,
+        )
+
+
 class StudyConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -91,6 +115,7 @@ class StudyConfig(BaseModel):
     sim: SimConfig = Field(default_factory=SimConfig)
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
     initial_state: InitialStateConfig | None = None
+    monte_carlo: MonteCarloConfig = Field(default_factory=MonteCarloConfig)
 
 
 def _resolve_path(path: str | Path, base: Path) -> Path:

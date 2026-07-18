@@ -51,7 +51,8 @@ Ship when SPEC §17 holds, especially:
 | Repo code skeleton (`uv`, `src/uavsim`, tests, CI) | **Done** (Phase 0) |
 | Phase 1 SIL physics loop | **Done** |
 | Phase 2 Guidance + control interface | **Done** |
-| MC / systems / export / HIL | **Not started** ← **now Phase 3** |
+| Phase 3 Robustness (local MC + study/report) | **Done** |
+| Systems / export / HIL | **Not started** ← **now Phase 4** |
 
 ---
 
@@ -77,13 +78,13 @@ Detail and MoSCoW: SPEC §6, §19. Module map: ARCH §3, §16.
 ## 5. Now / next / later
 
 ### Now
-1. **Phase 3** — local Monte Carlo + `uavsim study`, seed-stable smoke, trial table.  
+1. **Phase 4** — Docker study + sharded MC assemble.  
 2. Keep SPEC/ARCH/ROADMAP in sync when decisions change.
 
 ### Next
-1. Phase 4 containers + sharded MC assemble.  
+1. Phase 5 export + `compare` + second controller (Should).  
 2. Freeze timeseries format lean (Parquet) when MC artifacts need it (NPZ today).  
-3. Pick alternate controller type (PID cascade vs geometric) before Phase 5.
+3. Pick alternate controller type (PID cascade vs geometric) before Phase 5 ends.
 
 ### Later (post-core, prioritize by portfolio need)
 1. Phase 6 non-waypoint guidance (geometric is a likely first step).  
@@ -117,9 +118,9 @@ Use as a living board (check off in PRs or edit this file).
 - [x] Guidance stub backend test (non-waypoint shape)  
 
 ### M3 — MC + study CLI
-- [ ] `uavsim study` with seed reproducibility  
-- [ ] Trial table + summary schema  
-- [ ] Single-run `report` / figures consumer  
+- [x] `uavsim study` with seed reproducibility  
+- [x] Trial table + summary schema  
+- [x] Single-run `report` / figures consumer  
 
 ### M4 — Systems demo
 - [ ] Container runs a documented study  
@@ -200,3 +201,4 @@ Per `GROK.md` GSD: non-trivial work gets a SPEC note before a large implementati
 | 2026-07-18 | Phase 0 / M0 complete; next is Phase 1 SIL |
 | 2026-07-18 | Phase 1 / M1 complete: hover SIL, LQR, run artifacts, `uavsim simulate` |
 | 2026-07-18 | Phase 2 / M2 complete: waypoints, Akima interp, min-snap, auto, feasibility, registries |
+| 2026-07-18 | Phase 3 / M3 complete: local MC, `uavsim study`/`report`, trial table + summary |

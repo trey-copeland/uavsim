@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import Any
 
 from uavsim import __version__
 
@@ -31,11 +32,41 @@ def build_parser() -> argparse.ArgumentParser:
         help="Root directory for run artifacts (default: runs/)",
     )
 
-    p_study = sub.add_parser("study", help="Run a full study (e.g. Monte Carlo)")
-    p_study.add_argument("study", nargs="?", help="Path to study YAML (Phase 3+)")
+    p_study = sub.add_parser("study", help="Run a full study (nominal + optional Monte Carlo)")
+    p_study.add_argument("study", type=Path, help="Path to study YAML")
+    p_study.add_argument(
+        "--output",
+        type=Path,
+        default=Path("runs"),
+        help="Root directory for run artifacts (default: runs/)",
+    )
+    p_study.add_argument(
+        "--mc",
+        action="store_true",
+        help="Force Monte Carlo even if study YAML has monte_carlo.enabled=false",
+    )
+    p_study.add_argument(
+        "--no-mc",
+        action="store_true",
+        help="Skip Monte Carlo even if enabled in study YAML",
+    )
+    p_study.add_argument(
+        "--n-trials",
+        type=int,
+        default=None,
+        help="Override monte_carlo.n_trials for this run",
+    )
 
-    p_report = sub.add_parser("report", help="Generate report/figures from a run directory")
-    p_report.add_argument("run_dir", nargs="?", help="Path to run directory (Phase 3+)")
+    p_report = sub.add_parser(
+        "report",
+        help="Generate report/figures from a run directory (artifact consumer)",
+    )
+    p_report.add_argument("run_dir", type=Path, help="Path to run directory")
+    p_report.add_argument(
+        "--no-figures",
+        action="store_true",
+        help="Skip figure generation (markdown report only)",
+    )
 
     p_export = sub.add_parser(
         "export-controller",
@@ -65,6 +96,27 @@ def _not_implemented(command: str, phase_hint: str) -> int:
     return 2
 
 
+def _print_study_result(result: Any) -> None:
+    status = "OK" if result.success else "FAILED"
+    print(f"[{status}] run_dir={result.run_dir}")
+    m = result.metrics
+    print(
+        f"  rmse_pos={m['rmse_position_m']:.4f} m  "
+        f"max_pos={m['max_position_error_m']:.4f} m  "
+        f"success={m['success']}"
+    )
+    if result.mc_summary is not None:
+        s = result.mc_summary
+        print(
+            f"  MC n={s.get('n_trials')}  "
+            f"success={s.get('n_success')}/{s.get('n_trials')}  "
+            f"fail_rate={s.get('failure_rate')}"
+        )
+        rmse = (s.get("metrics") or {}).get("rmse_position_m") or {}
+        if rmse:
+            print(f"  MC rmse_pos mean={rmse.get('mean'):.4f}  p95={rmse.get('p95'):.4f} m")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -80,20 +132,63 @@ def main(argv: list[str] | None = None) -> int:
         if not study_path.is_file():
             print(f"Study file not found: {study_path}", file=sys.stderr)
             return 1
-        result = run_nominal_study(study_path, output_root=args.output)
-        status = "OK" if result.success else "FAILED"
-        print(f"[{status}] run_dir={result.run_dir}")
-        m = result.metrics
-        print(
-            f"  rmse_pos={m['rmse_position_m']:.4f} m  "
-            f"max_pos={m['max_position_error_m']:.4f} m  "
-            f"success={m['success']}"
-        )
+        result = run_nominal_study(study_path, output_root=args.output, run_mc=False)
+        _print_study_result(result)
         return 0 if result.success else 1
 
+    if args.command == "study":
+        from uavsim.studies import run_study
+
+        study_path = Path(args.study)
+        if not study_path.is_file():
+            print(f"Study file not found: {study_path}", file=sys.stderr)
+            return 1
+        if args.mc and args.no_mc:
+            print("Cannot combine --mc and --no-mc", file=sys.stderr)
+            return 1
+        if args.n_trials is not None and args.n_trials < 1:
+            print("--n-trials must be >= 1", file=sys.stderr)
+            return 1
+
+        force_mc: bool | None = None
+        if args.mc:
+            force_mc = True
+        elif args.no_mc:
+            force_mc = False
+
+        try:
+            result = run_study(
+                study_path,
+                output_root=args.output,
+                force_mc=force_mc,
+                n_trials_override=args.n_trials,
+            )
+        except (NotImplementedError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+
+        _print_study_result(result)
+        return 0 if result.success else 1
+
+    if args.command == "report":
+        from uavsim.viz import generate_report
+
+        run_dir = Path(args.run_dir)
+        if not run_dir.is_dir():
+            print(f"Run directory not found: {run_dir}", file=sys.stderr)
+            return 1
+        try:
+            rep = generate_report(run_dir, figures=not args.no_figures)
+        except FileNotFoundError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"[OK] {rep.message}")
+        print(f"  summary={rep.summary_md}")
+        for fig in rep.figures:
+            print(f"  figure={fig}")
+        return 0
+
     phase = {
-        "study": "Phase 3+",
-        "report": "Phase 3+",
         "export-controller": "Phase 5+",
         "compare": "Phase 5+",
         "hil": "Phase 7+",

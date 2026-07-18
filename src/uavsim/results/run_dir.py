@@ -91,16 +91,58 @@ def write_manifest(
     return path
 
 
-def write_text_report(run_dir: Path, metrics: dict[str, Any], study_id: str) -> Path:
+def write_text_report(
+    run_dir: Path,
+    metrics: dict[str, Any],
+    study_id: str,
+    *,
+    mc_summary: dict[str, Any] | None = None,
+) -> Path:
     lines = [
         f"# Study report: {study_id}",
         "",
-        "## Metrics",
+        "## Nominal metrics",
         "",
     ]
     for key, val in metrics.items():
         lines.append(f"- **{key}**: {val}")
     lines.append("")
+
+    if mc_summary is not None:
+        lines.extend(
+            [
+                "## Monte Carlo summary",
+                "",
+                f"- **n_trials**: {mc_summary.get('n_trials')}",
+                f"- **n_success**: {mc_summary.get('n_success')}",
+                f"- **failure_rate**: {mc_summary.get('failure_rate')}",
+                f"- **base_seed**: {mc_summary.get('base_seed')}",
+                f"- **redesign_controller**: {mc_summary.get('redesign_controller')}",
+                "",
+            ]
+        )
+        metric_stats = mc_summary.get("metrics") or {}
+        if metric_stats:
+            lines.append("### Metric statistics")
+            lines.append("")
+            for name, stats in metric_stats.items():
+                if not isinstance(stats, dict):
+                    continue
+                lines.append(
+                    f"- **{name}**: mean={stats.get('mean'):.6g}  "
+                    f"std={stats.get('std'):.6g}  "
+                    f"p50={stats.get('p50'):.6g}  "
+                    f"p95={stats.get('p95'):.6g}"
+                )
+            lines.append("")
+        corrs = mc_summary.get("correlations_vs_rmse_position") or {}
+        if corrs:
+            lines.append("### Correlations vs RMSE position")
+            lines.append("")
+            for pname, cval in corrs.items():
+                lines.append(f"- **{pname}**: {cval}")
+            lines.append("")
+
     path = run_dir / "reports" / "summary.md"
     path.write_text("\n".join(lines), encoding="utf-8")
     return path

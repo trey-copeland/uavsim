@@ -1,0 +1,36 @@
+# Small MC smoke for CI / quick demos (hold guidance, short horizon)
+schema_version: 1
+study_id: hover_mc_smoke
+seed: 7
+
+vehicle: configs/vehicles/default_quadrotor.yaml
+
+controller:
+  type: lqr_hover
+  Q_diag: [100, 100, 100, 10, 10, 1, 10, 10, 10, 1, 1, 0.1]
+  R_diag: [0.1, 1.0, 1.0, 1.0]
+
+guidance:
+  type: hold
+  position_ned_m: [0.0, 0.0, 0.0]
+  yaw_rad: 0.0
+  duration_s: 2.0
+
+sim:
+  dt_s: 0.02
+  method: rk45
+  rtol: 1.0e-5
+  atol: 1.0e-7
+
+metrics:
+  position_bound_m: 0.15
+
+monte_carlo:
+  enabled: true
+  n_trials: 4
+  backend: local
+  shards: 1
+  redesign_controller: false
+  mass_rel_sigma: 0.05
+  inertia_rel_sigma: 0.075
+  arm_rel_sigma: 0.02
