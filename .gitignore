@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.dmypy.json
+.pytype/
+cython_debug/
+
+# uv: commit uv.lock once the package exists (do not ignore it)
+
+# Simulation outputs
+runs/
+*.npz
+*.h5
+*.zarr
+!configs/**/*.yaml
+!configs/**/*.yml
+!configs/**/*.json
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Containers / local overrides
+docker-compose.override.yml
+
+# Secrets
+*.pem
+secrets/
+credentials*
+
+# Local agent overrides (if used)
+CLAUDE.local.md
+.grok/local/
