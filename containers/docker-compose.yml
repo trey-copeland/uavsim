@@ -1,0 +1,68 @@
+# Sharded MC demo (2 workers + merge) for hover_mc_smoke.
+#
+# From repo root:
+#   docker compose -f containers/docker-compose.yml build
+#   docker compose -f containers/docker-compose.yml run --rm merge
+#
+# Artifacts land under ./runs/compose_shards/ (host-mounted).
+
+services:
+  shard0:
+    build:
+      context: ..
+      dockerfile: containers/Dockerfile
+    image: uavsim:local
+    working_dir: /work
+    volumes:
+      - ..:/work
+    # Image venv is under /opt/uavsim; /work is host mount only.
+    command:
+      - mc-shard
+      - configs/studies/hover_mc_smoke.yaml
+      - --shard-id
+      - "0"
+      - --shards
+      - "2"
+      - --output
+      - runs/compose_shards/shard_00
+      - --n-trials
+      - "4"
+
+  shard1:
+    build:
+      context: ..
+      dockerfile: containers/Dockerfile
+    image: uavsim:local
+    working_dir: /work
+    volumes:
+      - ..:/work
+    command:
+      - mc-shard
+      - configs/studies/hover_mc_smoke.yaml
+      - --shard-id
+      - "1"
+      - --shards
+      - "2"
+      - --output
+      - runs/compose_shards/shard_01
+      - --n-trials
+      - "4"
+
+  merge:
+    image: uavsim:local
+    working_dir: /work
+    volumes:
+      - ..:/work
+    depends_on:
+      - shard0
+      - shard1
+    command:
+      - mc-merge
+      - runs/compose_shards/shard_00
+      - runs/compose_shards/shard_01
+      - --output
+      - runs/compose_shards/merged
+      - --n-trials
+      - "4"
+      - --seed
+      - "7"

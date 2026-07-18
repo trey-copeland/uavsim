@@ -56,6 +56,63 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Override monte_carlo.n_trials for this run",
     )
+    p_study.add_argument(
+        "--backend",
+        choices=["local", "docker"],
+        default=None,
+        help="MC execution backend (default: study config)",
+    )
+    p_study.add_argument(
+        "--shards",
+        type=int,
+        default=None,
+        help="Partition MC trials across N shards (default: study config)",
+    )
+    p_study.add_argument(
+        "--image",
+        type=str,
+        default=None,
+        help="Docker image for --backend docker (default: uavsim:local or UAVSIM_DOCKER_IMAGE)",
+    )
+
+    p_shard = sub.add_parser(
+        "mc-shard",
+        help="Run one MC shard worker (writes trials under --output)",
+    )
+    p_shard.add_argument("study", type=Path, help="Path to study YAML")
+    p_shard.add_argument("--shard-id", type=int, required=True, help="Shard index [0, shards)")
+    p_shard.add_argument("--shards", type=int, required=True, help="Total number of shards")
+    p_shard.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="Directory for this shard's trials.csv / shard_meta.json",
+    )
+    p_shard.add_argument("--n-trials", type=int, default=None, help="Override n_trials")
+
+    p_merge = sub.add_parser(
+        "mc-merge",
+        help="Merge shard directories into trials table + summary",
+    )
+    p_merge.add_argument(
+        "shard_dirs",
+        nargs="+",
+        type=Path,
+        help="Shard directories each containing trials.csv",
+    )
+    p_merge.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="Output directory for merged trials.csv + summary.json",
+    )
+    p_merge.add_argument(
+        "--n-trials",
+        type=int,
+        default=None,
+        help="Expected total trial count (fail if mismatch)",
+    )
+    p_merge.add_argument("--seed", type=int, default=None, help="base_seed for summary metadata")
 
     p_report = sub.add_parser(
         "report",
@@ -100,21 +157,26 @@ def _print_study_result(result: Any) -> None:
     status = "OK" if result.success else "FAILED"
     print(f"[{status}] run_dir={result.run_dir}")
     m = result.metrics
-    print(
-        f"  rmse_pos={m['rmse_position_m']:.4f} m  "
-        f"max_pos={m['max_position_error_m']:.4f} m  "
-        f"success={m['success']}"
-    )
+    if m:
+        print(
+            f"  rmse_pos={m.get('rmse_position_m', float('nan')):.4f} m  "
+            f"max_pos={m.get('max_position_error_m', float('nan')):.4f} m  "
+            f"success={m.get('success')}"
+        )
     if result.mc_summary is not None:
         s = result.mc_summary
         print(
             f"  MC n={s.get('n_trials')}  "
             f"success={s.get('n_success')}/{s.get('n_trials')}  "
-            f"fail_rate={s.get('failure_rate')}"
+            f"fail_rate={s.get('failure_rate')}  "
+            f"backend={result.backend}  shards={result.n_shards}"
         )
         rmse = (s.get("metrics") or {}).get("rmse_position_m") or {}
         if rmse:
-            print(f"  MC rmse_pos mean={rmse.get('mean'):.4f}  p95={rmse.get('p95'):.4f} m")
+            print(
+                f"  MC rmse_pos mean={rmse.get('mean'):.4f}  "
+                f"p95={rmse.get('p95'):.4f} m"
+            )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -149,6 +211,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.n_trials is not None and args.n_trials < 1:
             print("--n-trials must be >= 1", file=sys.stderr)
             return 1
+        if args.shards is not None and args.shards < 1:
+            print("--shards must be >= 1", file=sys.stderr)
+            return 1
 
         force_mc: bool | None = None
         if args.mc:
@@ -162,13 +227,57 @@ def main(argv: list[str] | None = None) -> int:
                 output_root=args.output,
                 force_mc=force_mc,
                 n_trials_override=args.n_trials,
+                backend=args.backend,
+                n_shards=args.shards,
+                docker_image=args.image,
+                repo_root=Path.cwd(),
             )
-        except (NotImplementedError, ValueError) as exc:
+        except (NotImplementedError, ValueError, RuntimeError, FileNotFoundError) as exc:
             print(str(exc), file=sys.stderr)
             return 1
 
         _print_study_result(result)
         return 0 if result.success else 1
+
+    if args.command == "mc-shard":
+        from uavsim.studies.pipeline import run_mc_shard_only
+
+        study_path = Path(args.study)
+        if not study_path.is_file():
+            print(f"Study file not found: {study_path}", file=sys.stderr)
+            return 1
+        if args.shards < 1 or args.shard_id < 0 or args.shard_id >= args.shards:
+            print("Invalid --shard-id / --shards", file=sys.stderr)
+            return 1
+        try:
+            out = run_mc_shard_only(
+                study_path,
+                shard_id=args.shard_id,
+                n_shards=args.shards,
+                output_dir=args.output,
+                n_trials_override=args.n_trials,
+            )
+        except (ValueError, FileNotFoundError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"[OK] shard_dir={out}")
+        return 0
+
+    if args.command == "mc-merge":
+        from uavsim.monte_carlo import merge_shard_directories, write_merged_mc_artifacts
+
+        try:
+            trials, summary = merge_shard_directories(
+                list(args.shard_dirs),
+                expected_n_trials=args.n_trials,
+                base_seed=args.seed,
+            )
+            write_merged_mc_artifacts(args.output, trials, summary)
+        except (ValueError, FileNotFoundError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"[OK] merged n_trials={summary.get('n_trials')} → {args.output}")
+        return 0
 
     if args.command == "report":
         from uavsim.viz import generate_report

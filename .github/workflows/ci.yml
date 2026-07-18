@@ -35,3 +35,30 @@ jobs:
 
       - name: Pytest
         run: uv run pytest -q
+
+  # Optional systems smoke — does not block PRs if docker unavailable on runner quirks
+  docker-smoke:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Sync project
+        run: uv sync --extra dev
+
+      - name: Build image
+        run: docker build -t uavsim:local -f containers/Dockerfile .
+
+      - name: Container study smoke
+        run: |
+          docker run --rm -v "$PWD":/work -w /work uavsim:local \
+            study configs/studies/hover_mc_smoke.yaml --output /work/runs --n-trials 2
+

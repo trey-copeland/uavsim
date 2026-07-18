@@ -18,6 +18,8 @@ def test_build_parser_has_expected_subcommands() -> None:
     for name in (
         "simulate",
         "study",
+        "mc-shard",
+        "mc-merge",
         "report",
         "export-controller",
         "compare",

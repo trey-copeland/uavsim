@@ -52,7 +52,8 @@ Ship when SPEC §17 holds, especially:
 | Phase 1 SIL physics loop | **Done** |
 | Phase 2 Guidance + control interface | **Done** |
 | Phase 3 Robustness (local MC + study/report) | **Done** |
-| Systems / export / HIL | **Not started** ← **now Phase 4** |
+| Phase 4 Systems (Docker + sharded MC) | **Done** |
+| Export / compare / HIL | **Not started** ← **now Phase 5** |
 
 ---
 
@@ -78,13 +79,12 @@ Detail and MoSCoW: SPEC §6, §19. Module map: ARCH §3, §16.
 ## 5. Now / next / later
 
 ### Now
-1. **Phase 4** — Docker study + sharded MC assemble.  
+1. **Phase 5** — controller export, `uavsim compare`, second controller (Should).  
 2. Keep SPEC/ARCH/ROADMAP in sync when decisions change.
 
 ### Next
-1. Phase 5 export + `compare` + second controller (Should).  
-2. Freeze timeseries format lean (Parquet) when MC artifacts need it (NPZ today).  
-3. Pick alternate controller type (PID cascade vs geometric) before Phase 5 ends.
+1. Phase 6 non-waypoint guidance.  
+2. Freeze timeseries format lean (Parquet) when needed (NPZ today).
 
 ### Later (post-core, prioritize by portfolio need)
 1. Phase 6 non-waypoint guidance (geometric is a likely first step).  
@@ -123,8 +123,8 @@ Use as a living board (check off in PRs or edit this file).
 - [x] Single-run `report` / figures consumer  
 
 ### M4 — Systems demo
-- [ ] Container runs a documented study  
-- [ ] Sharded MC merge matches local (soft tolerance)  
+- [x] Container runs a documented study  
+- [x] Sharded MC merge matches local (soft tolerance)  
 
 ### M5 — Workflow without hardware
 - [ ] Controller export round-trip  
@@ -202,3 +202,4 @@ Per `GROK.md` GSD: non-trivial work gets a SPEC note before a large implementati
 | 2026-07-18 | Phase 1 / M1 complete: hover SIL, LQR, run artifacts, `uavsim simulate` |
 | 2026-07-18 | Phase 2 / M2 complete: waypoints, Akima interp, min-snap, auto, feasibility, registries |
 | 2026-07-18 | Phase 3 / M3 complete: local MC, `uavsim study`/`report`, trial table + summary |
+| 2026-07-18 | Phase 4 / M4 complete: Docker image, sharded MC + merge, compose demo |

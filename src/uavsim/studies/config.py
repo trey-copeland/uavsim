@@ -81,13 +81,13 @@ class InitialStateConfig(BaseModel):
 
 
 class MonteCarloConfig(BaseModel):
-    """Local MC block. When enabled, ``uavsim study`` runs N perturbed trials."""
+    """MC block. When enabled, ``uavsim study`` runs N perturbed trials."""
 
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = False
     n_trials: int = Field(default=20, ge=1)
-    backend: Literal["local"] = "local"  # docker in Phase 4
+    backend: Literal["local", "docker"] = "local"
     shards: int = Field(default=1, ge=1)
     # Heritage default: design controller on nominal; plant is perturbed
     redesign_controller: bool = False

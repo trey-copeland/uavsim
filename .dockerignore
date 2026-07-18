@@ -1,0 +1,9 @@
+.git
+.venv
+runs
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+*.egg-info
+.mypy_cache

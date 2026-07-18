@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 
@@ -13,7 +13,10 @@ from uavsim.control.lqr import LqrHoverController
 from uavsim.guidance import HoldGuidance, WaypointsGuidance
 from uavsim.metrics import compute_metrics
 from uavsim.monte_carlo import (
+    partition_trials,
     run_monte_carlo,
+    write_merged_mc_artifacts,
+    write_shard_artifacts,
     write_trials_csv,
     write_trials_json,
 )
@@ -37,6 +40,8 @@ from uavsim.studies.config import (
 )
 from uavsim.vehicles.params import VehicleParams, load_vehicle
 
+BackendName = Literal["local", "docker"]
+
 
 @dataclass
 class StudyRunResult:
@@ -46,6 +51,8 @@ class StudyRunResult:
     feasibility: dict[str, Any] | None = None
     mc_summary: dict[str, Any] | None = None
     n_trials: int = 0
+    n_shards: int = 1
+    backend: str = "local"
 
 
 @dataclass
@@ -201,77 +208,237 @@ def _metric_row(metrics: dict[str, Any]) -> dict[str, Any]:
     return {k: metrics[k] for k in keys if k in metrics}
 
 
+def _make_trial_fn(prepared: PreparedStudy):
+    cfg = prepared.cfg
+    redesign = cfg.monte_carlo.redesign_controller
+    q = np.asarray(cfg.controller.Q_diag, dtype=float)
+    r = np.asarray(cfg.controller.R_diag, dtype=float)
+
+    def trial_fn(
+        trial_id: int,
+        plant_vehicle: VehicleParams,
+        _params: dict[str, float],
+    ) -> dict[str, Any]:
+        if redesign:
+            ctrl = design_lqr_hover(
+                plant_vehicle,
+                q_diag=q,
+                r_diag=r,
+                controller_id=cfg.controller.type,
+            )
+        else:
+            ctrl = prepared.controller
+        _sim, m = run_closed_loop_trial(prepared, plant_vehicle, controller=ctrl)
+        return _metric_row(m)
+
+    return trial_fn
+
+
+def run_mc_for_prepared(
+    prepared: PreparedStudy,
+    *,
+    n_shards: int = 1,
+    shards_root: Path | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any], Any]:
+    """
+    Run MC trials for a prepared study, optionally partitioned into shards.
+
+    When ``n_shards > 1`` and ``shards_root`` is set, intermediate shard
+    artifacts are written under ``shards_root/shard_XX/``.
+    """
+    cfg = prepared.cfg
+    n_trials = cfg.monte_carlo.n_trials
+    redesign = cfg.monte_carlo.redesign_controller
+    trial_fn = _make_trial_fn(prepared)
+    plan = partition_trials(n_trials, n_shards)
+
+    all_trials: list[dict[str, Any]] = []
+    for shard_id in range(n_shards):
+        ids = plan.trial_ids(shard_id)
+        if not ids:
+            shard_trials: list[dict[str, Any]] = []
+        else:
+            mc_result = run_monte_carlo(
+                nominal_vehicle=prepared.vehicle_nominal,
+                base_seed=cfg.seed,
+                n_trials=n_trials,
+                trial_fn=trial_fn,
+                spec=cfg.monte_carlo.perturbation_spec(),
+                redesign_controller=redesign,
+                trial_ids=ids,
+            )
+            shard_trials = mc_result.trials
+        all_trials.extend(shard_trials)
+        if shards_root is not None and n_shards > 1:
+            write_shard_artifacts(
+                Path(shards_root) / f"shard_{shard_id:02d}",
+                shard_id=shard_id,
+                n_shards=n_shards,
+                trials=shard_trials,
+                plan=plan,
+                extra_meta={"base_seed": cfg.seed, "study_id": cfg.study_id},
+            )
+
+    all_trials.sort(key=lambda r: int(r["trial_id"]))
+    from uavsim.monte_carlo import summarize_trials
+
+    summary = summarize_trials(all_trials)
+    summary["redesign_controller"] = redesign
+    summary["base_seed"] = int(cfg.seed)
+    summary["n_shards"] = n_shards
+    return all_trials, summary, plan
+
+
+def run_mc_shard_only(
+    study_path: str | Path,
+    *,
+    shard_id: int,
+    n_shards: int,
+    output_dir: str | Path,
+    n_trials_override: int | None = None,
+) -> Path:
+    """
+    Worker entry: run one shard's trials and write artifacts under ``output_dir``.
+
+    Does not run nominal sim or write a full run directory.
+    """
+    cfg, vehicle_path, cfg_hash, _ = load_study(study_path)
+    if n_trials_override is not None:
+        cfg.monte_carlo.n_trials = n_trials_override
+    if not cfg.monte_carlo.enabled:
+        cfg.monte_carlo.enabled = True
+    prepared = prepare_study(cfg, vehicle_path, cfg_hash)
+    plan = partition_trials(cfg.monte_carlo.n_trials, n_shards)
+    ids = plan.trial_ids(shard_id)
+    trial_fn = _make_trial_fn(prepared)
+    if ids:
+        mc_result = run_monte_carlo(
+            nominal_vehicle=prepared.vehicle_nominal,
+            base_seed=cfg.seed,
+            n_trials=cfg.monte_carlo.n_trials,
+            trial_fn=trial_fn,
+            spec=cfg.monte_carlo.perturbation_spec(),
+            redesign_controller=cfg.monte_carlo.redesign_controller,
+            trial_ids=ids,
+        )
+        trials = mc_result.trials
+    else:
+        trials = []
+    out = write_shard_artifacts(
+        Path(output_dir),
+        shard_id=shard_id,
+        n_shards=n_shards,
+        trials=trials,
+        plan=plan,
+        extra_meta={
+            "base_seed": cfg.seed,
+            "study_id": cfg.study_id,
+            "config_hash": cfg_hash,
+        },
+    )
+    return out
+
+
 def run_nominal_study(
     study_path: str | Path,
     *,
     output_root: str | Path = "runs",
     run_mc: bool | None = None,
     n_trials_override: int | None = None,
+    backend: BackendName | None = None,
+    n_shards: int | None = None,
+    docker_image: str | None = None,
+    repo_root: Path | None = None,
 ) -> StudyRunResult:
     """
     Run nominal SIL study (+ optional MC if config enables it).
 
-    ``run_mc``: None → follow config; True/False force enable/disable MC.
-    ``n_trials_override``: if set, overrides ``monte_carlo.n_trials``.
+    ``backend`` / ``n_shards`` override config when provided.
+    ``docker`` backend runs the whole study inside a container (local sharding inside).
     """
+    study_path = Path(study_path)
     cfg, vehicle_path, cfg_hash, _mission_path = load_study(study_path)
     if n_trials_override is not None:
         if n_trials_override < 1:
             msg = "n_trials_override must be >= 1"
             raise ValueError(msg)
         cfg.monte_carlo.n_trials = n_trials_override
-    prepared = prepare_study(cfg, vehicle_path, cfg_hash)
+    if n_shards is not None:
+        if n_shards < 1:
+            msg = "n_shards must be >= 1"
+            raise ValueError(msg)
+        cfg.monte_carlo.shards = n_shards
+    if backend is not None:
+        cfg.monte_carlo.backend = backend
 
+    do_mc = cfg.monte_carlo.enabled if run_mc is None else run_mc
+    resolved_backend: BackendName = cfg.monte_carlo.backend if do_mc else "local"
+    shards = cfg.monte_carlo.shards if do_mc else 1
+
+    # Docker path: execute study inside container with local backend
+    if do_mc and resolved_backend == "docker":
+        from uavsim.monte_carlo.docker_run import docker_available, docker_study
+
+        if not docker_available():
+            msg = "Docker backend requested but docker is not available"
+            raise RuntimeError(msg)
+        root = (repo_root or Path.cwd()).resolve()
+        out = Path(output_root)
+        if not out.is_absolute():
+            out = (root / out).resolve()
+        out.mkdir(parents=True, exist_ok=True)
+        result = docker_study(
+            study_path.resolve(),
+            repo_root=root,
+            output_root=out,
+            image=docker_image,
+            n_trials=cfg.monte_carlo.n_trials if n_trials_override is not None else None,
+            force_mc=run_mc if run_mc is not None else (True if do_mc else None),
+            shards=shards,
+        )
+        if result["returncode"] != 0:
+            msg = (
+                f"Docker study failed (code {result['returncode']}):\n"
+                f"{result['stderr'] or result['stdout']}"
+            )
+            raise RuntimeError(msg)
+        # Discover newest run dir for this study_id
+        runs = sorted(out.glob(f"{cfg.study_id}_*"), key=lambda p: p.stat().st_mtime)
+        if not runs:
+            msg = f"Docker study succeeded but no run dir found under {out}"
+            raise RuntimeError(msg)
+        run_dir = runs[-1]
+        metrics = {}
+        metrics_path = run_dir / "nominal" / "metrics.json"
+        if metrics_path.is_file():
+            import json
+
+            metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+        mc_summary = None
+        summary_path = run_dir / "monte_carlo" / "summary.json"
+        if summary_path.is_file():
+            import json
+
+            mc_summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        return StudyRunResult(
+            run_dir=run_dir,
+            metrics=metrics,
+            success=bool(metrics.get("success", True)),
+            mc_summary=mc_summary,
+            n_trials=int(mc_summary["n_trials"]) if mc_summary else 0,
+            n_shards=shards,
+            backend="docker",
+        )
+
+    prepared = prepare_study(cfg, vehicle_path, cfg_hash)
     sim_result, metrics = run_closed_loop_trial(prepared, prepared.vehicle_nominal)
     metrics["feasibility_ok"] = prepared.feasibility.ok
     overall_ok = bool(sim_result.success and metrics.get("success", False))
 
-    do_mc = cfg.monte_carlo.enabled if run_mc is None else run_mc
-    if do_mc and cfg.monte_carlo.backend != "local":
-        msg = f"MC backend {cfg.monte_carlo.backend!r} not implemented (Phase 4 for docker)"
-        raise NotImplementedError(msg)
-    if do_mc and cfg.monte_carlo.shards != 1:
-        msg = "Local MC with shards>1 is Phase 4; use shards: 1 for Phase 3"
-        raise NotImplementedError(msg)
-
     mc_summary: dict[str, Any] | None = None
     n_trials = 0
     mc_trials: list[dict[str, Any]] = []
-
-    if do_mc:
-        mc_cfg = cfg.monte_carlo
-        n_trials = mc_cfg.n_trials
-        redesign = mc_cfg.redesign_controller
-        q = np.asarray(cfg.controller.Q_diag, dtype=float)
-        r = np.asarray(cfg.controller.R_diag, dtype=float)
-
-        def trial_fn(
-            trial_id: int,
-            plant_vehicle: VehicleParams,
-            _params: dict[str, float],
-        ) -> dict[str, Any]:
-            if redesign:
-                ctrl = design_lqr_hover(
-                    plant_vehicle,
-                    q_diag=q,
-                    r_diag=r,
-                    controller_id=cfg.controller.type,
-                )
-            else:
-                ctrl = prepared.controller
-            _sim, m = run_closed_loop_trial(prepared, plant_vehicle, controller=ctrl)
-            return _metric_row(m)
-
-        mc_result = run_monte_carlo(
-            nominal_vehicle=prepared.vehicle_nominal,
-            base_seed=cfg.seed,
-            n_trials=n_trials,
-            trial_fn=trial_fn,
-            spec=mc_cfg.perturbation_spec(),
-            redesign_controller=redesign,
-        )
-        mc_trials = mc_result.trials
-        mc_summary = mc_result.summary
+    plan = None
 
     run_dir = create_run_directory(output_root, cfg.study_id)
     write_yaml(run_dir / "study_config.yaml", cfg.model_dump())
@@ -290,12 +457,21 @@ def run_nominal_study(
         },
     )
 
-    if do_mc and mc_summary is not None:
+    if do_mc:
+        n_trials = cfg.monte_carlo.n_trials
         mc_dir = run_dir / "monte_carlo"
-        mc_dir.mkdir(exist_ok=True)
-        write_trials_csv(mc_dir / "trials.csv", mc_trials)
-        write_trials_json(mc_dir / "trials.json", mc_trials)
-        write_json(mc_dir / "summary.json", mc_summary)
+        shards_root = mc_dir / "shards" if shards > 1 else None
+        mc_trials, mc_summary, plan = run_mc_for_prepared(
+            prepared,
+            n_shards=shards,
+            shards_root=shards_root,
+        )
+        write_merged_mc_artifacts(mc_dir, mc_trials, mc_summary, plan=plan if shards > 1 else None)
+        # Keep single-shard path writing same layout as Phase 3
+        if shards == 1:
+            write_trials_csv(mc_dir / "trials.csv", mc_trials)
+            write_trials_json(mc_dir / "trials.json", mc_trials)
+            write_json(mc_dir / "summary.json", mc_summary)
 
     write_text_report(
         run_dir,
@@ -319,8 +495,9 @@ def run_nominal_study(
             "monte_carlo_enabled": bool(do_mc),
             "execution": {
                 "mode": "local",
-                "shards": 1,
-                "backend": "local" if do_mc else "nominal_only",
+                "shards": shards if do_mc else 1,
+                "backend": resolved_backend if do_mc else "nominal_only",
+                "shard_plan": plan.to_dict() if plan is not None and shards > 1 else None,
             },
         },
     )
@@ -332,6 +509,8 @@ def run_nominal_study(
         feasibility=prepared.feasibility.to_dict(),
         mc_summary=mc_summary,
         n_trials=n_trials if do_mc else 0,
+        n_shards=shards if do_mc else 1,
+        backend=resolved_backend if do_mc else "local",
     )
 
 
@@ -341,6 +520,10 @@ def run_study(
     output_root: str | Path = "runs",
     force_mc: bool | None = None,
     n_trials_override: int | None = None,
+    backend: BackendName | None = None,
+    n_shards: int | None = None,
+    docker_image: str | None = None,
+    repo_root: Path | None = None,
 ) -> StudyRunResult:
     """CLI entry for ``uavsim study`` (MC when enabled in config)."""
     return run_nominal_study(
@@ -348,4 +531,8 @@ def run_study(
         output_root=output_root,
         run_mc=force_mc,
         n_trials_override=n_trials_override,
+        backend=backend,
+        n_shards=n_shards,
+        docker_image=docker_image,
+        repo_root=repo_root,
     )
