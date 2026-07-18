@@ -63,9 +63,7 @@ def test_merge_shard_directories(tmp_path: Path) -> None:
         ],
         plan=plan,
     )
-    trials, summary = merge_shard_directories(
-        [d0, d1], expected_n_trials=4, base_seed=7
-    )
+    trials, summary = merge_shard_directories([d0, d1], expected_n_trials=4, base_seed=7)
     assert [t["trial_id"] for t in trials] == [0, 1, 2, 3]
     assert summary["n_trials"] == 4
     assert summary["n_success"] == 3

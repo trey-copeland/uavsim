@@ -1,0 +1,32 @@
+# Companion study: run this for PID, and gentle_square.yaml for LQR, then:
+#   uavsim compare runs/<lqr_run> runs/<pid_run>
+# Same mission/vehicle as configs/studies/gentle_square.yaml (LQR baseline).
+schema_version: 1
+study_id: compare_lqr_vs_pid
+seed: 0
+
+vehicle: configs/vehicles/default_quadrotor.yaml
+
+controller:
+  type: pid_cascade
+  kp_pos: [2.5, 2.5, 6.0]
+  kd_pos: [2.0, 2.0, 3.5]
+  kp_att: [8.0, 8.0, 2.0]
+  kd_rate: [0.8, 0.8, 0.4]
+  max_tilt_rad: 0.436
+
+guidance:
+  type: waypoints
+  mission_file: configs/missions/gentle_square.yaml
+  method: auto
+  yaw_mode: constant
+  sample_dt_s: 0.01
+
+sim:
+  dt_s: 0.01
+  method: rk45
+  rtol: 1.0e-5
+  atol: 1.0e-7
+
+metrics:
+  position_bound_m: 0.75

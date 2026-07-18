@@ -164,9 +164,7 @@ def _path_in_container(path: Path, repo_root: Path, *, work_mount: str) -> str:
     return f"{work_mount}/{rel.as_posix()}"
 
 
-def _output_mount(
-    output_root: Path, repo_root: Path
-) -> tuple[str, list[tuple[Path, str]]]:
+def _output_mount(output_root: Path, repo_root: Path) -> tuple[str, list[tuple[Path, str]]]:
     """Return (container output path, extra volume mounts)."""
     root = repo_root.resolve()
     try:

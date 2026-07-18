@@ -16,4 +16,3 @@ __all__ = [
     "run_nominal_study",
     "run_study",
 ]
-

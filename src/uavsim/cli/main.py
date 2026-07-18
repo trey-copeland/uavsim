@@ -127,16 +127,35 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_export = sub.add_parser(
         "export-controller",
-        help="Export a versioned controller artifact from a run or design",
+        help="Export a versioned controller artifact from a run directory",
     )
-    p_export.add_argument("source", nargs="?", help="Run dir or design path (Phase 5+)")
+    p_export.add_argument(
+        "source", type=Path, help="Run directory containing nominal/controller_artifact.yaml"
+    )
+    p_export.add_argument(
+        "--out",
+        type=Path,
+        required=True,
+        help="Output path for controller artifact YAML",
+    )
 
     p_compare = sub.add_parser(
         "compare",
         help="Compare two run directories (metrics + overlays)",
     )
-    p_compare.add_argument("run_a", nargs="?", help="First run directory (Phase 5+)")
-    p_compare.add_argument("run_b", nargs="?", help="Second run directory (Phase 5+)")
+    p_compare.add_argument("run_a", type=Path, help="First run directory")
+    p_compare.add_argument("run_b", type=Path, help="Second run directory")
+    p_compare.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Output directory for compare artifacts (default: runs/compare_<a>_vs_<b>)",
+    )
+    p_compare.add_argument(
+        "--no-figures",
+        action="store_true",
+        help="Skip overlay figures",
+    )
 
     p_hil = sub.add_parser("hil", help="Hardware-in-the-loop session (post-core)")
     p_hil.add_argument("study", nargs="?", help="Path to study YAML (Phase 7+)")
@@ -173,10 +192,7 @@ def _print_study_result(result: Any) -> None:
         )
         rmse = (s.get("metrics") or {}).get("rmse_position_m") or {}
         if rmse:
-            print(
-                f"  MC rmse_pos mean={rmse.get('mean'):.4f}  "
-                f"p95={rmse.get('p95'):.4f} m"
-            )
+            print(f"  MC rmse_pos mean={rmse.get('mean'):.4f}  p95={rmse.get('p95'):.4f} m")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -297,9 +313,45 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  figure={fig}")
         return 0
 
+    if args.command == "export-controller":
+        from uavsim.control import export_from_run_dir
+
+        source = Path(args.source)
+        if not source.is_dir():
+            print(f"Run directory not found: {source}", file=sys.stderr)
+            return 1
+        try:
+            out = export_from_run_dir(source, args.out)
+        except (FileNotFoundError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"[OK] controller artifact → {out}")
+        return 0
+
+    if args.command == "compare":
+        from uavsim.viz import compare_runs
+
+        if not Path(args.run_a).is_dir() or not Path(args.run_b).is_dir():
+            print("Both run directories must exist", file=sys.stderr)
+            return 1
+        try:
+            cmp = compare_runs(
+                args.run_a,
+                args.run_b,
+                output_dir=args.output,
+                figures=not args.no_figures,
+            )
+        except (FileNotFoundError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"[OK] compare → {cmp.output_dir}")
+        print(f"  summary={cmp.summary_md}")
+        print(f"  deltas={cmp.delta_json}")
+        for fig in cmp.figures:
+            print(f"  figure={fig}")
+        return 0
+
     phase = {
-        "export-controller": "Phase 5+",
-        "compare": "Phase 5+",
         "hil": "Phase 7+",
     }.get(args.command, "future phase")
     return _not_implemented(args.command, phase)

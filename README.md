@@ -2,7 +2,7 @@
 
 Modern **quadrotor simulation and GNC analysis** framework for portfolio-quality demos: flight dynamics (NED), guidance, control, Monte Carlo robustness, and reproducible study pipelines — including containerized and sharded execution.
 
-**Status:** Phase 4 complete — Docker study image, sharded MC assemble, compose worker demo. Phase 5 is export + compare.  
+**Status:** Phase 5 complete — controller export, `compare`, PID cascade second law; core SIL workflow story is shippable. Post-core: non-waypoint nav (Phase 6), HIL (Phase 7).  
 
 **Intended workflow:** configure vehicle → inject dynamics → design/analyze control in SIL → export controller → (later) HIL → compare runs. Implementation follows `docs/ARCHITECTURE.md`.
 
@@ -58,6 +58,12 @@ uv run uavsim study configs/studies/hover_mc_smoke.yaml --shards 2
 docker build -t uavsim:local -f containers/Dockerfile .
 docker run --rm -v "$PWD":/work -w /work uavsim:local \
   study configs/studies/hover_mc_smoke.yaml --output runs
+
+# Export + compare + second controller (Phase 5)
+uv run uavsim simulate configs/studies/gentle_square.yaml
+uv run uavsim simulate configs/studies/compare_lqr_vs_pid.yaml
+uv run uavsim export-controller runs/<lqr_run> --out artifacts/controllers/lqr.yaml
+uv run uavsim compare runs/<lqr_run> runs/<pid_run> --figures
 ```
 
 Run artifacts land under `runs/<study_id>_<timestamp>/` (gitignored). Monte Carlo writes `monte_carlo/trials.csv`, `summary.json`. Figures need `uv sync --extra viz` (or `--extra dev`). Container details: [`docs/containers.md`](docs/containers.md).

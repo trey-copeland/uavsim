@@ -8,8 +8,10 @@ from typing import Any, Literal
 
 import numpy as np
 
-from uavsim.control import design_lqr_hover
+from uavsim.control.export import write_controller_artifact
+from uavsim.control.factory import build_controller_from_mapping, controller_artifact_for
 from uavsim.control.lqr import LqrHoverController
+from uavsim.control.pid import PidCascadeController
 from uavsim.guidance import HoldGuidance, WaypointsGuidance
 from uavsim.metrics import compute_metrics
 from uavsim.monte_carlo import (
@@ -41,6 +43,7 @@ from uavsim.studies.config import (
 from uavsim.vehicles.params import VehicleParams, load_vehicle
 
 BackendName = Literal["local", "docker"]
+AnyController = LqrHoverController | PidCascadeController
 
 
 @dataclass
@@ -61,7 +64,7 @@ class PreparedStudy:
     vehicle_nominal: VehicleParams
     vehicle_path: Path
     cfg_hash: str
-    controller: LqrHoverController
+    controller: AnyController
     reference: ReferenceTrajectory
     feasibility: Any
     plan_diagnostics: dict[str, Any]
@@ -85,12 +88,7 @@ def _build_guidance(cfg: StudyConfig) -> Any:
 
 def prepare_study(cfg: StudyConfig, vehicle_path: Path, cfg_hash: str) -> PreparedStudy:
     vehicle = load_vehicle(vehicle_path)
-    controller = design_lqr_hover(
-        vehicle,
-        q_diag=np.asarray(cfg.controller.Q_diag, dtype=float),
-        r_diag=np.asarray(cfg.controller.R_diag, dtype=float),
-        controller_id=cfg.controller.type,
-    )
+    controller = build_controller_from_mapping(cfg.controller, vehicle)
     backend = _build_guidance(cfg)
     plan = backend.plan(guidance_mission_dict(cfg), vehicle)
     reference = plan.reference
@@ -114,7 +112,7 @@ def prepare_study(cfg: StudyConfig, vehicle_path: Path, cfg_hash: str) -> Prepar
 def run_closed_loop_trial(
     prepared: PreparedStudy,
     plant_vehicle: VehicleParams,
-    controller: LqrHoverController | None = None,
+    controller: AnyController | None = None,
 ) -> tuple[ClosedLoopResult, dict[str, Any]]:
     """Simulate one closed-loop run; returns (sim_result, metrics)."""
     ctrl = controller if controller is not None else prepared.controller
@@ -211,8 +209,6 @@ def _metric_row(metrics: dict[str, Any]) -> dict[str, Any]:
 def _make_trial_fn(prepared: PreparedStudy):
     cfg = prepared.cfg
     redesign = cfg.monte_carlo.redesign_controller
-    q = np.asarray(cfg.controller.Q_diag, dtype=float)
-    r = np.asarray(cfg.controller.R_diag, dtype=float)
 
     def trial_fn(
         trial_id: int,
@@ -220,12 +216,7 @@ def _make_trial_fn(prepared: PreparedStudy):
         _params: dict[str, float],
     ) -> dict[str, Any]:
         if redesign:
-            ctrl = design_lqr_hover(
-                plant_vehicle,
-                q_diag=q,
-                r_diag=r,
-                controller_id=cfg.controller.type,
-            )
+            ctrl = build_controller_from_mapping(cfg.controller, plant_vehicle)
         else:
             ctrl = prepared.controller
         _sim, m = run_closed_loop_trial(prepared, plant_vehicle, controller=ctrl)
@@ -445,16 +436,20 @@ def run_nominal_study(
     _write_reference_artifacts(run_dir, prepared)
     write_nominal_timeseries(run_dir, sim_result.t, sim_result.x, sim_result.u)
     write_json(run_dir / "nominal" / "metrics.json", metrics)
-    write_json(
-        run_dir / "nominal" / "controller.json",
-        {
-            "id": prepared.controller.id,
-            "K_shape": list(prepared.controller.k.shape),
-            "poles_real_max": float(np.max(np.real(prepared.controller.poles))),
-            "u_hover": prepared.controller.u_hover.tolist(),
-            "design_vehicle_id": prepared.vehicle_nominal.vehicle_id,
-            "mc_redesign_controller": bool(do_mc and cfg.monte_carlo.redesign_controller),
-        },
+    ctrl_summary: dict[str, Any] = {
+        "id": prepared.controller.id,
+        "type": cfg.controller.type,
+        "u_hover": prepared.controller.u_hover.tolist(),
+        "design_vehicle_id": prepared.vehicle_nominal.vehicle_id,
+        "mc_redesign_controller": bool(do_mc and cfg.monte_carlo.redesign_controller),
+    }
+    if isinstance(prepared.controller, LqrHoverController):
+        ctrl_summary["K_shape"] = list(prepared.controller.k.shape)
+        ctrl_summary["poles_real_max"] = float(np.max(np.real(prepared.controller.poles)))
+    write_json(run_dir / "nominal" / "controller.json", ctrl_summary)
+    write_controller_artifact(
+        run_dir / "nominal" / "controller_artifact.yaml",
+        controller_artifact_for(prepared.controller, prepared.vehicle_nominal),
     )
 
     if do_mc:

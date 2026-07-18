@@ -1,0 +1,34 @@
+schema_version: 1
+study_id: hover_pid
+seed: 0
+
+vehicle: configs/vehicles/default_quadrotor.yaml
+
+controller:
+  type: pid_cascade
+  kp_pos: [2.5, 2.5, 6.0]
+  kd_pos: [2.0, 2.0, 3.5]
+  kp_att: [8.0, 8.0, 2.0]
+  kd_rate: [0.8, 0.8, 0.4]
+  max_tilt_rad: 0.436
+
+guidance:
+  type: hold
+  position_ned_m: [0.0, 0.0, 0.0]
+  yaw_rad: 0.0
+  duration_s: 5.0
+
+initial_state:
+  position_ned_m: [0.3, -0.2, 0.15]
+  euler_rad: [0.0, 0.0, 0.0]
+  velocity_ned_m_s: [0.0, 0.0, 0.0]
+  omega_body_rad_s: [0.0, 0.0, 0.0]
+
+sim:
+  dt_s: 0.01
+  method: rk45
+  rtol: 1.0e-6
+  atol: 1.0e-8
+
+metrics:
+  position_bound_m: 0.2

@@ -31,8 +31,7 @@ class ShardPlan:
             "n_trials": self.n_trials,
             "n_shards": self.n_shards,
             "ranges": [
-                {"shard_id": i, "start": s, "end": e}
-                for i, (s, e) in enumerate(self.ranges)
+                {"shard_id": i, "start": s, "end": e} for i, (s, e) in enumerate(self.ranges)
             ],
         }
 

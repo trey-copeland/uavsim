@@ -14,12 +14,31 @@ from uavsim.dynamics import STATE_DIM
 from uavsim.monte_carlo import PerturbationSpec
 
 
-class ControllerConfig(BaseModel):
+class LqrControllerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["lqr_hover"] = "lqr_hover"
     Q_diag: list[float] = Field(min_length=12, max_length=12)
     R_diag: list[float] = Field(min_length=4, max_length=4)
+
+
+class PidControllerConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["pid_cascade"] = "pid_cascade"
+    kp_pos: list[float] = Field(default_factory=lambda: [2.5, 2.5, 6.0], min_length=3, max_length=3)
+    kd_pos: list[float] = Field(default_factory=lambda: [2.0, 2.0, 3.5], min_length=3, max_length=3)
+    kp_att: list[float] = Field(default_factory=lambda: [8.0, 8.0, 2.0], min_length=3, max_length=3)
+    kd_rate: list[float] = Field(
+        default_factory=lambda: [0.8, 0.8, 0.4], min_length=3, max_length=3
+    )
+    max_tilt_rad: float = Field(default=0.436, gt=0)  # ~25 deg
+
+
+ControllerConfig = Annotated[
+    LqrControllerConfig | PidControllerConfig,
+    Field(discriminator="type"),
+]
 
 
 class HoldGuidanceConfig(BaseModel):

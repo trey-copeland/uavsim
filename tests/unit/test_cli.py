@@ -52,6 +52,11 @@ def test_report_missing_dir_returns_1(capsys: pytest.CaptureFixture[str]) -> Non
     assert "not found" in capsys.readouterr().err
 
 
+def test_compare_missing_dirs_returns_1(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["compare", "a", "b"]) == 1
+    assert "exist" in capsys.readouterr().err
+
+
 def test_simulate_missing_file_returns_1(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["simulate", "does_not_exist.yaml"]) == 1
     assert "not found" in capsys.readouterr().err
