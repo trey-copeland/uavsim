@@ -769,6 +769,7 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | Doc | Owner |
 |-----|--------|
 | `SPEC.md` | Product requirements / acceptance |
+| `ROADMAP.md` | Sequencing / milestones |
 | `docs/ARCHITECTURE.md` | This file |
 | `GROK.md` | Process |
 | `docs/theory.md` (later) | Frames, linearization, LQR, min-snap pointer |

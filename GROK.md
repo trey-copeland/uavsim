@@ -21,6 +21,7 @@ Public **quadrotor simulation & GNC framework** for portfolio-quality demos: dyn
 | Doc | Role |
 |-----|------|
 | `SPEC.md` | What/why: workflow, user stories, MoSCoW, acceptance (v0.2+) |
+| `ROADMAP.md` | Sequencing, milestones, now/next/later |
 | `GROK.md` | How we work (this file) |
 | `docs/ARCHITECTURE.md` | How: packages, protocols, SIL/HIL seams, results/compare |
 | `README.md` | Human entry / project status |
@@ -40,7 +41,7 @@ vehicle → dynamics → SIL design/analyze → export controller → HIL → co
 - Define **Success Criteria** (measurable outcomes).
 - Break into small, shippable increments.
 - Identify risks, dependencies, and effort level.
-- Output: Short roadmap note (can live in `SPEC.md` or `ROADMAP.md`).
+- Output: Update **`ROADMAP.md`** (milestones / now-next-later); keep `SPEC.md` for requirements.
 
 #### SPEC / Design Phase (Mandatory for non-trivial work)
 - Update or create relevant section in `SPEC.md`.
@@ -178,16 +179,11 @@ Carry these from SPEC §7; architecture doc will refine layout.
 
 ## 7. Near-term process (stand-up path)
 
-**Done:** SPEC refinement (v0.1.1), architecture map (`docs/ARCHITECTURE.md`), process docs, MIT license.
+**Done:** SPEC v0.2+, architecture v0.4, `ROADMAP.md`, process docs, MIT license.
 
-**Next:**
+**Next:** see **`ROADMAP.md`** (Phase 0 skeleton → Phase 1 SIL).
 
-1. **Repo skeleton** — `pyproject` / `uv`, package `uavsim`, pytest, ruff, CI stub, thin CLI.
-2. **Phase 1** — vehicle, dynamics, LQR, minimal reference path, run artifacts (`uavsim simulate`).
-3. **Language conventions** — add to `GROK.md` or `.grok/rules/` once the Python tree exists.
-4. Continue SPEC phases 2–6 (guidance quality, MC, systems, polish, nav expansion).
-
-Prefer implementing against `docs/ARCHITECTURE.md`; if reality forces a change, update ARCH in the same PR.
+Prefer implementing against `docs/ARCHITECTURE.md`; if reality forces a change, update ARCH + ROADMAP in the same change set.
 
 ---
 

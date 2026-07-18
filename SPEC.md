@@ -2,7 +2,7 @@
 
 **Working title / repo:** `quadrotor-sim`  
 **CLI / product name:** `uavsim`  
-**Status:** Living core specification (v0.2)  
+**Status:** Living core specification (v0.2.1)  
 **Author:** Trey Copeland  
 **Last updated:** 2026-07-18  
 **License (intent):** MIT  
@@ -12,6 +12,7 @@
 | Doc | Role |
 |-----|------|
 | `SPEC.md` (this file) | What / why / scope / acceptance |
+| `ROADMAP.md` | Sequencing, milestones, now/next/later |
 | `GROK.md` | How we work (GSD, tests, heritage rules) |
 | `docs/ARCHITECTURE.md` | Languages layout, packages, FFI, module APIs |
 | Language conventions (TBD) | Per-language tooling and idioms |
@@ -896,9 +897,9 @@ Refinement of numerics and exact orchestration tooling is expected during implem
 
 ## 19. Implementation phases (guidance)
 
-Phases are sequential **capability gates**, not strict calendar. Systems work is **pulled forward** relative to v0 (not left as Phase 4 garnish).
+**Living checklist and now/next/later:** [`ROADMAP.md`](ROADMAP.md).
 
-Phases map to user-story epics (A–F). Systems work is pulled forward (not left as garnish).
+Phases are sequential **capability gates**, not strict calendar. Systems work is **pulled forward** relative to v0 (not left as Phase 4 garnish). Phases map to user-story epics (A–F).
 
 ### Phase 0 — Stand-up
 - Repo skeleton, packaging (`uv`/`pyproject`), lint, test harness, CI stub  
@@ -961,6 +962,7 @@ Phases map to user-story epics (A–F). Systems work is pulled forward (not left
 | v0.1.4 | 2026-07-18 | HIL-ready architecture intent: SIL-first; plant I/O vs control-law seams; C6–C7; Phase 7; principle §7.11 |
 | v0.1.5 | 2026-07-18 | Primary workflow §1.3; user stories §1.4 (epics A–F); export/compare CLI; S5a/C8/C9 |
 | v0.2 | 2026-07-18 | Refined expectations §1.3.1; closed decisions for layout/workflow/export/compare; S9–S11; phased epic map; core acceptance includes export + multi-run compare Shoulds |
+| v0.2.1 | 2026-07-18 | Link `ROADMAP.md` as sequencing home; §19 points to roadmap |
 
 ---
 

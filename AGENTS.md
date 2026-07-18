@@ -22,6 +22,7 @@ Key obligations:
 | Doc | Role |
 |-----|------|
 | [`SPEC.md`](SPEC.md) | Product intent, user stories, acceptance (v0.2+) |
+| [`ROADMAP.md`](ROADMAP.md) | Sequencing, milestones, now/next/later |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Layout, protocols, SIL/HIL, compare/export |
 | [`GROK.md`](GROK.md) | Working agreements (process source of truth) |
 | [`README.md`](README.md) | Human entry / status |

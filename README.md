@@ -13,6 +13,7 @@ Modern **quadrotor simulation and GNC analysis** framework for portfolio-quality
 | Document | Role |
 |----------|------|
 | [`SPEC.md`](SPEC.md) | What we build, scope, acceptance |
+| [`ROADMAP.md`](ROADMAP.md) | Phases, milestones, now/next/later |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How we structure code, interfaces, systems |
 | [`GROK.md`](GROK.md) | How we work (GSD, tests, heritage rules) |
 | [`AGENTS.md`](AGENTS.md) | Agent entrypoint → `GROK.md` |
