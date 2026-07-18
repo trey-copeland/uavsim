@@ -40,11 +40,16 @@ def test_main_version(capsys: pytest.CaptureFixture[str]) -> None:
     assert __version__ in capsys.readouterr().out
 
 
-def test_unimplemented_command_returns_2(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["simulate"]) == 2
+def test_unimplemented_study_returns_2(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["study"]) == 2
     err = capsys.readouterr().err
     assert "not implemented" in err
-    assert "Phase 1" in err
+    assert "Phase 3" in err
+
+
+def test_simulate_missing_file_returns_1(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["simulate", "does_not_exist.yaml"]) == 1
+    assert "not found" in capsys.readouterr().err
 
 
 def test_console_script_help() -> None:

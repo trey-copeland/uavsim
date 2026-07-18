@@ -49,7 +49,8 @@ Ship when SPEC §17 holds, especially:
 | Architecture v0.4 | **Done** |
 | License / README / git baseline | **Done** |
 | Repo code skeleton (`uv`, `src/uavsim`, tests, CI) | **Done** (Phase 0) |
-| SIL / guidance / MC / systems / export / HIL | **Not started** ← **now Phase 1** |
+| Phase 1 SIL physics loop | **Done** |
+| Guidance / MC / systems / export / HIL | **Not started** ← **now Phase 2** |
 
 ---
 
@@ -75,12 +76,12 @@ Detail and MoSCoW: SPEC §6, §19. Module map: ARCH §3, §16.
 ## 5. Now / next / later
 
 ### Now
-1. **Phase 1** — vehicle, dynamics, LQR, trivial reference, SIL adapter, `uavsim simulate`, run artifacts.  
+1. **Phase 2** — waypoint guidance (interp / min-snap / feasibility), registries, ≥3 missions.  
 2. Keep SPEC/ARCH/ROADMAP in sync when decisions change.
 
 ### Next
-1. Phase 2 waypoint guidance (interp / min-snap / feasibility).  
-2. Freeze timeseries format lean (Parquet) when first artifacts land.  
+1. Phase 3 local MC + `uavsim study`.  
+2. Freeze timeseries format lean (Parquet) when MC artifacts need it (Phase 1 uses NPZ).  
 3. Pick alternate controller type (PID cascade vs geometric) before Phase 2 ends.
 
 ### Later (post-core, prioritize by portfolio need)
@@ -102,11 +103,11 @@ Use as a living board (check off in PRs or edit this file).
 - [x] Empty package modules match ARCH names  
 
 ### M1 — First SIL demo
-- [ ] Default vehicle config  
-- [ ] Nonlinear dynamics + hover LQR  
-- [ ] Minimal reference + closed-loop sim  
-- [ ] Run directory with metrics  
-- [ ] Unit tests: trim / basic invariants  
+- [x] Default vehicle config  
+- [x] Nonlinear dynamics + hover LQR  
+- [x] Minimal reference + closed-loop sim  
+- [x] Run directory with metrics  
+- [x] Unit tests: trim / basic invariants  
 
 ### M2 — Guidance portfolio path
 - [ ] Waypoint missions (hover, gentle, aggressive)  
@@ -196,3 +197,4 @@ Per `GROK.md` GSD: non-trivial work gets a SPEC note before a large implementati
 |------|--------|
 | 2026-07-18 | Initial roadmap from SPEC v0.2 / ARCH v0.4; M0–M7 checklist |
 | 2026-07-18 | Phase 0 / M0 complete; next is Phase 1 SIL |
+| 2026-07-18 | Phase 1 / M1 complete: hover SIL, LQR, run artifacts, `uavsim simulate` |

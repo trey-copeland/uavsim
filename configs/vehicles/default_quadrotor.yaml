@@ -1,0 +1,20 @@
+# Default 500 g class quadrotor (heritage ME590 scale)
+schema_version: 1
+vehicle_id: default_quadrotor
+
+mass_kg: 0.5
+gravity_m_s2: 9.81
+arm_length_m: 0.25
+
+inertia:
+  ixx_kg_m2: 0.0075
+  iyy_kg_m2: 0.0075
+  izz_kg_m2: 0.013
+
+# Actuator limits: thrust [N], body torques [N·m]
+# Torque authority sized so LQR can recover from modest offsets without
+# permanent saturation (heritage ±0.1 was too tight for these Q weights).
+limits:
+  thrust_min_n: 0.0
+  thrust_max_n: 9.81          # 2 * m * g with m=0.5
+  torque_max_nm: 1.0          # |τ| limit per axis

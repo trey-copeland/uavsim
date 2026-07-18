@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from uavsim import __version__
 
@@ -21,9 +22,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(dest="command", help="Available commands")
 
-    # Phase 1+: wired to library. Stubs document the intended surface.
     p_sim = sub.add_parser("simulate", help="Run a nominal closed-loop SIL study")
-    p_sim.add_argument("study", nargs="?", help="Path to study YAML (Phase 1+)")
+    p_sim.add_argument("study", type=Path, help="Path to study YAML")
+    p_sim.add_argument(
+        "--output",
+        type=Path,
+        default=Path("runs"),
+        help="Root directory for run artifacts (default: runs/)",
+    )
 
     p_study = sub.add_parser("study", help="Run a full study (e.g. Monte Carlo)")
     p_study.add_argument("study", nargs="?", help="Path to study YAML (Phase 3+)")
@@ -67,15 +73,31 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
 
+    if args.command == "simulate":
+        from uavsim.studies import run_nominal_study
+
+        study_path = Path(args.study)
+        if not study_path.is_file():
+            print(f"Study file not found: {study_path}", file=sys.stderr)
+            return 1
+        result = run_nominal_study(study_path, output_root=args.output)
+        status = "OK" if result.success else "FAILED"
+        print(f"[{status}] run_dir={result.run_dir}")
+        m = result.metrics
+        print(
+            f"  rmse_pos={m['rmse_position_m']:.4f} m  "
+            f"max_pos={m['max_position_error_m']:.4f} m  "
+            f"success={m['success']}"
+        )
+        return 0 if result.success else 1
+
     phase = {
-        "simulate": "Phase 1+",
         "study": "Phase 3+",
         "report": "Phase 3+",
         "export-controller": "Phase 5+",
         "compare": "Phase 5+",
         "hil": "Phase 7+",
     }.get(args.command, "future phase")
-
     return _not_implemented(args.command, phase)
 
 

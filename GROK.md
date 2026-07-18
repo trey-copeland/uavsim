@@ -181,7 +181,7 @@ Carry these from SPEC §7; architecture doc will refine layout.
 
 **Done:** SPEC v0.2+, architecture v0.4, `ROADMAP.md`, process docs, MIT license.
 
-**Next:** see **`ROADMAP.md`** (Phase 0 skeleton → Phase 1 SIL).
+**Next:** see **`ROADMAP.md`** (Phase 2 waypoint guidance).
 
 Prefer implementing against `docs/ARCHITECTURE.md`; if reality forces a change, update ARCH + ROADMAP in the same change set.
 

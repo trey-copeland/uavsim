@@ -1,0 +1,32 @@
+schema_version: 1
+study_id: hover_from_offset
+seed: 0
+
+vehicle: configs/vehicles/default_quadrotor.yaml
+
+controller:
+  type: lqr_hover
+  Q_diag: [100, 100, 100, 10, 10, 1, 10, 10, 10, 1, 1, 0.1]
+  R_diag: [0.1, 1.0, 1.0, 1.0]
+
+guidance:
+  type: hold
+  position_ned_m: [0.0, 0.0, 0.0]
+  yaw_rad: 0.0
+  duration_s: 8.0
+
+# Initial condition offset from reference (tests regulation)
+initial_state:
+  position_ned_m: [0.3, -0.2, 0.15]
+  euler_rad: [0.03, -0.02, 0.0]
+  velocity_ned_m_s: [0.0, 0.0, 0.0]
+  omega_body_rad_s: [0.0, 0.0, 0.0]
+
+sim:
+  dt_s: 0.01
+  method: rk45
+  rtol: 1.0e-6
+  atol: 1.0e-8
+
+metrics:
+  position_bound_m: 0.15

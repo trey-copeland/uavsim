@@ -2,7 +2,7 @@
 
 Modern **quadrotor simulation and GNC analysis** framework for portfolio-quality demos: flight dynamics (NED), guidance, control, Monte Carlo robustness, and reproducible study pipelines — including containerized and sharded execution.
 
-**Status:** Phase 0 complete — installable package + CLI stubs. Phase 1 (SIL loop) is next.  
+**Status:** Phase 1 complete — closed-loop hover SIL with LQR. Phase 2 (waypoint guidance) is next.  
 
 **Intended workflow:** configure vehicle → inject dynamics → design/analyze control in SIL → export controller → (later) HIL → compare runs. Implementation follows `docs/ARCHITECTURE.md`.
 
@@ -37,11 +37,13 @@ uv run pytest
 uv run ruff check src tests
 ```
 
-Simulation commands are stubbed until Phase 1+:
-
 ```bash
-# Phase 1+
+# Closed-loop hover (Phase 1)
 uv run uavsim simulate configs/studies/hover_nominal.yaml
+uv run uavsim simulate configs/studies/hover_from_offset.yaml
+
 # Phase 3+
-uv run uavsim study configs/studies/square_mc.yaml
+# uv run uavsim study configs/studies/square_mc.yaml
 ```
+
+Run artifacts land under `runs/<study_id>_<timestamp>/` (gitignored).
