@@ -20,11 +20,14 @@ Public **quadrotor simulation & GNC framework** for portfolio-quality demos: dyn
 
 | Doc | Role |
 |-----|------|
-| `SPEC.md` | What and why (capabilities, scope, non-goals) |
+| `SPEC.md` | What/why: workflow, user stories, MoSCoW, acceptance (v0.2+) |
 | `GROK.md` | How we work (this file) |
-| `docs/ARCHITECTURE.md` | How we structure code, protocols, systems, polyglot |
+| `docs/ARCHITECTURE.md` | How: packages, protocols, SIL/HIL seams, results/compare |
 | `README.md` | Human entry / project status |
 | Language convention notes (TBD) | Idioms, tooling, lint/format per language (after skeleton) |
+
+**Product workflow to honor in design reviews:**  
+vehicle → dynamics → SIL design/analyze → export controller → HIL → compare (SPEC §1.3).
 
 ---
 

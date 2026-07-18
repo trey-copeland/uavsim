@@ -9,7 +9,8 @@ Key obligations:
 - **Testing** — unit + integration; TDD default for new behavior; no MATLAB bit-parity
 - **Heritage** — domain reference only; **no runtime MATLAB dependency**
 - **Implementation map** — `docs/ARCHITECTURE.md` (packages, protocols, results, systems)
-- **Stand-up path** — architecture is in place → **repo skeleton** → Phase 1 physics/LQR loop
+- **Stand-up path** — design docs in place → **repo skeleton** → Phase 1 SIL loop
+- **Workflow** — vehicle → dynamics → SIL → export → HIL → compare (do not collapse plant I/O into control laws)
 
 ### Heritage path (domain only)
 
@@ -20,9 +21,9 @@ Key obligations:
 
 | Doc | Role |
 |-----|------|
-| [`SPEC.md`](SPEC.md) | Product intent, scope, acceptance |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Structure, interfaces, systems, polyglot |
-| [`GROK.md`](GROK.md) | Working agreements (source of truth for process) |
+| [`SPEC.md`](SPEC.md) | Product intent, user stories, acceptance (v0.2+) |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Layout, protocols, SIL/HIL, compare/export |
+| [`GROK.md`](GROK.md) | Working agreements (process source of truth) |
 | [`README.md`](README.md) | Human entry / status |
 
 Do not invent package layout that contradicts `docs/ARCHITECTURE.md`. Update SPEC/ARCH when product or structural decisions change.

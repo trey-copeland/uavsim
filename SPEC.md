@@ -2,7 +2,7 @@
 
 **Working title / repo:** `quadrotor-sim`  
 **CLI / product name:** `uavsim`  
-**Status:** Living core specification (v0.1.5)  
+**Status:** Living core specification (v0.2)  
 **Author:** Trey Copeland  
 **Last updated:** 2026-07-18  
 **License (intent):** MIT  
@@ -22,16 +22,24 @@
 
 | Topic | Decision |
 |-------|----------|
-| CLI / product name | **`uavsim`** (`simulate`, `study`, `report`, …) |
+| CLI / product name | **`uavsim`** (`simulate`, `study`, `report`, `export-controller`, `compare`, later `hil`) |
 | License | **MIT** |
-| Core ambition | **Systems-heavy core** — GNC depth **plus** containerized studies and sharded MC orchestration as first-class portfolio demos |
-| Language posture | **Python-first public surface** with **explicit polyglot boundaries from day one** (not “maybe later”) |
-| Second controller | **Should for core complete** (interface + ≥1 non-LQR implementation) |
-| Academic paper | **Cite only** — no paper-figure pipeline, no bit-level paper reproduction |
-| Architecture layout | **`docs/ARCHITECTURE.md`** (implementation map); this SPEC keeps product principles + logical modules |
-| Guidance / navigation | **Pluggable guidance stack** — core ships waypoint-driven generators (interp + min-snap); architecture must not hard-wire “waypoints → min-snap” as the only mission model |
+| Core ambition | **Systems-heavy core** — GNC depth **plus** containerized studies and sharded MC as first-class demos |
+| Language posture | **Python-first** with **explicit polyglot boundaries from day one** |
+| Package layout | **`src/uavsim/`** per ARCH: `vehicles` / `dynamics` / `reference` / `guidance` / `control` / `sim` / `studies` / … |
+| Vehicles vs dynamics | **vehicles** = params, limits, factory; **dynamics** = `f(x,u,p)`, linearize/trim |
+| Reference vs guidance | **reference** = trajectory types + evaluate + feasibility; **guidance** = planners only |
+| Config taxonomy | **`configs/missions/`** + **`configs/studies/`** (studies compose; missions describe what to fly) |
+| Primary workflow | **Vehicle → dynamics → SIL design/analyze → export controller → HIL → SIL↔HIL compare** (§1.3–1.4) |
+| SIL vs HIL | **SIL default** design loop; HIL is post-core *implementation* but **first-class product destination** |
+| Control vs hardware | **Control law protocol** ≠ **plant I/O / transport HAL** — no mega-HAL over algorithms |
+| Second controller | **Should for core** (one non-LQR impl + comparison study) |
+| Controller export | **Should for core** — versioned artifact (gains/trim/metadata); required before serious HIL |
+| Multi-run compare | **Should for core** — `uavsim compare` on two run dirs (SIL↔SIL now; SIL↔HIL when HIL exists) |
+| Academic paper | **Cite only** |
+| Guidance / navigation | Pluggable stack; core ships waypoint interp + min-snap; not the only mission model forever |
 
-Still open (see §18): min-snap solver backend, timeseries on-disk format, remote GitHub timing/visibility, exact polyglot hotspots (CasADi vs compiled vs other), priority order of post-core guidance modes.
+Still open (see §18): min-snap solver backend, timeseries format freeze, alternate controller type, first polyglot hotspot, first post-core nav mode, remote GitHub timing, HIL transport choice.
 
 ---
 
@@ -57,7 +65,7 @@ A hiring manager or technical interviewer should be able to clone the repo, run 
 2. Clean interfaces between **guidance** / plant / controller / analysis
 3. Reproducible results with a deliberate experiment pipeline
 4. **Systems thinking** — config-driven studies, containerized execution, sharded MC with a single assembled summary
-5. A credible roadmap for expansion (richer navigation, sensors, disturbances, more vehicles/controllers, HIL-adjacent ideas)
+5. A credible roadmap: richer navigation, controller export, and HIL with **fast SIL comparison** (not a second disconnected toolchain)
 
 ### 1.2 Problem / opportunity (GSD)
 
@@ -92,6 +100,21 @@ Ideal loop for a GNC engineer using `uavsim` (SIL-heavy now; HIL when the harnes
 | Compare | **Comparable run artifacts** (same metric schema, aligned time base) + **comparison viz** |
 
 SIL remains the default inner loop. HIL and write-out are first-class *product destinations*, not afterthoughts — even when implementation is phased (see user stories and MoSCoW).
+
+### 1.3.1 Refined product expectations (how we judge “good”)
+
+These expectations govern design reviews and acceptance — not only feature checklists.
+
+| Expectation | Meaning |
+|-------------|---------|
+| **One plant, many command sources** | SIL in-process controller and future HIL transport feed the **same** plant step and metrics. |
+| **Comparable by construction** | Every run writes schema-versioned metrics/timeseries so two runs can be diffed without custom scripts. |
+| **Fast inner loop** | Control tuning does not require containers, network, or hardware. |
+| **Honest write-out** | Export captures units, frames, trim, gains, and design provenance — not pickle-only blobs. |
+| **Viz is a consumer** | Plots/compare never reach into live sim state; they only read run dirs (and optional controller artifacts). |
+| **Laptop demos always work** | Portfolio path is SIL-only; HIL is additive (US-E5). |
+| **No certification theater** | Sim/HIL harness only; README states simulation-only. |
+| **Earn complexity** | Registries and interfaces yes; plugin frameworks and multi-repo packaging only when a second backend/controller forces them. |
 
 ---
 
@@ -139,7 +162,7 @@ Stories use the voice of primary personas. **Priority** maps to delivery phases 
 
 | ID | As a… | I want… | So that… | Priority |
 |----|--------|---------|----------|----------|
-| US-D1 | GNC engineer | to **export** a designed controller as a versioned artifact (gains, trim, sample rate, units, schema id) | HIL/firmware isn’t fed by tribal copy-paste | **Should** early schema; **Must** before serious HIL |
+| US-D1 | GNC engineer | to **export** a designed controller as a versioned artifact (gains, trim, sample rate, units, schema id) | HIL/firmware isn’t fed by tribal copy-paste | **Should (core)**; **Must** before serious HIL |
 | US-D2 | Embedded engineer | a documented mapping from export → on-target representation | bring-up doesn’t reverse-engineer Python objects | **Should** (with HIL path) |
 | US-D3 | GNC engineer | optional **codegen or compiled twin** later | PIL can match SIL structure | **Could** (post-core) |
 
@@ -151,7 +174,7 @@ Stories use the voice of primary personas. **Priority** maps to delivery phases 
 |----|--------|---------|----------|----------|
 | US-E1 | Integration engineer | to run the **same study/mission** with commands from an external target (HIL/PIL) | hardware closes the loop against our plant | **Could** impl; **Must** architecture |
 | US-E2 | GNC engineer | HIL runs to produce the **same metrics schema** as SIL | comparison is automatic, not spreadsheet archaeology | **Must** (with HIL) |
-| US-E3 | GNC engineer | **comparison visualization** (overlay time series, metric deltas, optional sync report) for SIL vs HIL runs | I can spot divergence in minutes | **Should** (with HIL); design viz as multi-run consumer from day one |
+| US-E3 | GNC engineer | **comparison visualization** (overlay time series, metric deltas) for two runs (SIL↔SIL or SIL↔HIL) | I can spot divergence in minutes | **Should (core)** for multi-run compare; HIL as second run when available |
 | US-E4 | Integration engineer | timeout / fail-safe behavior when the link drops | bad HIL sessions fail loudly and safely | **Must** (with HIL) |
 | US-E5 | Reviewer | a documented SIL-only path that never requires hardware | portfolio demos always work on a laptop | **Must** (core) |
 
@@ -450,10 +473,13 @@ Requirements use MoSCoW for prioritization within **systems-heavy core**.
 | S3a | Study config selects guidance backend by name/id (parallel to controller selection) |
 | S4 | Parallel local MC workers (process pool) in addition to container path |
 | S5 | Plot pack: 3D tracking, time series, control inputs, MC distributions / sensitivity |
-| S5a | Viz/report APIs accept **one or more run directories** (foundation for SIL↔HIL compare; US-E3) |
+| S5a | Viz/report APIs accept **one or more run directories** (multi-run consumers; US-E3) |
 | S6 | Second controller behind the same interface + comparison study example |
 | S7 | Controller-comparison study config (same mission, LQR vs alternate) |
 | S8 | Static results gallery (HTML) generated from a tagged release run |
+| S9 | **Controller export artifact** (versioned gains/trim/metadata) + round-trip load in SIL (US-D1) |
+| S10 | **`uavsim compare`** — overlay key time series + metric delta table for two run dirs (SIL↔SIL minimum) |
+| S11 | Plant step separable from in-process controller (SIL adapter pattern; enables future HIL without rewrite) |
 
 ### 6.3 Could (stretch after core narrative is solid)
 
@@ -466,8 +492,7 @@ Requirements use MoSCoW for prioritization within **systems-heavy core**.
 | C5 | First *non-waypoint* guidance backend (e.g. geometric path or simple replan demo) as portfolio extender |
 | C6 | Fixed-step plant mode + documented plant I/O contracts (`ActuatorCommand` / `MeasurementBus`) exercised in SIL |
 | C7 | First HIL or PIL transport adapter (e.g. UDP loopback or serial fixture) with timeout/fail policy |
-| C8 | Controller **export artifact** (gains/trim/metadata schema) loadable for HIL or external use |
-| C9 | **SIL vs HIL (or SIL vs SIL baseline) comparison viz** — overlay trajectories/controls + metric delta table from two run dirs |
+| C8 | Full SIL↔HIL comparison study using exported controller + transport (builds on S9–S10) |
 
 ### 6.4 Won’t (core)
 
@@ -483,7 +508,7 @@ Requirements use MoSCoW for prioritization within **systems-heavy core**.
 Corrections relative to MATLAB heritage; **detailed layout lives in the architecture doc**.
 
 1. **Separation of concerns**  
-   Trajectory generation, plant, controller, integrator, metrics, and reporting must not share mutable global state.
+   Guidance, reference, plant, controller, integrator, metrics, and reporting must not share mutable global state.
 
 2. **Controller as interface, not hard-wired LQR**  
    Core loop: `u = controller.compute(t, x, reference_ctx)`. LQR is implementation #1; alternate is implementation #2.
@@ -810,7 +835,8 @@ Positioning themes the project must make obvious:
 - Clone → `uavsim simulate` gentle mission → plots/metrics  
 - `uavsim study` MC with seed reproducibility  
 - Same study with `--backend docker --shards N` → identical summary within numerical tolerance  
-- (Should) Controller comparison on one mission  
+- (Should) Two controllers on one mission; **export** + **compare** two SIL runs  
+- (Post-core) HIL session compared to SIL baseline with `uavsim compare`  
 
 ---
 
@@ -818,18 +844,34 @@ Positioning themes the project must make obvious:
 
 Core is complete when all of the following hold:
 
+**GNC SIL (epics A–C)**
+
 1. Clone → install → run documented nominal sim and MC smoke on WSL without tribal knowledge  
 2. LQR closed-loop tracks a gentle mission with metrics written to a run directory  
 3. MC study produces trial table + summary + manifest with fixed seed reproducibility  
 4. Feasibility warnings appear for a known aggressive auto-yaw case  
 5. Tests and lint pass in CI; small MC smoke runs in CI  
-6. **Container image runs a documented study**  
+
+**Systems (epic F)**
+
+6. **Container image** runs a documented study  
 7. **Sharded MC path** produces assembled summary consistent with local MC for a fixed seed/N (documented tolerance)  
+
+**Extensibility & workflow readiness (epics B, D, E design)**
+
 8. README + architecture docs explain how to add a **controller**, a **guidance backend**, and (at design level) a non-Python module  
-9. **Should:** second controller + comparison example study  
-10. Architecture (and ideally a stub/test) proves sim/control/metrics do not hard-depend on waypoint/min-snap types  
-11. No dependency on the MATLAB tree at runtime  
-12. MIT license file present; safety messaging (simulation only) in README  
+9. Architecture (and ideally a stub/test) proves sim/control/metrics do not hard-depend on waypoint/min-snap types  
+10. **Should:** second controller + comparison example study  
+11. **Should:** controller **export** artifact round-trip (US-D1 / S9)  
+12. **Should:** **`uavsim compare`** on two SIL runs produces metric deltas + at least one overlay figure (US-E3 / S10)  
+13. **Should:** plant integration uses a separable command source (SIL adapter) so HIL is not a rewrite (S11)  
+
+**Hygiene**
+
+14. No dependency on the MATLAB tree at runtime  
+15. MIT license file present; safety messaging (simulation only) in README  
+
+**Explicitly not required for core complete:** live HIL hardware, firmware flash, certified software claims.
 
 Refinement of numerics and exact orchestration tooling is expected during implementation; this SPEC is the living product contract, not a frozen ICD.
 
@@ -856,47 +898,45 @@ Refinement of numerics and exact orchestration tooling is expected during implem
 
 Phases are sequential **capability gates**, not strict calendar. Systems work is **pulled forward** relative to v0 (not left as Phase 4 garnish).
 
-### Phase 0 — Stand-up
-- Repo skeleton, MIT license, packaging (`uv`/`pyproject`), lint, test harness, CI stub  
-- Architecture document (modules, **guidance + controller protocols**, polyglot boundary, results schema draft)  
-- Move/normalize docs as needed  
+Phases map to user-story epics (A–F). Systems work is pulled forward (not left as garnish).
 
-### Phase 1 — Physics & LQR loop
-- Vehicle config, nonlinear dynamics, linearization, LQR  
-- Minimal **reference trajectory** path (even linear segments) behind guidance interface + closed-loop hover/square  
+### Phase 0 — Stand-up
+- Repo skeleton, packaging (`uv`/`pyproject`), lint, test harness, CI stub  
+- Docs already: SPEC + ARCH (keep in sync as code lands)  
+
+### Phase 1 — Vehicle, dynamics, SIL loop (epics A, C partial)
+- `vehicles` + `dynamics` + LQR + trivial `reference` + `studies` pipeline  
+- Separable plant step + in-process SIL adapter (S11 foundation)  
 - Metrics + run artifacts + `uavsim simulate`  
 
-### Phase 2 — Waypoint guidance quality + controller interface
+### Phase 2 — Guidance + controller interface (epics B, C)
 - Waypoint load + interp + min-snap + feasibility  
-- Example missions; waypoint method selection policy  
-- Controller protocol hardened; start alternate controller  
-- Guidance registry/selection in study config; stub backend test  
+- Guidance registry; stub backend test  
+- Controller protocol hardened; start alternate controller (S6)  
 
-### Phase 3 — Robustness, results, local parallel MC
-- MC engine, summaries, plots-as-consumer  
-- Study YAML CLI (`uavsim study`)  
-- Seed reproducibility tests  
+### Phase 3 — Robustness, results, local MC (epics C, F partial)
+- MC engine, summaries, plots-as-consumer (single-run `report`)  
+- `uavsim study`; seed reproducibility  
 
-### Phase 4 — Systems core (containers + shards)
+### Phase 4 — Systems core (epic F)
 - Container image + one-command study  
 - Sharded workers + assemble  
-- CI smoke for container and/or shards as practical  
-- Controller comparison study (if not already done)  
+- CI smoke as practical  
 
-### Phase 5 — Public polish
-- README figures, static gallery (Should), docs pass  
-- Optional first polyglot hotspot (Could)  
-- Queue backend (Could)  
+### Phase 5 — Workflow polish toward HIL readiness (epics D, E-SIL)
+- Controller **export** + SIL round-trip (S9)  
+- Multi-run **`compare`** for two SIL runs (S10); multi-run viz APIs (S5a)  
+- Controller comparison study if not done  
+- README figures / gallery (Should)  
 
-### Phase 6 — Navigation expansion (post-core, when prioritized)
-- First non-waypoint guidance backend and/or online replan demo  
-- Docs + example study; keep core waypoint path stable  
+### Phase 6 — Navigation expansion (post-core; epic B growth)
+- First non-waypoint guidance backend and/or replan demo  
 
-### Phase 7 — HIL/PIL path (post-core, when prioritized)
-- Stabilize plant I/O schemas; fixed-step plant mode  
-- In-process adapter remains default SIL  
-- First transport adapter + gentle-mission SIL vs HIL comparison (soft tolerances)  
-- Explicit safety messaging: sim/HIL harness only  
+### Phase 7 — HIL/PIL (post-core; epic E)
+- Fixed-step plant + full plant I/O schemas (C6)  
+- First transport adapter + timeouts (C7)  
+- SIL vs HIL via export + `compare` (C8)  
+- Safety messaging: harness only  
 
 ---
 
@@ -920,6 +960,7 @@ Phases are sequential **capability gates**, not strict calendar. Systems work is
 | v0.1.3 | 2026-07-18 | Aligned logical modules with ARCH v0.1: `reference`/`guidance`, vehicles vs dynamics, `missions` + `studies` configs |
 | v0.1.4 | 2026-07-18 | HIL-ready architecture intent: SIL-first; plant I/O vs control-law seams; C6–C7; Phase 7; principle §7.11 |
 | v0.1.5 | 2026-07-18 | Primary workflow §1.3; user stories §1.4 (epics A–F); export/compare CLI; S5a/C8/C9 |
+| v0.2 | 2026-07-18 | Refined expectations §1.3.1; closed decisions for layout/workflow/export/compare; S9–S11; phased epic map; core acceptance includes export + multi-run compare Shoulds |
 
 ---
 

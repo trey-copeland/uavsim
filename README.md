@@ -2,7 +2,9 @@
 
 Modern **quadrotor simulation and GNC analysis** framework for portfolio-quality demos: flight dynamics (NED), guidance, control, Monte Carlo robustness, and reproducible study pipelines — including containerized and sharded execution.
 
-**Status:** Design / stand-up. Product intent and working agreements are documented; implementation follows the architecture doc.
+**Status:** Design / stand-up (SPEC v0.2, ARCH v0.4).  
+
+**Intended workflow:** configure vehicle → inject dynamics → design/analyze control in SIL → export controller → (later) HIL → compare runs. Implementation follows `docs/ARCHITECTURE.md`.
 
 > **Simulation only.** This is not flight-critical or certified software.
 

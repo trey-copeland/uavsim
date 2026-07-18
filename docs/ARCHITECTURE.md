@@ -1,11 +1,15 @@
 # Architecture — `uavsim` / quadrotor-sim
 
-**Status:** v0.3 (stand-up map)  
+**Status:** v0.4 (stand-up map)  
 **Last updated:** 2026-07-18  
-**Normative product intent:** [`SPEC.md`](../SPEC.md)  
+**Normative product intent:** [`SPEC.md`](../SPEC.md) (v0.2+)  
 **Working agreements:** [`GROK.md`](../GROK.md)
 
 This document is the **implementation map**: packages, interfaces, data flow, results, systems, and extension points. If code and this doc disagree, fix one of them — do not leave drift.
+
+**Product north star (SPEC §1.3):**  
+`vehicle config → dynamics → SIL design/analyze → export controller → HIL → compare SIL↔HIL`  
+Core ships the SIL path + export/compare foundations; HIL transports are post-core.
 
 ---
 
@@ -644,6 +648,34 @@ runs/<study_id>_<timestamp>/
 
 **Lean default:** Parquet for dense arrays + JSON for small metrics. Alternatives (HDF5/NPZ) remain open; pick one in Phase 1 and document in `docs/results_schema.md` when frozen.
 
+### 10.4 Multi-run comparison contract (SPEC S10 / US-E3)
+
+`uavsim compare run_a run_b` is a **results consumer** only.
+
+**Inputs:** two run directories with compatible `schema_version` (and ideally same mission/vehicle intent).  
+**Outputs (minimum):**
+
+- Metric delta table (RMSE position, max error, success flags, key control stats)
+- At least one overlay figure (e.g. position vs time or 3D path) for primary signals
+- Short markdown summary under a compare output path or stdout
+
+**Alignment policy (document when implementing):**
+
+- Prefer identical time grids; else resample to a common grid with documented method
+- Label runs by `execution.mode` (`sil` | `hil` | …) from manifests when present
+- Soft tolerances only — HIL will not match SIL bit-for-bit
+
+**Controller export** (SPEC S9) may live under `artifacts/controllers/` or inside the run dir; compare may optionally annotate which controller artifact each run used.
+
+### 10.5 Quality expectations for artifacts
+
+| Rule | Expectation |
+|------|-------------|
+| Schema version | Present on metrics, manifests, controller exports |
+| No live coupling | `viz` / `compare` / `report` never import sim loop internals |
+| Provenance | Manifest records seed, code identity, config hash, execution mode |
+| SIL vs HIL parity | Same metric field names and units across modes |
+
 ---
 
 ## 11. Monte Carlo and systems
@@ -746,15 +778,20 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 
 ---
 
-## 16. Implementation order (maps to SPEC phases)
+## 16. Implementation order (maps to SPEC §19)
 
-0. Skeleton: `pyproject`, package `uavsim`, pytest, ruff, CI stub, empty CLI  
-1. `vehicles` + `dynamics` + LQR + trivial `reference` + `studies` pipeline + `simulate` + run dir  
-2. Waypoint `guidance` (interp/minsnap/auto) + reference feasibility + controller protocol + registry  
-3. Metrics polish + MC local + `study`  
-4. Docker + shards + assemble  
-5. Polish docs/plots; optional alternate controller if not done  
-6. Post-core: first non-waypoint guidance / replan demo when prioritized  
+| Phase | Focus | Exit signals |
+|-------|--------|--------------|
+| 0 | Skeleton: `pyproject`, `uavsim`, pytest, ruff, CI stub, thin CLI | importable package, tests run |
+| 1 | `vehicles` + `dynamics` + LQR + trivial `reference` + `studies` + SIL adapter + `simulate` | hover/square SIL, run dir |
+| 2 | Waypoint `guidance` + feasibility + controller registry + alternate start | ≥3 missions, stub guidance test |
+| 3 | Metrics polish + local MC + `study` | seed-stable MC smoke |
+| 4 | Docker + shards + assemble | F12–F13 style demos |
+| 5 | **Export (S9) + compare (S10)** + multi-run viz; controller compare study | workflow demo without hardware |
+| 6 | Post-core: non-waypoint guidance | — |
+| 7 | Post-core: fixed-step + HIL transport + SIL↔HIL compare | — |
+
+**Expectation:** Phase 5 completes the *software* story of the north-star workflow; Phase 7 attaches hardware without redesigning plant/metrics.
 
 ---
 
@@ -773,6 +810,8 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | 2026-07-18 | Import DAG pinned (§3.2); control must not import guidance backends |
 | 2026-07-18 | HIL readiness via plant I/O + transport adapters — not a mega-HAL over control laws (§7A) |
 | 2026-07-18 | SIL remains default design loop; fixed-step plant option reserved for HIL/PIL |
+| 2026-07-18 | Multi-run compare is a results consumer (§10.4); export + compare are Phase 5 (pre-HIL) |
+| 2026-07-18 | Align with SPEC v0.2 refined expectations and S9–S11 |
 
 ---
 
@@ -783,7 +822,8 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | v0 | 2026-07-18 | Initial architecture map for stand-up; aligns with SPEC v0.1.1 |
 | v0.1 | 2026-07-18 | Layout pin: `reference` vs `guidance`; vehicles/dynamics split; missions config; studies pipeline; import DAG |
 | v0.2 | 2026-07-18 | §7A SIL/PIL/HIL modes; plant step + MeasurementBus/ActuatorCommand; hil package hooks |
-| v0.3 | 2026-07-18 | Workflow goal §1.7; controller export §7.5; compare CLI; ties to SPEC user stories |
+| v0.3 | 2026-07-18 | Workflow goal; controller export §7.5; compare CLI; ties to SPEC user stories |
+| v0.4 | 2026-07-18 | §10.4–10.5 compare/artifact quality; phase table with export/compare before HIL; SPEC v0.2 alignment |
 
 ---
 
