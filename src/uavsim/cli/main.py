@@ -114,6 +114,34 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_merge.add_argument("--seed", type=int, default=None, help="base_seed for summary metadata")
 
+    p_gallery = sub.add_parser(
+        "gallery",
+        help="Build React showcase (JSON + SPA) from runs or portfolio base case",
+    )
+    p_gallery.add_argument(
+        "--base-case",
+        action="store_true",
+        help="Run portfolio base-case studies and write docs/showcase",
+    )
+    p_gallery.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Output directory (default: docs/showcase for --base-case)",
+    )
+    p_gallery.add_argument(
+        "runs",
+        nargs="*",
+        type=Path,
+        help="Run directories to include (ignored with --base-case)",
+    )
+    p_gallery.add_argument(
+        "--n-mc-trials",
+        type=int,
+        default=12,
+        help="MC trial count for base-case hover study (default 12)",
+    )
+
     p_report = sub.add_parser(
         "report",
         help="Generate report/figures from a run directory (artifact consumer)",
@@ -304,6 +332,42 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(f"[OK] merged n_trials={summary.get('n_trials')} → {args.output}")
         return 0
+
+    if args.command == "gallery":
+        from uavsim.viz.gallery import (
+            build_gallery_document,
+            generate_base_case_gallery,
+            run_to_gallery_entry,
+            write_gallery,
+        )
+
+        try:
+            if args.base_case:
+                path = generate_base_case_gallery(
+                    repo_root=Path.cwd(),
+                    out_dir=args.out,
+                    n_mc_trials=args.n_mc_trials,
+                )
+                print(f"[OK] base-case gallery → {path}")
+                print(f"  open {(args.out or Path('docs/showcase')) / 'index.html'}")
+                return 0
+            if not args.runs:
+                print("Provide run dirs or --base-case", file=sys.stderr)
+                return 1
+            entries = []
+            for rd in args.runs:
+                if not Path(rd).is_dir():
+                    print(f"Not a run directory: {rd}", file=sys.stderr)
+                    return 1
+                entries.append(run_to_gallery_entry(rd))
+            doc = build_gallery_document(entries)
+            out = Path(args.out or "docs/showcase")
+            write_gallery(doc, out, copy_app=True)
+            print(f"[OK] gallery → {out / 'data' / 'showcase.json'}")
+            return 0
+        except (FileNotFoundError, ValueError, RuntimeError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
 
     if args.command == "report":
         from uavsim.viz import generate_report

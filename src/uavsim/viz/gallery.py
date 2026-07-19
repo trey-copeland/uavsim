@@ -1,0 +1,279 @@
+"""Export run artifacts to a browser-ready gallery payload (React showcase)."""
+
+from __future__ import annotations
+
+import json
+import shutil
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+from uavsim import __version__
+from uavsim.viz.compare import compute_metric_deltas
+from uavsim.viz.loaders import load_run, ned_to_plot
+
+GALLERY_SCHEMA = 1
+
+# Portfolio base case: tracking + second controller + MC robustness
+BASE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
+    # (relative study path, gallery id, role)
+    ("configs/studies/gentle_square.yaml", "gentle_square_lqr", "tracking_lqr"),
+    ("configs/studies/compare_lqr_vs_pid.yaml", "gentle_square_pid", "tracking_pid"),
+    ("configs/studies/hover_mc_smoke.yaml", "hover_mc", "monte_carlo"),
+)
+
+
+def _downsample(n: int, max_points: int) -> np.ndarray:
+    if n <= max_points:
+        return np.arange(n)
+    return np.unique(np.linspace(0, n - 1, max_points).astype(int))
+
+
+def run_to_gallery_entry(
+    run_dir: str | Path,
+    *,
+    gallery_id: str | None = None,
+    label: str | None = None,
+    role: str = "run",
+    max_points: int = 160,
+) -> dict[str, Any]:
+    """Serialize one run dir to JSON-friendly dict (downsampled timeseries)."""
+    art = load_run(run_dir)
+    gid = gallery_id or art.study_id
+    entry: dict[str, Any] = {
+        "id": gid,
+        "label": label or art.study_id,
+        "role": role,
+        "study_id": art.study_id,
+        "source_run": str(Path(run_dir).name),
+        "metrics": art.metrics,
+        "feasibility": art.feasibility,
+        "manifest": {
+            "seed": (art.manifest or {}).get("seed"),
+            "status": (art.manifest or {}).get("status"),
+            "execution": (art.manifest or {}).get("execution"),
+        },
+        "limits": {
+            "thrust_min_n": art.limits.thrust_min_n,
+            "thrust_max_n": (
+                None if not np.isfinite(art.limits.thrust_max_n) else art.limits.thrust_max_n
+            ),
+            "torque_max_nm": (
+                None if not np.isfinite(art.limits.torque_max_nm) else art.limits.torque_max_nm
+            ),
+        },
+        "timeseries": None,
+        "mc": None,
+    }
+
+    if art.t is not None and art.x is not None and art.u is not None:
+        idx = _downsample(art.t.size, max_points)
+        t = art.t[idx]
+        x = art.x[idx]
+        u = art.u[idx]
+        pos_plot = ned_to_plot(x[:, 0:3])
+        ts: dict[str, Any] = {
+            "t": t.tolist(),
+            "pos_ned": x[:, 0:3].tolist(),
+            "pos_plot": pos_plot.tolist(),  # N, E, up
+            "vel_ned": x[:, 6:9].tolist(),
+            "euler_deg": np.rad2deg(x[:, 3:6]).tolist(),
+            "omega": x[:, 9:12].tolist(),
+            "u": u.tolist(),
+        }
+        if art.t_ref is not None and art.x_ref is not None:
+            # resample ref onto same t grid
+            pref = np.zeros((idx.size, 3))
+            for j, ti in enumerate(t):
+                k = int(np.argmin(np.abs(art.t_ref - ti)))
+                pref[j] = art.x_ref[k, 0:3]
+            ts["ref_ned"] = pref.tolist()
+            ts["ref_plot"] = ned_to_plot(pref).tolist()
+        entry["timeseries"] = ts
+
+    if art.trials:
+        # Cap trials payload for browser
+        trials = art.trials
+        if len(trials) > 200:
+            trials = trials[:200]
+        entry["mc"] = {
+            "summary": art.mc_summary,
+            "trials": trials,
+            "n_trials": len(art.trials),
+        }
+    return entry
+
+
+def build_gallery_document(
+    runs: list[dict[str, Any]],
+    *,
+    title: str = "uavsim results showcase",
+    description: str = "",
+    compare_ids: tuple[str, str] | None = None,
+) -> dict[str, Any]:
+    """Assemble top-level showcase.json document."""
+    by_id = {r["id"]: r for r in runs}
+    compare = None
+    if compare_ids is not None:
+        a_id, b_id = compare_ids
+        if a_id in by_id and b_id in by_id:
+            deltas = compute_metric_deltas(
+                by_id[a_id].get("metrics") or {},
+                by_id[b_id].get("metrics") or {},
+            )
+            compare = {
+                "a": a_id,
+                "b": b_id,
+                "label_a": by_id[a_id]["label"],
+                "label_b": by_id[b_id]["label"],
+                "deltas": deltas,
+            }
+
+    return {
+        "schema_version": GALLERY_SCHEMA,
+        "title": title,
+        "description": description,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "uavsim_version": __version__,
+        "runs": runs,
+        "compare": compare,
+        "ui": {
+            "default_run": runs[0]["id"] if runs else None,
+            "tabs": ["overview", "flight", "metrics", "monte_carlo", "compare"],
+        },
+    }
+
+
+def write_gallery(
+    document: dict[str, Any],
+    out_dir: str | Path,
+    *,
+    copy_app: bool = True,
+    template_dir: str | Path | None = None,
+) -> Path:
+    """
+    Write showcase.json (+ optional static React app files) under out_dir.
+
+    ``template_dir`` defaults to package-adjacent ``docs/showcase`` templates
+    if present, else embeds minimal files from ``uavsim.viz.showcase_assets``.
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    data_dir = out_dir / "data"
+    data_dir.mkdir(exist_ok=True)
+    path = data_dir / "showcase.json"
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(document, f, indent=2)
+        f.write("\n")
+
+    if copy_app:
+        _ensure_showcase_app(out_dir, template_dir=template_dir)
+    return path
+
+
+def _ensure_showcase_app(out_dir: Path, *, template_dir: Path | str | None) -> None:
+    """Copy or write the React single-page app into out_dir."""
+    # Prefer committed templates under docs/showcase next to data/
+    candidates: list[Path] = []
+    if template_dir is not None:
+        candidates.append(Path(template_dir))
+    # repo layout when developing
+    repo_showcase = Path.cwd() / "docs" / "showcase"
+    candidates.append(repo_showcase)
+    # package-relative (installed wheel may not include docs — fall back to write)
+    pkg = Path(__file__).resolve().parents[3] / "docs" / "showcase"
+    candidates.append(pkg)
+
+    for src in candidates:
+        if (src / "index.html").is_file() and (src / "app.js").is_file():
+            for name in ("index.html", "app.js", "styles.css"):
+                f = src / name
+                if f.is_file() and f.resolve().parent != out_dir.resolve():
+                    shutil.copy2(f, out_dir / name)
+            return
+
+    # Inline fallback if templates missing
+    from uavsim.viz.showcase_assets import APP_JS, INDEX_HTML, STYLES_CSS
+
+    (out_dir / "index.html").write_text(INDEX_HTML, encoding="utf-8")
+    (out_dir / "app.js").write_text(APP_JS, encoding="utf-8")
+    (out_dir / "styles.css").write_text(STYLES_CSS, encoding="utf-8")
+
+
+def generate_base_case_gallery(
+    *,
+    repo_root: str | Path | None = None,
+    out_dir: str | Path | None = None,
+    runs_tmp: str | Path | None = None,
+    max_points: int = 160,
+    n_mc_trials: int = 12,
+) -> Path:
+    """
+    Run the portfolio base-case studies and write ``docs/showcase``.
+
+    Base case:
+      1. Gentle square with LQR (tracking demo)
+      2. Same mission with PID cascade (controller compare)
+      3. Hover MC smoke (robustness)
+    """
+    from uavsim.studies import run_nominal_study
+
+    root = Path(repo_root or Path.cwd()).resolve()
+    out = Path(out_dir or (root / "docs" / "showcase")).resolve()
+    tmp = Path(runs_tmp or (root / "runs" / "_showcase_build")).resolve()
+    tmp.mkdir(parents=True, exist_ok=True)
+
+    entries: list[dict[str, Any]] = []
+    labels = {
+        "gentle_square_lqr": "Gentle square — LQR",
+        "gentle_square_pid": "Gentle square — PID cascade",
+        "hover_mc": "Hover MC smoke",
+    }
+    for rel, gid, role in BASE_CASE_STUDIES:
+        study = root / rel
+        if not study.is_file():
+            msg = f"Base-case study missing: {study}"
+            raise FileNotFoundError(msg)
+        force_mc = role == "monte_carlo"
+        n_override = n_mc_trials if force_mc else None
+        result = run_nominal_study(
+            study,
+            output_root=tmp,
+            run_mc=force_mc if force_mc else False,
+            n_trials_override=n_override,
+        )
+        entries.append(
+            run_to_gallery_entry(
+                result.run_dir,
+                gallery_id=gid,
+                label=labels.get(gid, gid),
+                role=role,
+                max_points=max_points,
+            )
+        )
+
+    doc = build_gallery_document(
+        entries,
+        title="uavsim — portfolio results showcase",
+        description=(
+            "Frozen base case: LQR vs PID on a gentle square mission, plus a "
+            "seeded hover Monte Carlo under mass/inertia uncertainty. "
+            "All data regenerated from configs via `uavsim gallery --base-case`."
+        ),
+        compare_ids=("gentle_square_lqr", "gentle_square_pid"),
+    )
+    write_gallery(doc, out, copy_app=True, template_dir=root / "docs" / "showcase")
+    # write meta for README
+    meta = {
+        "schema_version": GALLERY_SCHEMA,
+        "generated_at": doc["generated_at"],
+        "uavsim_version": __version__,
+        "runs": [e["id"] for e in entries],
+        "command": "uavsim gallery --base-case",
+    }
+    with (out / "data" / "meta.json").open("w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2)
+        f.write("\n")
+    return out / "data" / "showcase.json"

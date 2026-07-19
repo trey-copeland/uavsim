@@ -2,11 +2,23 @@
 
 Modern **quadrotor simulation and GNC analysis** framework for portfolio-quality demos: flight dynamics (NED), guidance, control, Monte Carlo robustness, and reproducible study pipelines — including containerized and sharded execution.
 
-**Status:** Core SIL workflow complete (through Phase 5). Visualization pack (§11A V1–V8): interactive 3D, compare overlays, MC plots. Post-core: nav (Phase 6), HIL (Phase 7).  
+**Status:** Core SIL workflow complete (through Phase 5). Visualization pack + **React results showcase** (GitHub Pages-ready). Post-core: nav (Phase 6), HIL (Phase 7).  
 
 **Intended workflow:** configure vehicle → inject dynamics → design/analyze control in SIL → export controller → (later) HIL → compare runs. Implementation follows `docs/ARCHITECTURE.md`.
 
 > **Simulation only.** This is not flight-critical or certified software.
+
+## Live showcase
+
+Interactive React document rolling up the portfolio **base case** (LQR square, PID on the same mission, hover Monte Carlo):
+
+| | |
+|--|--|
+| **Local** | `python -m http.server 8765 --directory docs/showcase` → [http://127.0.0.1:8765/](http://127.0.0.1:8765/) |
+| **GitHub Pages** | After enabling the Pages workflow: `https://trey-copeland.github.io/uavsim/` |
+| **Source / regenerate** | [`docs/showcase/`](docs/showcase/) · `uv run uavsim gallery --base-case` |
+
+Tabs: overview cards · 3D flight scrubber · metrics + feasibility · MC hist/CDF/scatter · LQR vs PID compare.
 
 ## Docs
 
@@ -16,6 +28,7 @@ Modern **quadrotor simulation and GNC analysis** framework for portfolio-quality
 | [`ROADMAP.md`](ROADMAP.md) | Phases, milestones, now/next/later |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How we structure code, interfaces, systems |
 | [`docs/viz.md`](docs/viz.md) | Interactive 3D + report figure pack (§11A) |
+| [`docs/showcase/README.md`](docs/showcase/README.md) | React showcase + Pages hosting |
 | [`docs/containers.md`](docs/containers.md) | Docker + sharded MC |
 | [`GROK.md`](GROK.md) | How we work (GSD, tests, heritage rules) |
 | [`AGENTS.md`](AGENTS.md) | Agent entrypoint → `GROK.md` |
@@ -71,6 +84,10 @@ uv run uavsim compare runs/<lqr_run> runs/<pid_run> --figures
 uv run uavsim report runs/<study_id>_<timestamp>/ --interactive
 # → figures/flight_3d.html (rotate, play, vectors + HUD)
 uv run uavsim compare runs/<a> runs/<b> --interactive
+
+# React portfolio showcase (base case → docs/showcase)
+uv run uavsim gallery --base-case
+python -m http.server 8765 --directory docs/showcase
 ```
 
 Run artifacts land under `runs/<study_id>_<timestamp>/` (gitignored). Monte Carlo writes `monte_carlo/trials.csv`, `summary.json`. Viz extras: `uv sync --extra viz` (matplotlib + plotly).

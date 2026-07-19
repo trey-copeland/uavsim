@@ -20,6 +20,7 @@ def test_build_parser_has_expected_subcommands() -> None:
         "study",
         "mc-shard",
         "mc-merge",
+        "gallery",
         "report",
         "export-controller",
         "compare",

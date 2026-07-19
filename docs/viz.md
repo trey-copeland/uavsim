@@ -10,7 +10,13 @@ uv sync --extra viz   # matplotlib + plotly
 uv run uavsim simulate configs/studies/gentle_square.yaml
 uv run uavsim report runs/<study_id>_<timestamp>/ --interactive
 # open figures/flight_3d.html in a browser (rotate, play, vectors + HUD)
+
+# Full portfolio rollup (React SPA + frozen base-case JSON)
+uv run uavsim gallery --base-case
+python -m http.server 8765 --directory docs/showcase
 ```
+
+See also [`docs/showcase/README.md`](showcase/README.md) for GitHub Pages.
 
 Dual-run:
 
