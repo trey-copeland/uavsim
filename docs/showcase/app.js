@@ -18,15 +18,60 @@
     return String(x);
   }
 
-  function PlotDiv({ id, data, layout, config }) {
+  /** Axis ranges from list of [x,y,z] point arrays (keeps 3D view stable while scrubbing). */
+  function sceneBoundsFromPlots(plotArrays, padFrac) {
+    const xs = [];
+    const ys = [];
+    const zs = [];
+    (plotArrays || []).forEach(function (arr) {
+      if (!arr) return;
+      for (let k = 0; k < arr.length; k++) {
+        xs.push(arr[k][0]);
+        ys.push(arr[k][1]);
+        zs.push(arr[k][2]);
+      }
+    });
+    function rng(a) {
+      if (!a.length) return [-1, 1];
+      let lo = Math.min.apply(null, a);
+      let hi = Math.max.apply(null, a);
+      if (!Number.isFinite(lo) || !Number.isFinite(hi)) return [-1, 1];
+      if (hi - lo < 1e-6) {
+        lo -= 0.5;
+        hi += 0.5;
+      }
+      const pad = (padFrac == null ? 0.15 : padFrac) * (hi - lo);
+      return [lo - pad, hi + pad];
+    }
+    return { x: rng(xs), y: rng(ys), z: rng(zs) };
+  }
+
+  function PlotDiv({ id, data, layout, config, preserveCamera }) {
     const ref = useRef(null);
     useEffect(() => {
       if (!ref.current || !window.Plotly) return;
-      Plotly.react(ref.current, data, layout, config || { responsive: true, displayModeBar: true });
+      const gd = ref.current;
+      let nextLayout = layout || {};
+      // Keep user orbit/zoom when scrubbing: reuse existing camera + stable uirevision.
+      if (preserveCamera && gd.layout && gd.layout.scene && gd.layout.scene.camera) {
+        nextLayout = Object.assign({}, nextLayout, {
+          scene: Object.assign({}, nextLayout.scene || {}, {
+            camera: gd.layout.scene.camera,
+          }),
+        });
+      }
+      Plotly.react(
+        gd,
+        data,
+        nextLayout,
+        config || { responsive: true, displayModeBar: true }
+      );
+    }, [id, data, layout, preserveCamera]);
+    useEffect(() => {
       return () => {
-        if (ref.current) Plotly.purge(ref.current);
+        if (ref.current && window.Plotly) Plotly.purge(ref.current);
       };
-    }, [id, data, layout]);
+    }, [id]);
     return e("div", { className: "plot", ref, id });
   }
 
@@ -79,12 +124,26 @@
   function FlightTab({ run }) {
     const ts = run.timeseries;
     const [frame, setFrame] = useState(0);
+    // Reset scrub when switching runs (new id).
+    useEffect(() => {
+      setFrame(0);
+    }, [run && run.id]);
+
     if (!ts) return e("div", { className: "card" }, "No timeseries for this run.");
 
     const n = ts.t.length;
     const i = Math.min(frame, n - 1);
     const pos = ts.pos_plot;
     const trail = pos.slice(0, i + 1);
+    // Fixed world box from full path (+ ref) so autorange never collapses to the marker.
+    const bounds = sceneBoundsFromPlots([pos, ts.ref_plot], 0.18);
+    const span = Math.max(
+      bounds.x[1] - bounds.x[0],
+      bounds.y[1] - bounds.y[0],
+      bounds.z[1] - bounds.z[0],
+      0.5
+    );
+
     const traces = [
       {
         type: "scatter3d",
@@ -111,7 +170,7 @@
         x: [pos[i][0]],
         y: [pos[i][1]],
         z: [pos[i][2]],
-        marker: { size: 5, color: "#e7ecf3" },
+        marker: { size: 4, color: "#e7ecf3" },
         name: "vehicle",
       },
     ];
@@ -127,15 +186,16 @@
         opacity: 0.7,
       });
     }
-    // velocity arrow (plot frame)
+    // velocity arrow scaled to ~12% of path span (plot frame: up = -D)
     const v = ts.vel_ned[i];
-    const scale = 0.4;
+    const vNorm = Math.hypot(v[0], v[1], v[2]) || 1;
+    const vLen = 0.12 * span;
     traces.push({
       type: "scatter3d",
       mode: "lines",
-      x: [pos[i][0], pos[i][0] + v[0] * scale],
-      y: [pos[i][1], pos[i][1] + v[1] * scale],
-      z: [pos[i][2], pos[i][2] - v[2] * scale],
+      x: [pos[i][0], pos[i][0] + (v[0] / vNorm) * vLen],
+      y: [pos[i][1], pos[i][1] + (v[1] / vNorm) * vLen],
+      z: [pos[i][2], pos[i][2] - (v[2] / vNorm) * vLen],
       line: { color: "#3ecf8e", width: 6 },
       name: "velocity",
     });
@@ -158,6 +218,16 @@
       fmt(ts.euler_deg[i][2], 1) +
       ")°";
 
+    const axisStyle = function (title, range) {
+      return {
+        title: title,
+        gridcolor: "#2d3a4d",
+        zerolinecolor: "#3a4a60",
+        range: range,
+        autorange: false,
+      };
+    };
+
     return e(
       "div",
       null,
@@ -178,19 +248,27 @@
         e("span", { style: { color: "var(--muted)", fontSize: "0.85rem" } }, hud)
       ),
       e("div", { className: "card" }, e(PlotDiv, {
-        id: "flight3d",
+        id: "flight3d-" + run.id,
+        preserveCamera: true,
         data: traces,
         layout: {
           paper_bgcolor: "#0c1018",
           plot_bgcolor: "#0c1018",
           font: { color: "#e7ecf3", size: 11 },
           margin: { l: 0, r: 0, t: 20, b: 0 },
+          // Stable revision while scrubbing this run — keeps orbit/zoom.
+          uirevision: "flight-" + run.id,
           scene: {
-            xaxis: { title: "N [m]", gridcolor: "#2d3a4d" },
-            yaxis: { title: "E [m]", gridcolor: "#2d3a4d" },
-            zaxis: { title: "up [m]", gridcolor: "#2d3a4d" },
-            aspectmode: "data",
+            xaxis: axisStyle("N [m]", bounds.x),
+            yaxis: axisStyle("E [m]", bounds.y),
+            zaxis: axisStyle("up [m]", bounds.z),
+            aspectmode: "cube",
             bgcolor: "#0c1018",
+            camera: {
+              eye: { x: 1.55, y: 1.55, z: 1.15 },
+              center: { x: 0, y: 0, z: 0 },
+              up: { x: 0, y: 0, z: 1 },
+            },
           },
           showlegend: true,
           legend: { orientation: "h" },
@@ -435,6 +513,7 @@
       ),
       e("div", { className: "card", style: { gridColumn: "1 / -1" } }, e(PlotDiv, {
         id: "cmp3d",
+        preserveCamera: true,
         data: [
           {
             type: "scatter3d",
@@ -455,22 +534,27 @@
             name: cmp.label_b,
           },
         ],
-        layout: {
-          title: "Path overlay (N, E, up=−D)",
-          paper_bgcolor: "#0c1018",
-          plot_bgcolor: "#0c1018",
-          font: { color: "#e7ecf3", size: 11 },
-          height: 460,
-          margin: { t: 40, r: 0, b: 0, l: 0 },
-          scene: {
-            xaxis: { title: "N", gridcolor: "#2d3a4d" },
-            yaxis: { title: "E", gridcolor: "#2d3a4d" },
-            zaxis: { title: "up", gridcolor: "#2d3a4d" },
-            aspectmode: "data",
-            bgcolor: "#0c1018",
-          },
-          legend: { orientation: "h" },
-        },
+        layout: (function () {
+          const b = sceneBoundsFromPlots([pa, pb], 0.18);
+          return {
+            title: "Path overlay (N, E, up=−D)",
+            paper_bgcolor: "#0c1018",
+            plot_bgcolor: "#0c1018",
+            font: { color: "#e7ecf3", size: 11 },
+            height: 460,
+            margin: { t: 40, r: 0, b: 0, l: 0 },
+            uirevision: "compare-paths",
+            scene: {
+              xaxis: { title: "N", gridcolor: "#2d3a4d", range: b.x, autorange: false },
+              yaxis: { title: "E", gridcolor: "#2d3a4d", range: b.y, autorange: false },
+              zaxis: { title: "up", gridcolor: "#2d3a4d", range: b.z, autorange: false },
+              aspectmode: "cube",
+              bgcolor: "#0c1018",
+              camera: { eye: { x: 1.55, y: 1.55, z: 1.15 } },
+            },
+            legend: { orientation: "h" },
+          };
+        })(),
       }))
     );
   }
