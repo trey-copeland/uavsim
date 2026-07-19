@@ -18,61 +18,255 @@
     return String(x);
   }
 
-  /** Axis ranges from list of [x,y,z] point arrays (keeps 3D view stable while scrubbing). */
-  function sceneBoundsFromPlots(plotArrays, padFrac) {
+  /**
+   * Equal-span 3D box around path points (meters).
+   * Flat trajectories (tiny Z span) still get a cubic world box so Plotly
+   * does not zoom into a paper-thin slab.
+   */
+  function equalSceneBounds(plotArrays, padFrac, minHalf) {
     const xs = [];
     const ys = [];
     const zs = [];
     (plotArrays || []).forEach(function (arr) {
       if (!arr) return;
       for (let k = 0; k < arr.length; k++) {
-        xs.push(arr[k][0]);
-        ys.push(arr[k][1]);
-        zs.push(arr[k][2]);
+        xs.push(+arr[k][0]);
+        ys.push(+arr[k][1]);
+        zs.push(+arr[k][2]);
       }
     });
-    function rng(a) {
-      if (!a.length) return [-1, 1];
+    function midHalf(a) {
+      if (!a.length) return { mid: 0, half: minHalf || 1 };
       let lo = Math.min.apply(null, a);
       let hi = Math.max.apply(null, a);
-      if (!Number.isFinite(lo) || !Number.isFinite(hi)) return [-1, 1];
-      if (hi - lo < 1e-6) {
-        lo -= 0.5;
-        hi += 0.5;
-      }
-      const pad = (padFrac == null ? 0.15 : padFrac) * (hi - lo);
-      return [lo - pad, hi + pad];
+      if (!Number.isFinite(lo) || !Number.isFinite(hi)) return { mid: 0, half: minHalf || 1 };
+      const mid = 0.5 * (lo + hi);
+      let half = 0.5 * (hi - lo);
+      const pad = padFrac == null ? 0.2 : padFrac;
+      half = Math.max(half * (1 + pad), minHalf == null ? 0.75 : minHalf);
+      return { mid: mid, half: half };
     }
-    return { x: rng(xs), y: rng(ys), z: rng(zs) };
+    const mx = midHalf(xs);
+    const my = midHalf(ys);
+    const mz = midHalf(zs);
+    const half = Math.max(mx.half, my.half, mz.half);
+    return {
+      x: [mx.mid - half, mx.mid + half],
+      y: [my.mid - half, my.mid + half],
+      z: [mz.mid - half, mz.mid + half],
+      half: half,
+    };
   }
 
-  function PlotDiv({ id, data, layout, config, preserveCamera }) {
+  function sceneBoundsFromPlots(plotArrays, padFrac) {
+    // Used by compare tab — equal box for stability.
+    return equalSceneBounds(plotArrays, padFrac, 0.75);
+  }
+
+  function PlotDiv({ id, data, layout, config }) {
     const ref = useRef(null);
     useEffect(() => {
       if (!ref.current || !window.Plotly) return;
-      const gd = ref.current;
-      let nextLayout = layout || {};
-      // Keep user orbit/zoom when scrubbing: reuse existing camera + stable uirevision.
-      if (preserveCamera && gd.layout && gd.layout.scene && gd.layout.scene.camera) {
-        nextLayout = Object.assign({}, nextLayout, {
-          scene: Object.assign({}, nextLayout.scene || {}, {
-            camera: gd.layout.scene.camera,
-          }),
-        });
-      }
       Plotly.react(
-        gd,
+        ref.current,
         data,
-        nextLayout,
+        layout,
         config || { responsive: true, displayModeBar: true }
       );
-    }, [id, data, layout, preserveCamera]);
+    }, [id, data, layout]);
     useEffect(() => {
       return () => {
         if (ref.current && window.Plotly) Plotly.purge(ref.current);
       };
     }, [id]);
     return e("div", { className: "plot", ref, id });
+  }
+
+  /**
+   * Flight 3D: newPlot once per run (fixed equal bounds + camera), then
+   * restyle-only on scrub so zoom/orbit never resets.
+   */
+  function Flight3DView({ runId, ts, frame }) {
+    const ref = useRef(null);
+    const ready = useRef(false);
+    const boundsRef = useRef(null);
+
+    // Full (re)build when run changes
+    useEffect(() => {
+      if (!ref.current || !window.Plotly || !ts || !ts.pos_plot) return;
+      const pos = ts.pos_plot;
+      const bounds = equalSceneBounds([pos, ts.ref_plot], 0.25, 1.0);
+      boundsRef.current = bounds;
+      ready.current = false;
+
+      const axis = function (title, range) {
+        return {
+          title: title,
+          range: range,
+          autorange: false,
+          gridcolor: "#2d3a4d",
+          zerolinecolor: "#3a4a60",
+          showbackground: true,
+          backgroundcolor: "#0c1018",
+        };
+      };
+
+      const traces = [
+        {
+          type: "scatter3d",
+          mode: "lines",
+          x: pos.map(function (p) {
+            return p[0];
+          }),
+          y: pos.map(function (p) {
+            return p[1];
+          }),
+          z: pos.map(function (p) {
+            return p[2];
+          }),
+          line: { color: "rgba(100,140,200,0.4)", width: 4 },
+          name: "path",
+          hoverinfo: "skip",
+        },
+      ];
+      if (ts.ref_plot) {
+        traces.push({
+          type: "scatter3d",
+          mode: "lines",
+          x: ts.ref_plot.map(function (p) {
+            return p[0];
+          }),
+          y: ts.ref_plot.map(function (p) {
+            return p[1];
+          }),
+          z: ts.ref_plot.map(function (p) {
+            return p[2];
+          }),
+          line: { color: "orange", width: 2, dash: "dash" },
+          name: "reference",
+          opacity: 0.75,
+          hoverinfo: "skip",
+        });
+      }
+      // placeholders for trail / vehicle / velocity — updated via restyle
+      traces.push({
+        type: "scatter3d",
+        mode: "lines",
+        x: [pos[0][0]],
+        y: [pos[0][1]],
+        z: [pos[0][2]],
+        line: { color: "#3d9cf0", width: 6 },
+        name: "trail",
+      });
+      traces.push({
+        type: "scatter3d",
+        mode: "markers",
+        x: [pos[0][0]],
+        y: [pos[0][1]],
+        z: [pos[0][2]],
+        marker: { size: 5, color: "#e7ecf3" },
+        name: "vehicle",
+      });
+      traces.push({
+        type: "scatter3d",
+        mode: "lines",
+        x: [pos[0][0], pos[0][0]],
+        y: [pos[0][1], pos[0][1]],
+        z: [pos[0][2], pos[0][2]],
+        line: { color: "#3ecf8e", width: 6 },
+        name: "velocity",
+      });
+
+      const layout = {
+        paper_bgcolor: "#0c1018",
+        plot_bgcolor: "#0c1018",
+        font: { color: "#e7ecf3", size: 11 },
+        margin: { l: 0, r: 0, t: 10, b: 0 },
+        uirevision: "flight-static-" + runId,
+        scene: {
+          xaxis: axis("N [m]", bounds.x),
+          yaxis: axis("E [m]", bounds.y),
+          zaxis: axis("up [m]", bounds.z),
+          // Equal meters on all axes (matches equal ranges)
+          aspectmode: "cube",
+          bgcolor: "#0c1018",
+          // Pull back so the full box is visible on first paint
+          camera: {
+            eye: { x: 1.85, y: 1.85, z: 1.35 },
+            center: { x: 0, y: 0, z: 0 },
+            up: { x: 0, y: 0, z: 1 },
+          },
+        },
+        showlegend: true,
+        legend: { orientation: "h", y: 1.08 },
+        height: 500,
+      };
+
+      Plotly.newPlot(ref.current, traces, layout, {
+        responsive: true,
+        displayModeBar: true,
+      }).then(function () {
+        ready.current = true;
+      });
+
+      return function () {
+        ready.current = false;
+        if (ref.current && window.Plotly) Plotly.purge(ref.current);
+      };
+    }, [runId, ts]);
+
+    // Scrub: restyle only — never relayout scene (preserves zoom/orbit)
+    useEffect(() => {
+      if (!ref.current || !window.Plotly || !ready.current || !ts || !ts.pos_plot) return;
+      const pos = ts.pos_plot;
+      const n = pos.length;
+      const i = Math.max(0, Math.min(frame, n - 1));
+      const trail = pos.slice(0, i + 1);
+      const bounds = boundsRef.current;
+      const half = bounds ? bounds.half : 1;
+      const v = ts.vel_ned[i];
+      const vNorm = Math.hypot(v[0], v[1], v[2]) || 1;
+      const vLen = 0.1 * 2 * half; // ~10% of box edge
+      const px = pos[i][0];
+      const py = pos[i][1];
+      const pz = pos[i][2];
+
+      // Trace index: 0 path, [1 ref?], trail, vehicle, velocity
+      const hasRef = !!ts.ref_plot;
+      const iTrail = hasRef ? 2 : 1;
+      const iVeh = iTrail + 1;
+      const iVel = iTrail + 2;
+
+      Plotly.restyle(
+        ref.current,
+        {
+          x: [
+            trail.map(function (p) {
+              return p[0];
+            }),
+            [px],
+            [px, px + (v[0] / vNorm) * vLen],
+          ],
+          y: [
+            trail.map(function (p) {
+              return p[1];
+            }),
+            [py],
+            [py, py + (v[1] / vNorm) * vLen],
+          ],
+          z: [
+            trail.map(function (p) {
+              return p[2];
+            }),
+            [pz],
+            [pz, pz - (v[2] / vNorm) * vLen],
+          ],
+        },
+        [iTrail, iVeh, iVel]
+      );
+    }, [frame, ts, runId]);
+
+    return e("div", { className: "plot", ref: ref, id: "flight3d-" + runId });
   }
 
   function Overview({ doc, onSelect }) {
@@ -133,73 +327,7 @@
 
     const n = ts.t.length;
     const i = Math.min(frame, n - 1);
-    const pos = ts.pos_plot;
-    const trail = pos.slice(0, i + 1);
-    // Fixed world box from full path (+ ref) so autorange never collapses to the marker.
-    const bounds = sceneBoundsFromPlots([pos, ts.ref_plot], 0.18);
-    const span = Math.max(
-      bounds.x[1] - bounds.x[0],
-      bounds.y[1] - bounds.y[0],
-      bounds.z[1] - bounds.z[0],
-      0.5
-    );
-
-    const traces = [
-      {
-        type: "scatter3d",
-        mode: "lines",
-        x: pos.map((p) => p[0]),
-        y: pos.map((p) => p[1]),
-        z: pos.map((p) => p[2]),
-        line: { color: "rgba(100,140,200,0.35)", width: 3 },
-        name: "full path",
-        showlegend: false,
-      },
-      {
-        type: "scatter3d",
-        mode: "lines",
-        x: trail.map((p) => p[0]),
-        y: trail.map((p) => p[1]),
-        z: trail.map((p) => p[2]),
-        line: { color: "#3d9cf0", width: 5 },
-        name: "trail",
-      },
-      {
-        type: "scatter3d",
-        mode: "markers",
-        x: [pos[i][0]],
-        y: [pos[i][1]],
-        z: [pos[i][2]],
-        marker: { size: 4, color: "#e7ecf3" },
-        name: "vehicle",
-      },
-    ];
-    if (ts.ref_plot) {
-      traces.unshift({
-        type: "scatter3d",
-        mode: "lines",
-        x: ts.ref_plot.map((p) => p[0]),
-        y: ts.ref_plot.map((p) => p[1]),
-        z: ts.ref_plot.map((p) => p[2]),
-        line: { color: "orange", width: 2, dash: "dash" },
-        name: "reference",
-        opacity: 0.7,
-      });
-    }
-    // velocity arrow scaled to ~12% of path span (plot frame: up = -D)
     const v = ts.vel_ned[i];
-    const vNorm = Math.hypot(v[0], v[1], v[2]) || 1;
-    const vLen = 0.12 * span;
-    traces.push({
-      type: "scatter3d",
-      mode: "lines",
-      x: [pos[i][0], pos[i][0] + (v[0] / vNorm) * vLen],
-      y: [pos[i][1], pos[i][1] + (v[1] / vNorm) * vLen],
-      z: [pos[i][2], pos[i][2] - (v[2] / vNorm) * vLen],
-      line: { color: "#3ecf8e", width: 6 },
-      name: "velocity",
-    });
-
     const u = ts.u[i];
     const hud =
       "t=" +
@@ -217,16 +345,6 @@
       "," +
       fmt(ts.euler_deg[i][2], 1) +
       ")°";
-
-    const axisStyle = function (title, range) {
-      return {
-        title: title,
-        gridcolor: "#2d3a4d",
-        zerolinecolor: "#3a4a60",
-        range: range,
-        autorange: false,
-      };
-    };
 
     return e(
       "div",
@@ -247,34 +365,7 @@
         }),
         e("span", { style: { color: "var(--muted)", fontSize: "0.85rem" } }, hud)
       ),
-      e("div", { className: "card" }, e(PlotDiv, {
-        id: "flight3d-" + run.id,
-        preserveCamera: true,
-        data: traces,
-        layout: {
-          paper_bgcolor: "#0c1018",
-          plot_bgcolor: "#0c1018",
-          font: { color: "#e7ecf3", size: 11 },
-          margin: { l: 0, r: 0, t: 20, b: 0 },
-          // Stable revision while scrubbing this run — keeps orbit/zoom.
-          uirevision: "flight-" + run.id,
-          scene: {
-            xaxis: axisStyle("N [m]", bounds.x),
-            yaxis: axisStyle("E [m]", bounds.y),
-            zaxis: axisStyle("up [m]", bounds.z),
-            aspectmode: "cube",
-            bgcolor: "#0c1018",
-            camera: {
-              eye: { x: 1.55, y: 1.55, z: 1.15 },
-              center: { x: 0, y: 0, z: 0 },
-              up: { x: 0, y: 0, z: 1 },
-            },
-          },
-          showlegend: true,
-          legend: { orientation: "h" },
-          height: 480,
-        },
-      })),
+      e("div", { className: "card" }, e(Flight3DView, { runId: run.id, ts: ts, frame: i })),
       e(
         "div",
         { className: "grid cols-2", style: { marginTop: "1rem" } },
