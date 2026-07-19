@@ -14,7 +14,7 @@ name: Pages showcase
 
 on:
   push:
-    branches: [master, main]
+    branches: [main, master]
     paths:
       - "docs/showcase/**"
       - ".github/workflows/pages-showcase.yml"
