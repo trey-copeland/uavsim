@@ -749,7 +749,7 @@ Exact thresholds are config, not buried constants without names.
 | **V2** | **Dual-run 3D overlay** | `compare` (or report dual) shows two trails / vehicle markers; same alignment policy as S10 |
 | **V3** | **Time-synced strip charts** | Position error, controls \(u(t)\), attitude vs \(t\) — static pack always; optional synced panel in interactive HTML |
 | **V4** | **Saturation / limit shading** | Control time series mark samples near thrust/torque limits (from vehicle limits in study config or controller artifact) |
-| **V5** | **MC plot pack** | Beyond RMSE hist: **CDF** of RMSE; **scatter** mass (and optionally other params) vs RMSE when `monte_carlo/trials.csv` present |
+| **V5** | **MC plot pack** | When `trials.csv` present: RMSE hist + CDF; **all param scatters** vs RMSE (mass, inertias, arm); multipanel sensitivity; **metric boxplots** + multi-metric hist grid; success bar; correlation bars; **exemplar path overlay** (re-sim best/median/worst); interactive `mc_dashboard.html` / `mc_sensitivity.html` with `--interactive` |
 | **V6** | **Feasibility callouts** | Report header/section from `guidance/feasibility.json` (ok, issue codes, severities) |
 | **V7** | **Interview one-liner** | `uavsim report <run> --interactive` writes interactive HTML under `figures/` and prints the path |
 | **V8** | **Export stills** | At least one PNG keyframe of the 3D scene (path + vehicle pose) for README / static sharing |

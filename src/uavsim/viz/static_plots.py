@@ -14,6 +14,7 @@ from uavsim.viz.loaders import (
     ned_to_plot,
     saturation_mask,
 )
+from uavsim.viz.mc_plots import write_mc_figures
 
 
 def write_static_figures(art: RunArtifacts, fig_dir: Path | None = None) -> list[Path]:
@@ -36,7 +37,7 @@ def write_static_figures(art: RunArtifacts, fig_dir: Path | None = None) -> list
         if path3d is not None:
             written.append(path3d)
 
-    written.extend(_mc_pack(art, fig_dir, plt))
+    written.extend(write_mc_figures(art, fig_dir))
     return written
 
 
@@ -196,58 +197,3 @@ def _flight_still(art: RunArtifacts, fig_dir: Path, plt: Any) -> Path | None:
     fig.savefig(out, dpi=140)
     plt.close(fig)
     return out
-
-
-def _mc_pack(art: RunArtifacts, fig_dir: Path, plt: Any) -> list[Path]:
-    """V5: hist + CDF + mass vs RMSE scatter."""
-    if not art.trials:
-        return []
-    rmse = [float(t["rmse_position_m"]) for t in art.trials if t.get("rmse_position_m") is not None]
-    if not rmse:
-        return []
-    written: list[Path] = []
-    rmse_a = np.asarray(rmse, dtype=float)
-
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.hist(rmse_a, bins=min(20, max(5, len(rmse_a) // 2)), edgecolor="black", alpha=0.75)
-    ax.set_xlabel("RMSE position [m]")
-    ax.set_ylabel("count")
-    n = art.mc_summary.get("n_trials") if art.mc_summary else len(rmse_a)
-    ax.set_title(f"MC RMSE histogram (N={n})")
-    ax.grid(True, alpha=0.3)
-    fig.tight_layout()
-    out = fig_dir / "mc_rmse_hist.png"
-    fig.savefig(out, dpi=120)
-    plt.close(fig)
-    written.append(out)
-
-    # CDF
-    s = np.sort(rmse_a)
-    y = np.arange(1, s.size + 1) / s.size
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.plot(s, y, drawstyle="steps-post")
-    ax.set_xlabel("RMSE position [m]")
-    ax.set_ylabel("CDF")
-    ax.set_title("MC RMSE CDF (V5)")
-    ax.grid(True, alpha=0.3)
-    fig.tight_layout()
-    out = fig_dir / "mc_rmse_cdf.png"
-    fig.savefig(out, dpi=120)
-    plt.close(fig)
-    written.append(out)
-
-    masses = [t.get("mass_kg") for t in art.trials]
-    if all(m is not None for m in masses):
-        fig, ax = plt.subplots(figsize=(6, 4))
-        ax.scatter(masses, rmse_a, alpha=0.75, edgecolors="k", linewidths=0.3)
-        ax.set_xlabel("mass [kg]")
-        ax.set_ylabel("RMSE position [m]")
-        ax.set_title("MC mass vs RMSE (V5)")
-        ax.grid(True, alpha=0.3)
-        fig.tight_layout()
-        out = fig_dir / "mc_mass_vs_rmse.png"
-        fig.savefig(out, dpi=120)
-        plt.close(fig)
-        written.append(out)
-
-    return written

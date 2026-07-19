@@ -68,6 +68,19 @@ def generate_report(
         except FileNotFoundError as exc:
             parts.append(str(exc))
 
+        if art.trials:
+            try:
+                from uavsim.viz.mc_plots import write_mc_dashboard_html
+
+                dash = write_mc_dashboard_html(art)
+                fig_paths.append(dash)
+                sens = art.run_dir / "figures" / "mc_sensitivity.html"
+                if sens.is_file():
+                    fig_paths.append(sens)
+                parts.append(f"mc_dashboard={dash}")
+            except (ImportError, FileNotFoundError) as exc:
+                parts.append(f"mc_dashboard skipped: {exc}")
+
     return ReportResult(
         run_dir=run_dir,
         summary_md=summary_md,

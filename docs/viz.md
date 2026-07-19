@@ -25,7 +25,12 @@ uv run uavsim compare runs/<a> runs/<b> --interactive
 |------|--------|
 | `figures/nominal_timeseries.png` | V3 strips + V4 saturation bands |
 | `figures/nominal_path_3d.png` / `flight_still.png` | V8 stills |
-| `figures/mc_rmse_hist.png`, `mc_rmse_cdf.png`, `mc_mass_vs_rmse.png` | V5 |
+| `figures/mc_rmse_hist.png`, `mc_rmse_cdf.png` | V5 distributions |
+| `figures/mc_*_vs_rmse.png`, `mc_param_scatters.png` | V5 param sensitivity |
+| `figures/mc_metrics_box.png`, `mc_metrics_dist.png` | V5 multi-metric |
+| `figures/mc_success.png`, `mc_param_corr.png` | V5 summary |
+| `figures/mc_exemplar_paths.png` | V5 re-sim best/median/worst paths |
+| `figures/mc_dashboard.html`, `mc_sensitivity.html` | V5 interactive (`--interactive`) |
 | `figures/flight_3d.html` | V1 + V7 interactive |
 | `compare_*/compare_3d.html` | V2 dual overlay |
 | `reports/summary.md` | metrics + V6 feasibility section |

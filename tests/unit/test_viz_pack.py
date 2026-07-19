@@ -76,6 +76,28 @@ def test_mc_static_pack(tmp_path: Path) -> None:
     assert "mc_rmse_hist.png" in names
     assert "mc_rmse_cdf.png" in names
     assert "mc_mass_vs_rmse.png" in names
+    assert "mc_param_scatters.png" in names
+    assert "mc_metrics_box.png" in names
+    assert "mc_metrics_dist.png" in names
+    assert "mc_success.png" in names
+    assert "mc_param_corr.png" in names
+    assert "mc_exemplar_paths.png" in names
+
+
+@pytest.mark.skipif(not plotly_available(), reason="plotly not installed")
+def test_mc_dashboard(tmp_path: Path) -> None:
+    from uavsim.viz.mc_plots import write_mc_dashboard_html
+
+    result = run_nominal_study(
+        ROOT / "configs" / "studies" / "hover_mc_smoke.yaml",
+        output_root=tmp_path / "runs",
+        run_mc=True,
+        n_trials_override=4,
+    )
+    art = load_run(result.run_dir)
+    dash = write_mc_dashboard_html(art)
+    assert dash.is_file()
+    assert (result.run_dir / "figures" / "mc_sensitivity.html").is_file()
 
 
 @pytest.mark.skipif(not plotly_available(), reason="plotly not installed")
