@@ -27,6 +27,8 @@ Tabs: overview cards · 3D flight scrubber · metrics + feasibility · MC hist/C
 | [`SPEC.md`](SPEC.md) | What we build, scope, acceptance |
 | [`ROADMAP.md`](ROADMAP.md) | Phases, milestones, now/next/later |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How we structure code, interfaces, systems |
+| [`docs/developer/README.md`](docs/developer/README.md) | **Extend & research:** vehicles, control, guidance, dynamics |
+| [`docs/developer/EXTENSIBILITY_TODO.md`](docs/developer/EXTENSIBILITY_TODO.md) | Gaps / enablement backlog for plugins |
 | [`docs/viz.md`](docs/viz.md) | Interactive 3D + report figure pack (§11A) |
 | [`docs/showcase/README.md`](docs/showcase/README.md) | React showcase + Pages hosting |
 | [`docs/containers.md`](docs/containers.md) | Docker + sharded MC |

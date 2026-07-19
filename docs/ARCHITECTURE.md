@@ -1,9 +1,10 @@
 # Architecture — `uavsim` / quadrotor-sim
 
 **Status:** v0.4 (stand-up map)  
-**Last updated:** 2026-07-18  
+**Last updated:** 2026-07-19  
 **Normative product intent:** [`SPEC.md`](../SPEC.md) (v0.2+)  
-**Working agreements:** [`GROK.md`](../GROK.md)
+**Working agreements:** [`GROK.md`](../GROK.md)  
+**How to extend (research users):** [`docs/developer/`](developer/README.md) · backlog [`EXTENSIBILITY_TODO.md`](developer/EXTENSIBILITY_TODO.md)
 
 This document is the **implementation map**: packages, interfaces, data flow, results, systems, and extension points. If code and this doc disagree, fix one of them — do not leave drift.
 
@@ -301,7 +302,10 @@ Unknown `type` → hard error at config load (fail fast).
 3. Register in the guidance registry.  
 4. Emit a standard `uavsim.reference.ReferenceTrajectory`.  
 5. Add unit tests for the backend + one integration test that drives `ClosedLoopSim` without control changes.  
-6. Add example under `configs/missions/` + study under `configs/studies/`.
+6. Add example under `configs/missions/` + study under `configs/studies/`.  
+7. **Also wire** `studies/pipeline._build_guidance` and `guidance_mission_dict` until registry-driven config lands (see developer guide **TODO G-5**).
+
+Step-by-step narrative: [`docs/developer/guidance.md`](developer/guidance.md).
 
 ### 6.8 Post-core navigation (planned, not core-complete)
 
@@ -345,9 +349,12 @@ xdot = dynamics.f(x, u, vehicle)     # uavsim.dynamics
 ### 7.3 How to add a controller
 
 1. Implement protocol; no direct imports of a specific guidance backend.  
-2. Register by id; study config `controller.type`.  
+2. Extend factory + study config `controller.type` (registry is **TODO C-5**).  
 3. Unit test interface + integration smoke on a gentle mission.  
-4. Optional comparison study config (same mission, two controllers).
+4. Optional comparison study config (same mission, two controllers).  
+5. Optional export artifact path for HIL handoff.
+
+Step-by-step narrative: [`docs/developer/control.md`](developer/control.md).
 
 ### 7.4 Control-law refinement path (SIL)
 
