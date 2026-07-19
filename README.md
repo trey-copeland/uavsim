@@ -2,7 +2,9 @@
 
 Modern **quadrotor simulation and GNC analysis** framework for portfolio-quality demos: flight dynamics (NED), guidance, control, Monte Carlo robustness, and reproducible study pipelines — including containerized and sharded execution.
 
-**Status:** Core SIL workflow complete (through Phase 5). Visualization pack + **React results showcase** (GitHub Pages-ready). Post-core: nav (Phase 6), HIL (Phase 7).  
+**Status:** Core SIL workflow complete (through Phase 5). Visualization pack + **React results showcase**. Post-core: nav (Phase 6), HIL (Phase 7).
+
+**Live showcase:** [https://trey-copeland.github.io/uavsim/](https://trey-copeland.github.io/uavsim/)
 
 **Intended workflow:** configure vehicle → inject dynamics → design/analyze control in SIL → export controller → (later) HIL → compare runs. Implementation follows `docs/ARCHITECTURE.md`.
 
@@ -10,15 +12,17 @@ Modern **quadrotor simulation and GNC analysis** framework for portfolio-quality
 
 ## Live showcase
 
-Interactive React document rolling up the portfolio **base case** (LQR square, PID on the same mission, hover Monte Carlo):
+Interactive React document rolling up the portfolio **base case** (elevated figure-eight under LQR and PID, multi-hundred-trial Monte Carlo).
+
+**→ [Open the live showcase](https://trey-copeland.github.io/uavsim/)**
 
 | | |
 |--|--|
+| **Live (GitHub Pages)** | [trey-copeland.github.io/uavsim](https://trey-copeland.github.io/uavsim/) |
 | **Local** | `python -m http.server 8765 --directory docs/showcase` → [http://127.0.0.1:8765/](http://127.0.0.1:8765/) |
-| **GitHub Pages** | `https://trey-copeland.github.io/uavsim/` — after first green **Pages showcase** job: **Settings → Pages → Deploy from a branch → `gh-pages` / root** |
-| **Source / regenerate** | [`docs/showcase/`](docs/showcase/) · `uv run uavsim gallery --base-case` |
+| **Source / regenerate** | [`docs/showcase/`](docs/showcase/) · `uv run uavsim gallery --base-case` (uses study YAML MC N, default 200) |
 
-Tabs: overview cards · 3D flight scrubber · metrics + feasibility · MC hist/CDF/scatter · LQR vs PID compare.
+Tabs: overview · 3D flight scrubber · metrics · MC distribution/sensitivity grids · LQR vs PID compare.
 
 ## Docs
 
@@ -62,12 +66,14 @@ uv run uavsim simulate configs/studies/hover_from_offset.yaml
 # Waypoint missions (Phase 2)
 uv run uavsim simulate configs/studies/hover_waypoints.yaml
 uv run uavsim simulate configs/studies/gentle_square.yaml
+uv run uavsim simulate configs/studies/figure_eight.yaml
 uv run uavsim simulate configs/studies/gentle_square_interp.yaml
 uv run uavsim simulate configs/studies/aggressive_square.yaml
 
 # Monte Carlo robustness (Phase 3)
 uv run uavsim study configs/studies/hover_mc_smoke.yaml
 uv run uavsim study configs/studies/gentle_square_mc.yaml --n-trials 10
+uv run uavsim study configs/studies/figure_eight_mc.yaml --n-trials 20
 uv run uavsim report runs/<study_id>_<timestamp>/
 
 # Sharded MC + container (Phase 4) — see docs/containers.md
@@ -77,8 +83,8 @@ docker run --rm -v "$PWD":/work -w /work uavsim:local \
   study configs/studies/hover_mc_smoke.yaml --output runs
 
 # Export + compare + second controller (Phase 5)
-uv run uavsim simulate configs/studies/gentle_square.yaml
-uv run uavsim simulate configs/studies/compare_lqr_vs_pid.yaml
+uv run uavsim simulate configs/studies/figure_eight.yaml
+uv run uavsim simulate configs/studies/figure_eight_pid.yaml
 uv run uavsim export-controller runs/<lqr_run> --out artifacts/controllers/lqr.yaml
 uv run uavsim compare runs/<lqr_run> runs/<pid_run> --figures
 
@@ -87,10 +93,12 @@ uv run uavsim report runs/<study_id>_<timestamp>/ --interactive
 # → figures/flight_3d.html (rotate, play, vectors + HUD)
 uv run uavsim compare runs/<a> runs/<b> --interactive
 
-# React portfolio showcase (base case → docs/showcase)
+# React portfolio showcase (figure-eight base case → docs/showcase)
+# Full MC is ~200 trials (several minutes); smoke with --n-mc-trials 8
 uv run uavsim gallery --base-case
 python -m http.server 8765 --directory docs/showcase
 ```
+
 
 Run artifacts land under `runs/<study_id>_<timestamp>/` (gitignored). Monte Carlo writes `monte_carlo/trials.csv`, `summary.json`. Viz extras: `uv sync --extra viz` (matplotlib + plotly).
 

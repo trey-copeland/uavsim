@@ -16,13 +16,16 @@ from uavsim.viz.loaders import load_run, ned_to_plot
 
 GALLERY_SCHEMA = 1
 
-# Portfolio base case: tracking + second controller + MC robustness
+# Portfolio base case: figure-eight tracking + second controller + large MC
 BASE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
     # (relative study path, gallery id, role)
-    ("configs/studies/gentle_square.yaml", "gentle_square_lqr", "tracking_lqr"),
-    ("configs/studies/compare_lqr_vs_pid.yaml", "gentle_square_pid", "tracking_pid"),
-    ("configs/studies/hover_mc_smoke.yaml", "hover_mc", "monte_carlo"),
+    ("configs/studies/figure_eight.yaml", "figure_eight_lqr", "tracking_lqr"),
+    ("configs/studies/figure_eight_pid.yaml", "figure_eight_pid", "tracking_pid"),
+    ("configs/studies/figure_eight_mc.yaml", "figure_eight_mc", "monte_carlo"),
 )
+
+# Browser payload cap (full n_trials still reported in mc.n_trials / summary)
+MC_TRIALS_IN_GALLERY = 400
 
 
 def _downsample(n: int, max_points: int) -> np.ndarray:
@@ -94,14 +97,15 @@ def run_to_gallery_entry(
         entry["timeseries"] = ts
 
     if art.trials:
-        # Cap trials payload for browser
+        # Cap trials payload for browser (summary still reflects full N)
         trials = art.trials
-        if len(trials) > 200:
-            trials = trials[:200]
+        if len(trials) > MC_TRIALS_IN_GALLERY:
+            trials = trials[:MC_TRIALS_IN_GALLERY]
         entry["mc"] = {
             "summary": art.mc_summary,
             "trials": trials,
             "n_trials": len(art.trials),
+            "n_trials_in_payload": len(trials),
         }
     return entry
 
@@ -109,7 +113,7 @@ def run_to_gallery_entry(
 def build_gallery_document(
     runs: list[dict[str, Any]],
     *,
-    title: str = "uavsim results showcase",
+    title: str = "uavsim · flight results",
     description: str = "",
     compare_ids: tuple[str, str] | None = None,
 ) -> dict[str, Any]:
@@ -207,16 +211,18 @@ def generate_base_case_gallery(
     repo_root: str | Path | None = None,
     out_dir: str | Path | None = None,
     runs_tmp: str | Path | None = None,
-    max_points: int = 160,
-    n_mc_trials: int = 12,
+    max_points: int = 200,
+    n_mc_trials: int | None = None,
 ) -> Path:
     """
     Run the portfolio base-case studies and write ``docs/showcase``.
 
     Base case:
-      1. Gentle square with LQR (tracking demo)
+      1. Elevated figure-eight with LQR (tracking demo)
       2. Same mission with PID cascade (controller compare)
-      3. Hover MC smoke (robustness)
+      3. Figure-eight Monte Carlo under mass/inertia/arm uncertainty
+
+    ``n_mc_trials`` overrides the study YAML when set (useful for smoke tests).
     """
     from uavsim.studies import run_nominal_study
 
@@ -227,9 +233,9 @@ def generate_base_case_gallery(
 
     entries: list[dict[str, Any]] = []
     labels = {
-        "gentle_square_lqr": "Gentle square — LQR",
-        "gentle_square_pid": "Gentle square — PID cascade",
-        "hover_mc": "Hover MC smoke",
+        "figure_eight_lqr": "Figure-eight — LQR",
+        "figure_eight_pid": "Figure-eight — PID cascade",
+        "figure_eight_mc": "Figure-eight Monte Carlo",
     }
     for rel, gid, role in BASE_CASE_STUDIES:
         study = root / rel
@@ -237,7 +243,7 @@ def generate_base_case_gallery(
             msg = f"Base-case study missing: {study}"
             raise FileNotFoundError(msg)
         force_mc = role == "monte_carlo"
-        n_override = n_mc_trials if force_mc else None
+        n_override = n_mc_trials if force_mc and n_mc_trials is not None else None
         result = run_nominal_study(
             study,
             output_root=tmp,
@@ -256,13 +262,13 @@ def generate_base_case_gallery(
 
     doc = build_gallery_document(
         entries,
-        title="uavsim — portfolio results showcase",
+        title="uavsim · flight results",
         description=(
-            "Frozen base case: LQR vs PID on a gentle square mission, plus a "
-            "seeded hover Monte Carlo under mass/inertia uncertainty. "
-            "All data regenerated from configs via `uavsim gallery --base-case`."
+            "Elevated figure-eight under LQR and PID, plus a multi-hundred-trial "
+            "Monte Carlo with mass, inertia, and arm uncertainty. "
+            "Software-in-the-loop only."
         ),
-        compare_ids=("gentle_square_lqr", "gentle_square_pid"),
+        compare_ids=("figure_eight_lqr", "figure_eight_pid"),
     )
     write_gallery(doc, out, copy_app=True, template_dir=root / "docs" / "showcase")
     # write meta for README

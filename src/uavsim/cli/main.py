@@ -138,8 +138,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_gallery.add_argument(
         "--n-mc-trials",
         type=int,
-        default=12,
-        help="MC trial count for base-case hover study (default 12)",
+        default=None,
+        help="Override MC trial count for base-case study (default: study YAML, e.g. 200)",
     )
 
     p_report = sub.add_parser(

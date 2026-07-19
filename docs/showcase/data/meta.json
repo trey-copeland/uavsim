@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-19T15:02:34.132757+00:00",
+  "generated_at": "2026-07-19T16:30:50.716001+00:00",
   "uavsim_version": "0.1.0",
   "runs": [
-    "gentle_square_lqr",
-    "gentle_square_pid",
-    "hover_mc"
+    "figure_eight_lqr",
+    "figure_eight_pid",
+    "figure_eight_mc"
   ],
   "command": "uavsim gallery --base-case"
 }

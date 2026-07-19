@@ -1,31 +1,44 @@
 :root {
-  --bg: #0f1419;
-  --panel: #1a2332;
-  --border: #2d3a4d;
-  --text: #e7ecf3;
-  --muted: #8b9bb4;
-  --accent: #3d9cf0;
+  --bg: #111315;
+  --panel: #1a1d21;
+  --border: #2a2f36;
+  --text: #e8eaed;
+  --muted: #9aa0a6;
+  --accent: #5b9fd4;
   --good: #3ecf8e;
   --bad: #f07178;
   --warn: #e6b450;
-  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 * { box-sizing: border-box; }
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  line-height: 1.45;
+  line-height: 1.5;
 }
 .loading { padding: 2rem; color: var(--muted); }
 header.app-header {
   border-bottom: 1px solid var(--border);
-  padding: 1rem 1.5rem;
-  background: linear-gradient(180deg, #152033 0%, var(--bg) 100%);
+  padding: 1.25rem 1.5rem 1.1rem;
+  background: var(--bg);
 }
-header h1 { margin: 0 0 0.25rem; font-size: 1.35rem; font-weight: 600; }
+header h1 {
+  margin: 0 0 0.4rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", "Segoe UI Mono", Menlo, monospace;
+}
+header .tagline {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  max-width: 62ch;
+  line-height: 1.45;
+}
 header p { margin: 0; color: var(--muted); font-size: 0.9rem; max-width: 70ch; }
-.meta { margin-top: 0.5rem; font-size: 0.75rem; color: var(--muted); }
+.meta { margin-top: 0.55rem; font-size: 0.72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 nav.tabs {
   display: flex; flex-wrap: wrap; gap: 0.35rem;
   padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border);

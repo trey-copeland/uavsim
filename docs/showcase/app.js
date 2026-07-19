@@ -365,12 +365,12 @@
       e(
         "div",
         { className: "card", style: { gridColumn: "1 / -1" } },
-        e("h2", null, "Base case narrative"),
+        e("h2", null, "About these runs"),
         e(
           "p",
           { style: { margin: 0, color: "var(--muted)", fontSize: "0.9rem" } },
           doc.description ||
-            "Portfolio SIL demo: nonlinear quadrotor tracking, two controllers, Monte Carlo robustness."
+            "LQR and PID on a gentle square, plus hover Monte Carlo under mass and inertia uncertainty."
         )
       )
     );
@@ -664,14 +664,169 @@
   function McTab({ run }) {
     const mc = run.mc;
     if (!mc || !mc.trials || !mc.trials.length) {
-      return e("div", { className: "card" }, "No Monte Carlo trials in this run. Select the hover MC card.");
+      return e(
+        "div",
+        { className: "card" },
+        "No Monte Carlo trials in this run. Open the Monte Carlo card from Overview."
+      );
     }
     const trials = mc.trials;
-    const rmse = trials.map((t) => t.rmse_position_m).filter((x) => x != null);
-    const mass = trials.map((t) => t.mass_kg);
+    const col = (key) => trials.map((t) => t[key]).filter((x) => x != null && Number.isFinite(+x)).map(Number);
+    const rmse = col("rmse_position_m");
+    const att = col("rmse_attitude_rad").map((r) => (r * 180) / Math.PI);
     const s = [...rmse].sort((a, b) => a - b);
     const cdfY = s.map((_, i) => (i + 1) / s.length);
-    const nOk = trials.filter((t) => t.success === true).length;
+    const nShow = trials.length;
+    const nAll = mc.n_trials || nShow;
+    const sum = mc.summary || {};
+    const nOk =
+      sum.n_success != null
+        ? sum.n_success
+        : trials.filter((t) => t.success === true).length;
+    const mPos = (sum.metrics || {}).rmse_position_m || {};
+    const plotTheme = {
+      paper_bgcolor: "#0c1018",
+      plot_bgcolor: "#0c1018",
+      font: { color: "#e7ecf3", size: 11 },
+      margin: { t: 36, r: 12, b: 40, l: 48 },
+    };
+    const nbins = Math.max(12, Math.min(40, Math.floor(Math.sqrt(Math.max(rmse.length, 1)))));
+
+    // Multi-metric distribution grid (heritage-style pack)
+    const distSpecs = [
+      { key: "rmse_position_m", title: "Position RMSE [m]", scale: 1 },
+      { key: "rmse_attitude_rad", title: "Attitude RMSE [deg]", scale: 180 / Math.PI },
+      { key: "max_position_error_m", title: "Max |e| [m]", scale: 1 },
+      { key: "rmse_velocity_m_s", title: "Velocity RMSE [m/s]", scale: 1 },
+      { key: "peak_thrust_n", title: "Peak thrust [N]", scale: 1 },
+      { key: "control_effort_proxy", title: "Control effort", scale: 1 },
+    ];
+    const distGrid = {
+      data: distSpecs.map((spec, i) => ({
+        x: col(spec.key).map((v) => v * spec.scale),
+        type: "histogram",
+        nbinsx: nbins,
+        marker: { color: "#5b9fd4", line: { color: "#111315", width: 0.35 } },
+        xaxis: "x" + (i + 1),
+        yaxis: "y" + (i + 1),
+        name: spec.title,
+        showlegend: false,
+      })),
+      layout: (function () {
+        const L = {
+          ...plotTheme,
+          height: 440,
+          title: { text: "Metric distributions (all trials in payload)", font: { size: 13 } },
+          margin: { t: 48, r: 16, b: 36, l: 40 },
+        };
+        for (let i = 0; i < 6; i++) {
+          const colI = i % 3;
+          const rowI = Math.floor(i / 3);
+          const x0 = 0.06 + colI * 0.32;
+          const x1 = x0 + 0.26;
+          const y0 = rowI === 0 ? 0.58 : 0.08;
+          const y1 = rowI === 0 ? 0.95 : 0.45;
+          L["xaxis" + (i + 1)] = {
+            domain: [x0, x1],
+            anchor: "y" + (i + 1),
+            title: { text: distSpecs[i].title, font: { size: 10 } },
+            gridcolor: "#2a2f36",
+            zeroline: false,
+            tickfont: { size: 9 },
+          };
+          L["yaxis" + (i + 1)] = {
+            domain: [y0, y1],
+            anchor: "x" + (i + 1),
+            title: colI === 0 ? { text: "count", font: { size: 10 } } : undefined,
+            gridcolor: "#2a2f36",
+            tickfont: { size: 9 },
+          };
+        }
+        return L;
+      })(),
+    };
+
+    // Parameter sensitivity grid: params vs position RMSE + Ixx/Iyy vs attitude
+    const sensPairs = [
+      { x: "mass_kg", y: "rmse_position_m", xt: "mass [kg]", yt: "pos RMSE [m]", yScale: 1 },
+      { x: "ixx_kg_m2", y: "rmse_position_m", xt: "Ixx [kg·m²]", yt: "pos RMSE [m]", yScale: 1 },
+      { x: "iyy_kg_m2", y: "rmse_position_m", xt: "Iyy [kg·m²]", yt: "pos RMSE [m]", yScale: 1 },
+      { x: "izz_kg_m2", y: "rmse_position_m", xt: "Izz [kg·m²]", yt: "pos RMSE [m]", yScale: 1 },
+      { x: "arm_length_m", y: "rmse_position_m", xt: "arm [m]", yt: "pos RMSE [m]", yScale: 1 },
+      {
+        x: "iyy_kg_m2",
+        y: "rmse_attitude_rad",
+        xt: "Iyy [kg·m²]",
+        yt: "att RMSE [deg]",
+        yScale: 180 / Math.PI,
+      },
+    ];
+    const sensGrid = {
+      data: sensPairs.map((p, i) => {
+        const xs = [];
+        const ys = [];
+        trials.forEach((t) => {
+          const xv = t[p.x];
+          const yv = t[p.y];
+          if (xv == null || yv == null) return;
+          if (!Number.isFinite(+xv) || !Number.isFinite(+yv)) return;
+          xs.push(+xv);
+          ys.push(+yv * p.yScale);
+        });
+        return {
+          x: xs,
+          y: ys,
+          mode: "markers",
+          type: "scatter",
+          marker: { size: 5, color: "#e6b450", opacity: 0.65, line: { width: 0 } },
+          xaxis: "x" + (i + 1),
+          yaxis: "y" + (i + 1),
+          showlegend: false,
+        };
+      }),
+      layout: (function () {
+        const L = {
+          ...plotTheme,
+          height: 440,
+          title: { text: "Parameter sensitivity", font: { size: 13 } },
+          margin: { t: 48, r: 16, b: 36, l: 48 },
+        };
+        for (let i = 0; i < sensPairs.length; i++) {
+          const colI = i % 3;
+          const rowI = Math.floor(i / 3);
+          const x0 = 0.07 + colI * 0.32;
+          const x1 = x0 + 0.26;
+          const y0 = rowI === 0 ? 0.58 : 0.08;
+          const y1 = rowI === 0 ? 0.95 : 0.45;
+          L["xaxis" + (i + 1)] = {
+            domain: [x0, x1],
+            anchor: "y" + (i + 1),
+            title: { text: sensPairs[i].xt, font: { size: 10 } },
+            gridcolor: "#2a2f36",
+            zeroline: false,
+            tickfont: { size: 9 },
+          };
+          L["yaxis" + (i + 1)] = {
+            domain: [y0, y1],
+            anchor: "x" + (i + 1),
+            title: { text: sensPairs[i].yt, font: { size: 10 } },
+            gridcolor: "#2a2f36",
+            tickfont: { size: 9 },
+          };
+        }
+        return L;
+      })(),
+    };
+
+    // Correlation bars (position RMSE vs params) from summary when present
+    const corr =
+      sum.correlations_vs_rmse_position ||
+      (sum.correlations && sum.correlations.rmse_position_m) ||
+      {};
+    const corrKeys = ["mass_kg", "ixx_kg_m2", "iyy_kg_m2", "izz_kg_m2", "arm_length_m"].filter(
+      (k) => corr[k] != null && Number.isFinite(+corr[k])
+    );
+    const corrVals = corrKeys.map((k) => +corr[k]);
 
     return e(
       "div",
@@ -679,67 +834,119 @@
       e(
         "div",
         { className: "card" },
-        e("h2", null, "MC summary"),
-        e("div", { className: "stat" }, String(mc.n_trials), e("span", null, "trials")),
+        e("h2", null, "MC summary — ", run.label),
+        e("div", { className: "stat" }, String(nAll), e("span", null, "trials")),
         e(
           "p",
           { style: { color: "var(--muted)", fontSize: "0.85rem" } },
           "success ",
           nOk,
           "/",
-          trials.length,
+          nAll,
+          nShow !== nAll ? " · plots use " + nShow + " trials" : "",
           " · fail rate ",
-          fmt((mc.summary || {}).failure_rate, 3)
-        )
+          fmt(sum.failure_rate, 3)
+        ),
+        mPos.mean != null
+          ? e(
+              "p",
+              { style: { color: "var(--muted)", fontSize: "0.85rem", marginTop: "0.35rem" } },
+              "pos RMSE mean ",
+              fmt(mPos.mean, 4),
+              " ± ",
+              fmt(mPos.std, 4),
+              " m · p95 ",
+              fmt(mPos.p95, 4),
+              " m"
+            )
+          : null,
+        att.length
+          ? e(
+              "p",
+              { style: { color: "var(--muted)", fontSize: "0.85rem" } },
+              "att RMSE (payload) mean ",
+              fmt(att.reduce((a, b) => a + b, 0) / att.length, 2),
+              "°"
+            )
+          : null
       ),
       e("div", { className: "card" }, e(PlotDiv, {
         id: "mc_hist",
-        data: [{ x: rmse, type: "histogram", nbinsx: 12, marker: { color: "#3d9cf0" } }],
+        data: [
+          {
+            x: rmse,
+            type: "histogram",
+            nbinsx: nbins,
+            marker: { color: "#5b9fd4", line: { color: "#111315", width: 0.4 } },
+          },
+        ],
         layout: {
-          title: "RMSE histogram",
-          paper_bgcolor: "#0c1018",
-          plot_bgcolor: "#0c1018",
-          font: { color: "#e7ecf3", size: 11 },
-          height: 300,
-          margin: { t: 40, r: 10, b: 40, l: 50 },
+          ...plotTheme,
+          title: "Position RMSE",
+          height: 280,
+          xaxis: { title: "RMSE [m]", gridcolor: "#2a2f36" },
+          yaxis: { title: "count", gridcolor: "#2a2f36" },
         },
       })),
       e("div", { className: "card" }, e(PlotDiv, {
         id: "mc_cdf",
-        data: [{ x: s, y: cdfY, type: "scatter", mode: "lines", line: { shape: "hv", color: "#3ecf8e" } }],
-        layout: {
-          title: "RMSE CDF",
-          paper_bgcolor: "#0c1018",
-          plot_bgcolor: "#0c1018",
-          font: { color: "#e7ecf3", size: 11 },
-          height: 300,
-          margin: { t: 40, r: 10, b: 40, l: 50 },
-          xaxis: { title: "RMSE [m]" },
-          yaxis: { title: "CDF" },
-        },
-      })),
-      e("div", { className: "card" }, e(PlotDiv, {
-        id: "mc_scatter",
         data: [
           {
-            x: mass,
-            y: rmse,
-            mode: "markers",
+            x: s,
+            y: cdfY,
             type: "scatter",
-            marker: { size: 9, color: "#e6b450" },
+            mode: "lines",
+            line: { shape: "hv", color: "#3ecf8e", width: 2 },
           },
         ],
         layout: {
-          title: "mass vs RMSE",
-          paper_bgcolor: "#0c1018",
-          plot_bgcolor: "#0c1018",
-          font: { color: "#e7ecf3", size: 11 },
-          height: 300,
-          margin: { t: 40, r: 10, b: 40, l: 50 },
-          xaxis: { title: "mass [kg]" },
-          yaxis: { title: "RMSE [m]" },
+          ...plotTheme,
+          title: "Position RMSE CDF",
+          height: 280,
+          xaxis: { title: "RMSE [m]", gridcolor: "#2a2f36" },
+          yaxis: { title: "CDF", gridcolor: "#2a2f36", range: [0, 1.02] },
         },
-      }))
+      })),
+      corrKeys.length
+        ? e("div", { className: "card" }, e(PlotDiv, {
+            id: "mc_corr",
+            data: [
+              {
+                y: corrKeys,
+                x: corrVals,
+                type: "bar",
+                orientation: "h",
+                marker: {
+                  color: corrVals.map((v) => (v >= 0 ? "#f07178" : "#5b9fd4")),
+                  line: { color: "#111315", width: 0.4 },
+                },
+              },
+            ],
+            layout: {
+              ...plotTheme,
+              title: "Pearson r vs position RMSE",
+              height: 280,
+              xaxis: { title: "r", range: [-1.05, 1.05], gridcolor: "#2a2f36", zeroline: true },
+              yaxis: { automargin: true, tickfont: { size: 10 } },
+              margin: { t: 40, r: 16, b: 40, l: 100 },
+            },
+          }))
+        : e(
+            "div",
+            { className: "card" },
+            e("h2", null, "Correlations"),
+            e("p", { style: { color: "var(--muted)" } }, "No correlation summary in this run.")
+          ),
+      e(
+        "div",
+        { className: "card", style: { gridColumn: "1 / -1" } },
+        e(PlotDiv, { id: "mc_dist_grid", data: distGrid.data, layout: distGrid.layout })
+      ),
+      e(
+        "div",
+        { className: "card", style: { gridColumn: "1 / -1" } },
+        e(PlotDiv, { id: "mc_sens_grid", data: sensGrid.data, layout: sensGrid.layout })
+      )
     );
   }
 
@@ -944,17 +1151,16 @@
       e(
         "header",
         { className: "app-header" },
-        e("h1", null, doc.title || "uavsim showcase"),
-        e("p", null, doc.description || ""),
+        e("h1", null, doc.title || "uavsim · flight results"),
+        e("p", { className: "tagline" }, doc.description || ""),
         e(
           "div",
           { className: "meta" },
-          "uavsim ",
+          "v",
           doc.uavsim_version || "?",
-          " · generated ",
-          doc.generated_at || "?",
-          " · schema ",
-          doc.schema_version
+          doc.generated_at
+            ? " · " + String(doc.generated_at).slice(0, 10)
+            : ""
         )
       ),
       e(
@@ -976,10 +1182,8 @@
       e(
         "footer",
         { className: "footer" },
-        "Simulation only — not flight-critical. ",
-        e("a", { href: "https://github.com/trey-copeland/uavsim" }, "github.com/trey-copeland/uavsim"),
-        " · regenerate: ",
-        e("code", null, "uv run uavsim gallery --base-case")
+        "Simulation only — not flight software. Source: ",
+        e("a", { href: "https://github.com/trey-copeland/uavsim" }, "github.com/trey-copeland/uavsim")
       )
     );
   }

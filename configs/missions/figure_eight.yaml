@@ -1,0 +1,20 @@
+# Figure-eight with slow lobes and altitude undulation (NED, z positive down).
+# Based on heritage figure_eight_long (constant yaw, ≥4 s segments → minsnap-friendly)
+# with elevation changes for a more interesting 3D path. Path-tangent yaw is
+# intentionally *not* used — auto-yaw on this class of path is a known failure mode.
+schema_version: 1
+name: figure_eight
+description: >
+  Figure-eight with constant yaw and mild altitude variation for closed-loop
+  tracking demos (LQR validation band vs ME590 figure_eight_long).
+frame: NED
+waypoints:
+  - {label: start_rest, time: 0.0, x: 0.0, y: 0.0, z: 1.5, yaw: 0.0}
+  - {label: right_begin, time: 4.0, x: 1.0, y: 0.5, z: 1.7, yaw: 0.0}
+  - {label: right_peak, time: 8.0, x: 2.0, y: 0.0, z: 2.0, yaw: 0.0}
+  - {label: right_bottom, time: 12.0, x: 1.0, y: -0.5, z: 1.7, yaw: 0.0}
+  - {label: center_cross, time: 16.0, x: 0.0, y: 0.0, z: 1.5, yaw: 0.0}
+  - {label: left_bottom, time: 20.0, x: -1.0, y: -0.5, z: 1.3, yaw: 0.0}
+  - {label: left_peak, time: 24.0, x: -2.0, y: 0.0, z: 1.0, yaw: 0.0}
+  - {label: left_top, time: 28.0, x: -1.0, y: 0.5, z: 1.3, yaw: 0.0}
+  - {label: end_rest, time: 32.0, x: 0.0, y: 0.0, z: 1.5, yaw: 0.0}
