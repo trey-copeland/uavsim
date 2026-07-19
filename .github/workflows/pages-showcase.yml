@@ -1,4 +1,9 @@
 # Deploy docs/showcase as the GitHub Pages site (React portfolio showpiece).
+#
+# One-time repo setup (required or "Setup Pages" fails):
+#   Settings → Pages → Build and deployment → Source: GitHub Actions
+#
+# Or run this workflow after flipping that toggle (workflow_dispatch also works).
 name: Pages showcase
 
 on:
@@ -19,22 +24,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # Official static-site pattern: build/upload artifact, then deploy.
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Pages
+        id: pages
         uses: actions/configure-pages@v5
+        with:
+          # Create/enable the Pages site if the repo has never used Actions Pages.
+          enablement: true
 
-      - name: Upload artifact
+      - name: Verify showcase payload
+        run: |
+          test -f docs/showcase/index.html
+          test -f docs/showcase/app.js
+          test -f docs/showcase/data/showcase.json
+          python3 -c "import json; json.load(open('docs/showcase/data/showcase.json'))"
+          echo "Showcase OK ($(wc -c < docs/showcase/data/showcase.json) bytes data)"
+
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs/showcase
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

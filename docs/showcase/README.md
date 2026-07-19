@@ -30,16 +30,29 @@ python -m http.server 8765 --directory docs/showcase
 
 ## Host on GitHub Pages
 
-**Recommended:** deploy only this folder (workflow in `.github/workflows/pages-showcase.yml`).
+Workflow: [`.github/workflows/pages-showcase.yml`](../../.github/workflows/pages-showcase.yml).
 
-After the first successful workflow run, enable Pages:
+### One-time setup (required)
 
-1. Repo **Settings → Pages**
-2. Source: **GitHub Actions**
-3. Site URL: `https://<user>.github.io/uavsim/` (root = this showcase)
+If you see **Setup Pages** fail with *Get Pages site failed*, Pages is not
+wired to Actions yet:
 
-Alternatively, set Pages source to branch `master` / folder `/docs` and open  
-`https://<user>.github.io/uavsim/showcase/`.
+1. Open the repo on GitHub → **Settings → Pages**
+2. Under **Build and deployment → Source**, choose **GitHub Actions** (not “Deploy from a branch”)
+3. Re-run the failed workflow: **Actions → Pages showcase → Re-run jobs**  
+   (or push a no-op change / use **Run workflow**)
+
+No separate “build” is required; this folder is already static.
+
+### After it works
+
+| | |
+|--|--|
+| Site URL | `https://trey-copeland.github.io/uavsim/` |
+| Local | `python -m http.server 8765 --directory docs/showcase` |
+
+**Note:** The first deploy may also prompt to approve the `github-pages`
+environment under **Settings → Environments** if protection rules are on.
 
 ## What’s in the UI
 

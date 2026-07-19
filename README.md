@@ -15,7 +15,7 @@ Interactive React document rolling up the portfolio **base case** (LQR square, P
 | | |
 |--|--|
 | **Local** | `python -m http.server 8765 --directory docs/showcase` → [http://127.0.0.1:8765/](http://127.0.0.1:8765/) |
-| **GitHub Pages** | After enabling the Pages workflow: `https://trey-copeland.github.io/uavsim/` |
+| **GitHub Pages** | `https://trey-copeland.github.io/uavsim/` — enable **Settings → Pages → Source: GitHub Actions**, then re-run **Pages showcase** |
 | **Source / regenerate** | [`docs/showcase/`](docs/showcase/) · `uv run uavsim gallery --base-case` |
 
 Tabs: overview cards · 3D flight scrubber · metrics + feasibility · MC hist/CDF/scatter · LQR vs PID compare.
