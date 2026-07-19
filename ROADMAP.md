@@ -54,6 +54,7 @@ Ship when SPEC §17 holds, especially:
 | Phase 3 Robustness (local MC + study/report) | **Done** |
 | Phase 4 Systems (Docker + sharded MC) | **Done** |
 | Phase 5 Workflow polish (export / compare / 2nd controller) | **Done** |
+| Phase 5b Visualization pack (S5 / §11A V1–V8) | **Done** |
 | HIL / post-core nav | **Not started** ← **now Phase 6+** |
 
 ---
@@ -80,7 +81,7 @@ Detail and MoSCoW: SPEC §6, §19. Module map: ARCH §3, §16.
 ## 5. Now / next / later
 
 ### Now
-1. **Phase 6** — first non-waypoint guidance backend (optional portfolio extender).  
+1. **Phase 6** — first non-waypoint guidance (optional portfolio extender).  
 2. Keep SPEC/ARCH/ROADMAP in sync when decisions change.
 
 ### Next
@@ -132,6 +133,16 @@ Use as a living board (check off in PRs or edit this file).
 - [x] `uavsim compare` two SIL runs  
 - [x] Second controller comparison study (Should)  
 - [x] **→ declare core complete** when SPEC §17 satisfied (SIL path + systems + export/compare)  
+
+### M5b — Visualization pack (SPEC §11A)
+- [x] V1 Playback + path trail (interactive HTML)  
+- [x] V2 Dual-run 3D overlay  
+- [x] V3 Time-synced strip charts  
+- [x] V4 Saturation / limit shading on \(u(t)\)  
+- [x] V5 MC CDF + param-vs-RMSE scatter  
+- [x] V6 Feasibility callouts in report  
+- [x] V7 `uavsim report --interactive`  
+- [x] V8 3D still PNG export  
 
 ### M6 — Nav beyond waypoints
 - [ ] First non-waypoint guidance backend + example study  
@@ -205,3 +216,4 @@ Per `GROK.md` GSD: non-trivial work gets a SPEC note before a large implementati
 | 2026-07-18 | Phase 3 / M3 complete: local MC, `uavsim study`/`report`, trial table + summary |
 | 2026-07-18 | Phase 4 / M4 complete: Docker image, sharded MC + merge, compose demo |
 | 2026-07-18 | Phase 5 / M5 complete: controller export, compare, PID cascade second law |
+| 2026-07-19 | Phase 5b / M5b: viz pack V1–V8 (interactive 3D, MC plots, feasibility, stills) |

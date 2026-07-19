@@ -473,8 +473,9 @@ Requirements use MoSCoW for prioritization within **systems-heavy core**.
 | S3 | Feasibility gate with warn vs fail thresholds (operates on reference trajectories, not only waypoint pipelines) |
 | S3a | Study config selects guidance backend by name/id (parallel to controller selection) |
 | S4 | Parallel local MC workers (process pool) in addition to container path |
-| S5 | Plot pack: 3D tracking, time series, control inputs, MC distributions / sensitivity |
+| S5 | Plot pack: 3D tracking, time series, control inputs, MC distributions / sensitivity (**detail §11A**) |
 | S5a | Viz/report APIs accept **one or more run directories** (multi-run consumers; US-E3) |
+| S5b | Interactive 3D flight view (HTML): rotate scene, playback, vectors + absolute HUD (**§11A**) |
 | S6 | Second controller behind the same interface + comparison study example |
 | S7 | Controller-comparison study config (same mission, LQR vs alternate) |
 | S8 | Static results gallery (HTML) generated from a tagged release run |
@@ -665,7 +666,7 @@ Core may implement only the waypoint family; reviews should reject designs that 
 | Min-snap QP | **Open** — SciPy vs OSQP/cvxpy vs CasADi | CasADi is a natural polyglot/GNC-adjacent option |
 | Config | Pydantic + YAML (or TOML) | Schema validation |
 | Data | JSON metrics + columnar timeseries (**format open**: Parquet preferred lean) | Fast MC analytics |
-| Viz | Matplotlib; optional Plotly | Results consumers only |
+| Viz | Matplotlib (static); optional Plotly (interactive HTML) | Results consumers only; see §11A |
 | Local parallel | joblib / multiprocessing / concurrent.futures | Local MC |
 | Containers | Docker + Compose | Single-study and worker shards |
 | Orchestration | Compose scale-out first; queue optional (Could) | Core needs shards + assemble |
@@ -733,6 +734,54 @@ Define explicit boolean criteria, e.g.:
 - Attitudes remain within configured envelope
 
 Exact thresholds are config, not buried constants without names.
+
+---
+
+## 11A. Visualization pack (Should — portfolio analysis UX)
+
+**Hard rule:** all viz is a **consumer of run directories** (and optional controller artifacts). No imports from live `sim` loop state. Frames: paths plotted as NED with **up = −D** for human readability; vector math remains NED/body as documented on each figure.
+
+### 11A.1 Capability list (V1–V8)
+
+| ID | Capability | Acceptance |
+|----|------------|------------|
+| **V1** | **Playback + path trail** | Interactive view: play/pause/scrub; flown path trail; reference path when `reference/grid.npz` exists |
+| **V2** | **Dual-run 3D overlay** | `compare` (or report dual) shows two trails / vehicle markers; same alignment policy as S10 |
+| **V3** | **Time-synced strip charts** | Position error, controls \(u(t)\), attitude vs \(t\) — static pack always; optional synced panel in interactive HTML |
+| **V4** | **Saturation / limit shading** | Control time series mark samples near thrust/torque limits (from vehicle limits in study config or controller artifact) |
+| **V5** | **MC plot pack** | Beyond RMSE hist: **CDF** of RMSE; **scatter** mass (and optionally other params) vs RMSE when `monte_carlo/trials.csv` present |
+| **V6** | **Feasibility callouts** | Report header/section from `guidance/feasibility.json` (ok, issue codes, severities) |
+| **V7** | **Interview one-liner** | `uavsim report <run> --interactive` writes interactive HTML under `figures/` and prints the path |
+| **V8** | **Export stills** | At least one PNG keyframe of the 3D scene (path + vehicle pose) for README / static sharing |
+
+### 11A.2 Interactive 3D vectors (single-run view)
+
+At current time \(t\), draw (relative length for comparison; **absolute values in HUD**):
+
+| Vector | Encoding |
+|--------|----------|
+| Velocity \(v\) (NED) | Arrow at vehicle |
+| Position error \(p - p_\mathrm{ref}\) | Arrow (when reference available) |
+| Thrust direction | Along −body-\(z\), length ∝ \(F\) or \(F/(mg)\) |
+| Body axes triad | Unit length (frame literacy) |
+| Optional: \(\omega\), \(\tau\) | Body frame or HUD-only if cluttered |
+
+HUD (absolute): \(t\), \(\|e_p\|\), \(\|v\|\), \(F\), \(\|\tau\|\), Euler (deg), success/in-bounds if metrics present.
+
+### 11A.3 CLI / artifacts
+
+```bash
+uavsim report runs/<id>                 # markdown + static figures (V3–V6, V8)
+uavsim report runs/<id> --interactive   # + Plotly HTML (V1, V7); requires viz extra
+uavsim compare runs/a runs/b            # deltas + overlays; --interactive → dual 3D (V2)
+```
+
+Outputs under `runs/.../figures/` (and compare output dir): `*.png`, `flight_3d.html`, optional `compare_3d.html`.
+
+### 11A.4 Dependencies
+
+- **Must path:** matplotlib (static) via optional `viz` / `dev` extra (CI uses `dev`).
+- **Interactive:** plotly in `viz` extra; missing plotly → clear message, static pack still works.
 
 ---
 
@@ -930,6 +979,10 @@ Phases are sequential **capability gates**, not strict calendar. Systems work is
 - Controller comparison study if not done  
 - README figures / gallery (Should)  
 
+### Phase 5b — Visualization pack (S5 / S5b / §11A)
+- V1–V8: interactive 3D, dual overlay, strips, saturation, MC plots, feasibility, CLI, stills  
+- `uavsim report --interactive`; compare dual HTML when plotly available  
+
 ### Phase 6 — Navigation expansion (post-core; epic B growth)
 - First non-waypoint guidance backend and/or replan demo  
 
@@ -963,6 +1016,7 @@ Phases are sequential **capability gates**, not strict calendar. Systems work is
 | v0.1.5 | 2026-07-18 | Primary workflow §1.3; user stories §1.4 (epics A–F); export/compare CLI; S5a/C8/C9 |
 | v0.2 | 2026-07-18 | Refined expectations §1.3.1; closed decisions for layout/workflow/export/compare; S9–S11; phased epic map; core acceptance includes export + multi-run compare Shoulds |
 | v0.2.1 | 2026-07-18 | Link `ROADMAP.md` as sequencing home; §19 points to roadmap |
+| v0.2.2 | 2026-07-19 | §11A visualization pack V1–V8; S5b interactive 3D; Phase 5b |
 
 ---
 

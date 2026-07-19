@@ -122,7 +122,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_report.add_argument(
         "--no-figures",
         action="store_true",
-        help="Skip figure generation (markdown report only)",
+        help="Skip static figure generation (markdown report only)",
+    )
+    p_report.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Write interactive Plotly flight_3d.html (requires plotly / --extra viz)",
     )
 
     p_export = sub.add_parser(
@@ -155,6 +160,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-figures",
         action="store_true",
         help="Skip overlay figures",
+    )
+    p_compare.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Write dual-run Plotly compare_3d.html (requires plotly)",
     )
 
     p_hil = sub.add_parser("hil", help="Hardware-in-the-loop session (post-core)")
@@ -303,7 +313,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Run directory not found: {run_dir}", file=sys.stderr)
             return 1
         try:
-            rep = generate_report(run_dir, figures=not args.no_figures)
+            rep = generate_report(
+                run_dir,
+                figures=not args.no_figures,
+                interactive=args.interactive,
+            )
         except FileNotFoundError as exc:
             print(str(exc), file=sys.stderr)
             return 1
@@ -311,6 +325,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  summary={rep.summary_md}")
         for fig in rep.figures:
             print(f"  figure={fig}")
+        if rep.interactive is not None:
+            print(f"  interactive={rep.interactive}")
         return 0
 
     if args.command == "export-controller":
@@ -340,6 +356,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.run_b,
                 output_dir=args.output,
                 figures=not args.no_figures,
+                interactive=args.interactive,
             )
         except (FileNotFoundError, ValueError) as exc:
             print(str(exc), file=sys.stderr)
@@ -349,6 +366,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  deltas={cmp.delta_json}")
         for fig in cmp.figures:
             print(f"  figure={fig}")
+        if cmp.interactive is not None:
+            print(f"  interactive={cmp.interactive}")
         return 0
 
     phase = {

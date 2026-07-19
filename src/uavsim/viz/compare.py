@@ -19,6 +19,7 @@ class CompareResult:
     delta_json: Path
     figures: list[Path] = field(default_factory=list)
     deltas: dict[str, Any] = field(default_factory=dict)
+    interactive: Path | None = None
 
 
 def _load_json(path: Path) -> dict[str, Any] | None:
@@ -86,6 +87,7 @@ def compare_runs(
     *,
     output_dir: str | Path | None = None,
     figures: bool = True,
+    interactive: bool = False,
 ) -> CompareResult:
     """
     Compare two run directories.
@@ -156,12 +158,28 @@ def compare_runs(
         with contextlib.suppress(ImportError):
             fig_paths = _overlay_figures(run_a, run_b, out / "figures", label_a, label_b)
 
+    interactive_path: Path | None = None
+    if interactive:
+        try:
+            from uavsim.viz.flight3d import write_compare_flight_html
+            from uavsim.viz.loaders import load_run
+
+            interactive_path = write_compare_flight_html(
+                load_run(run_a),
+                load_run(run_b),
+                out / "figures" / "compare_3d.html",
+            )
+            fig_paths.append(interactive_path)
+        except (ImportError, FileNotFoundError):
+            pass
+
     return CompareResult(
         output_dir=out,
         summary_md=summary_md,
         delta_json=delta_path,
         figures=fig_paths,
         deltas=deltas,
+        interactive=interactive_path,
     )
 
 

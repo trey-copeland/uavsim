@@ -97,6 +97,7 @@ def write_text_report(
     study_id: str,
     *,
     mc_summary: dict[str, Any] | None = None,
+    feasibility: dict[str, Any] | None = None,
 ) -> Path:
     lines = [
         f"# Study report: {study_id}",
@@ -107,6 +108,37 @@ def write_text_report(
     for key, val in metrics.items():
         lines.append(f"- **{key}**: {val}")
     lines.append("")
+
+    # V6: feasibility callouts
+    if feasibility is not None:
+        lines.extend(
+            [
+                "## Feasibility",
+                "",
+                f"- **ok**: {feasibility.get('ok')}",
+                "",
+            ]
+        )
+        issues = feasibility.get("issues") or []
+        if issues:
+            lines.append("### Issues")
+            lines.append("")
+            for issue in issues:
+                if isinstance(issue, dict):
+                    sev = issue.get("severity", "?")
+                    code = issue.get("code", "?")
+                    msg = issue.get("message", "")
+                    lines.append(f"- **[{sev}] {code}**: {msg}")
+                else:
+                    lines.append(f"- {issue}")
+            lines.append("")
+        summary = feasibility.get("summary") or {}
+        if summary:
+            lines.append("### Summary stats")
+            lines.append("")
+            for k, v in summary.items():
+                lines.append(f"- **{k}**: {v}")
+            lines.append("")
 
     if mc_summary is not None:
         lines.extend(
