@@ -1,15 +1,10 @@
-# Publish docs/showcase to the gh-pages branch (static React showpiece).
+# Publish docs/showcase → gh-pages, then ensure GitHub Pages serves that branch.
 #
-# Why not actions/deploy-pages?
-#   configure-pages / deploy-pages require an existing Pages site with
-#   source = "GitHub Actions". Fresh repos get HTTP 404 from the Pages API
-#   ("Get Pages site failed") even with enablement: true in some cases.
-#
-# One-time UI step after the first green run:
-#   Settings → Pages → Build and deployment
-#     Source: Deploy from a branch
-#     Branch: gh-pages / (root)
-#   Site: https://trey-copeland.github.io/uavsim/
+# Why peaceiris + explicit Pages API:
+#   - Pure "GitHub Actions" Pages (configure-pages) 404s until a site exists.
+#   - Pushing to gh-pages alone does not always rebuild if Pages source was never set.
+#   - After deploy we create/update the Pages site (branch: gh-pages, path: /)
+#     and request a build so https://<user>.github.io/<repo>/ picks up new files.
 name: Pages showcase
 
 on:
@@ -22,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  pages: write
 
 concurrency:
   group: pages-showcase
@@ -44,12 +40,75 @@ jobs:
           python3 -c "import json; d=json.load(open('docs/showcase/data/showcase.json')); assert d.get('runs')"
           echo "Showcase OK ($(wc -c < docs/showcase/data/showcase.json) bytes data)"
 
+      - name: Cache-bust static asset URLs
+        run: |
+          set -euo pipefail
+          SHA="${GITHUB_SHA:0:7}"
+          # Query strings force browsers / CDNs to fetch new app.js after deploys
+          sed -i "s|href=\"./styles.css\"|href=\"./styles.css?v=${SHA}\"|" docs/showcase/index.html
+          sed -i "s|src=\"./app.js\"|src=\"./app.js?v=${SHA}\"|" docs/showcase/index.html
+          # Showcase JSON fetch (app.js)
+          sed -i "s|fetch(\"./data/showcase.json\")|fetch(\"./data/showcase.json?v=${SHA}\")|" docs/showcase/app.js
+          # Embed build id for debugging in the loading banner path
+          printf '%s\n' "${SHA}" > docs/showcase/data/BUILD_SHA
+          echo "Cache-bust version=${SHA}"
+          grep -E 'app\.js|showcase\.json' docs/showcase/index.html docs/showcase/app.js | head -20
+
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs/showcase
-          # Keep only the published tree (no history bloat).
           force_orphan: true
           user_name: "github-actions[bot]"
           user_email: "github-actions[bot]@users.noreply.github.com"
+
+      - name: Point GitHub Pages at gh-pages and request build
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const source = { branch: "gh-pages", path: "/" };
+
+            async function ensurePages() {
+              try {
+                const { data } = await github.rest.repos.getPages({ owner, repo });
+                console.log("Pages exists:", JSON.stringify(data.source || data));
+                // Prefer classic branch deploy from gh-pages
+                try {
+                  await github.rest.repos.updateInformationAboutPagesSite({
+                    owner,
+                    repo,
+                    build_type: "legacy",
+                    source,
+                  });
+                  console.log("Updated Pages source → gh-pages /");
+                } catch (upd) {
+                  console.log("updateInformationAboutPagesSite:", upd.status, upd.message);
+                }
+              } catch (err) {
+                if (err.status !== 404) throw err;
+                console.log("No Pages site yet; creating (legacy, gh-pages /)…");
+                await github.rest.repos.createPagesSite({
+                  owner,
+                  repo,
+                  build_type: "legacy",
+                  source,
+                });
+                console.log("Created Pages site");
+              }
+            }
+
+            await ensurePages();
+
+            try {
+              const build = await github.rest.repos.requestPagesBuild({ owner, repo });
+              console.log("Requested Pages build:", build.data.status, build.data.url);
+            } catch (bErr) {
+              console.log("requestPagesBuild failed:", bErr.status, bErr.message);
+              core.warning(
+                "Could not request a Pages build via API. " +
+                "In the repo: Settings → Pages → Source: Deploy from a branch → gh-pages / (root)."
+              );
+            }

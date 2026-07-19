@@ -32,21 +32,24 @@ python -m http.server 8765 --directory docs/showcase
 Workflow: [`.github/workflows/pages-showcase.yml`](../../.github/workflows/pages-showcase.yml)  
 publishes this folder to the **`gh-pages`** branch (not the Actions Pages API).
 
-### After the first successful workflow run
+### Site URL
 
-1. Open the repo → **Settings → Pages**
-2. **Build and deployment → Source:** **Deploy from a branch**
-3. **Branch:** `gh-pages` / **`/` (root)** → Save
-4. Site URL: **`https://trey-copeland.github.io/uavsim/`**
+**https://trey-copeland.github.io/uavsim/**
 
-You only need that branch picker once. Later pushes that touch `docs/showcase/**`
-update the site automatically.
+### If the live site is stuck on old JS
 
-### Why not “Source: GitHub Actions”?
+Symptoms: `app.js` on the site is smaller / older than `origin/gh-pages:app.js`, or
+`last-modified` does not move after a green **Pages showcase** run.
 
-`actions/configure-pages` calls the Pages REST API and fails with **404 Not Found**
-until a Pages site already exists. Branch deploy via `peaceiris/actions-gh-pages`
-avoids that chicken-and-egg.
+1. Confirm **Settings → Pages → Source** is **Deploy from a branch**, branch **`gh-pages`**, folder **`/` (root)**. Save again if unsure (this triggers a rebuild).
+2. Wait 1–2 minutes, then hard-refresh (or open `app.js?v=<newsha>`).
+3. Workflow now **cache-busts** `app.js` / `styles.css` / `showcase.json` query strings and calls the Pages **request build** API after each deploy.
+
+### Why deploys can look “successful” but the site stays old
+
+Pushing to `gh-pages` only updates the branch. GitHub Pages must be **enabled and
+pointed at that branch** to publish. The workflow tries to create/update that
+config with `GITHUB_TOKEN`; if the token lacks permission, set Source in the UI.
 
 ## What’s in the UI
 
