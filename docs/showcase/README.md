@@ -17,42 +17,36 @@ From the repo root:
 ```bash
 uv sync --extra dev
 uv run uavsim gallery --base-case
-# writes docs/showcase/data/showcase.json (+ copies SPA files)
+# writes docs/showcase/data/showcase.json (+ SPA files)
 ```
 
 Serve locally:
 
 ```bash
-# any static server from docs/showcase
 python -m http.server 8765 --directory docs/showcase
 # open http://127.0.0.1:8765/
 ```
 
 ## Host on GitHub Pages
 
-Workflow: [`.github/workflows/pages-showcase.yml`](../../.github/workflows/pages-showcase.yml).
+Workflow: [`.github/workflows/pages-showcase.yml`](../../.github/workflows/pages-showcase.yml)  
+publishes this folder to the **`gh-pages`** branch (not the Actions Pages API).
 
-### One-time setup (required)
+### After the first successful workflow run
 
-If you see **Setup Pages** fail with *Get Pages site failed*, Pages is not
-wired to Actions yet:
+1. Open the repo → **Settings → Pages**
+2. **Build and deployment → Source:** **Deploy from a branch**
+3. **Branch:** `gh-pages` / **`/` (root)** → Save
+4. Site URL: **`https://trey-copeland.github.io/uavsim/`**
 
-1. Open the repo on GitHub → **Settings → Pages**
-2. Under **Build and deployment → Source**, choose **GitHub Actions** (not “Deploy from a branch”)
-3. Re-run the failed workflow: **Actions → Pages showcase → Re-run jobs**  
-   (or push a no-op change / use **Run workflow**)
+You only need that branch picker once. Later pushes that touch `docs/showcase/**`
+update the site automatically.
 
-No separate “build” is required; this folder is already static.
+### Why not “Source: GitHub Actions”?
 
-### After it works
-
-| | |
-|--|--|
-| Site URL | `https://trey-copeland.github.io/uavsim/` |
-| Local | `python -m http.server 8765 --directory docs/showcase` |
-
-**Note:** The first deploy may also prompt to approve the `github-pages`
-environment under **Settings → Environments** if protection rules are on.
+`actions/configure-pages` calls the Pages REST API and fails with **404 Not Found**
+until a Pages site already exists. Branch deploy via `peaceiris/actions-gh-pages`
+avoids that chicken-and-egg.
 
 ## What’s in the UI
 

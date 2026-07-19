@@ -1,9 +1,15 @@
-# Deploy docs/showcase as the GitHub Pages site (React portfolio showpiece).
+# Publish docs/showcase to the gh-pages branch (static React showpiece).
 #
-# One-time repo setup (required or "Setup Pages" fails):
-#   Settings → Pages → Build and deployment → Source: GitHub Actions
+# Why not actions/deploy-pages?
+#   configure-pages / deploy-pages require an existing Pages site with
+#   source = "GitHub Actions". Fresh repos get HTTP 404 from the Pages API
+#   ("Get Pages site failed") even with enablement: true in some cases.
 #
-# Or run this workflow after flipping that toggle (workflow_dispatch also works).
+# One-time UI step after the first green run:
+#   Settings → Pages → Build and deployment
+#     Source: Deploy from a branch
+#     Branch: gh-pages / (root)
+#   Site: https://trey-copeland.github.io/uavsim/
 name: Pages showcase
 
 on:
@@ -15,49 +21,35 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages-showcase
   cancel-in-progress: true
 
 jobs:
-  # Official static-site pattern: build/upload artifact, then deploy.
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Pages
-        id: pages
-        uses: actions/configure-pages@v5
-        with:
-          # Create/enable the Pages site if the repo has never used Actions Pages.
-          enablement: true
-
       - name: Verify showcase payload
         run: |
+          set -euo pipefail
           test -f docs/showcase/index.html
           test -f docs/showcase/app.js
+          test -f docs/showcase/styles.css
           test -f docs/showcase/data/showcase.json
-          python3 -c "import json; json.load(open('docs/showcase/data/showcase.json'))"
+          python3 -c "import json; d=json.load(open('docs/showcase/data/showcase.json')); assert d.get('runs')"
           echo "Showcase OK ($(wc -c < docs/showcase/data/showcase.json) bytes data)"
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: docs/showcase
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/showcase
+          # Keep only the published tree (no history bloat).
+          force_orphan: true
+          user_name: "github-actions[bot]"
+          user_email: "github-actions[bot]@users.noreply.github.com"
