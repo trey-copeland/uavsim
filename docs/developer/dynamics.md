@@ -46,15 +46,30 @@ sim:
 
 Controllers and metrics still consume **Euler 12-state** (via bus bridges). Optional observers: [estimation.md](estimation.md).
 
-### Next SIL (after 5c/5d — ROADMAP Now)
+### Motors + mixer (D-7 / D-8 — landed)
 
-| ID | Change | Why |
-|----|--------|-----|
-| **D-7 / D-8** | Motor dynamics + mixer / allocation | Fidelity for later HIL; arm length used |
-| **D-13 / V-7** | Flexible / elastic lumped states | Research airframes |
-| **D-4 / D-5** | Drag / aero in \(f\) | Optional fidelity |
+Control laws still command **body wrench** \(u\). Optional plant path:
 
-Gentle figure-eight / square demos remain the Euler regression baseline.
+1. **Mixer (allocation):** \(u \leftrightarrow f_{1:4}\) via X-quad geometry + `arm_length_m` + `ct`/`cq`  
+2. **Motors:** first-order lag on speeds \(\omega_i\); \(f_i = c_T \omega_i^2\); realized wrench from mixer  
+
+```yaml
+sim:
+  plant: motors   # default: wrench (instantaneous body force/torque)
+  attitude: euler # or quat (+ 4 motor states)
+```
+
+Vehicle `propulsion:` block (see `configs/vehicles/default_quadrotor.yaml`).  
+Demo: `configs/studies/figure_eight_motors.yaml`.
+
+| ID | Status |
+|----|--------|
+| **D-8** mixer / allocation | **Done** — `dynamics/mixer.py` |
+| **D-7** first-order motor states | **Done** — `dynamics/motors.py` (`euler_motors` / `quat_motors`) |
+| **D-13 / V-7** flexible body | **TODO** |
+| **D-4 / D-5** drag / aero | **TODO** |
+
+Gentle figure-eight / square demos remain the Euler **wrench** regression baseline.
 
 ### Where it is used
 

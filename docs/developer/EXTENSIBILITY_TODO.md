@@ -16,7 +16,7 @@ Legend: **Done** · **Partial** · **TODO** · **Out of scope (core)**
 | V-3 | Diagonal inertia only | **Partial** | Off-diagonal products **TODO** |
 | V-4 | Optional aero / drag coefficients on vehicle schema | **TODO** | Blocked by `extra="forbid"` until fields added |
 | V-5 | Enforce \(F_\max \ge mg\) at validate | **TODO** | Soft expectation today |
-| V-6 | Motor mixer uses `arm_length_m` | **TODO** | Field stored unused by plant |
+| V-6 | Motor mixer uses `arm_length_m` | **Done** | X-quad allocation in `dynamics/mixer.py` |
 | V-7 | Arm mechanics / elasticity params | **TODO** | Parametric + lumped states |
 | V-8 | Multi-airframe families (tilt-rotor, hybrid VTOL, etc.) | **TODO** (low priority) | Pluggable dynamics + extended `VehicleParams` / mixer; preserve core 6-DoF base. Guide: [airframes.md](airframes.md) |
 
@@ -86,8 +86,8 @@ Guide: [guidance.md](guidance.md)
 | D-4 | Vehicle aero params (drag, damping) | **TODO** | Plan D1 |
 | D-5 | Drag / damping in \(f(x,u,p)\) | **TODO** | Plan D3 |
 | D-6 | Numeric linearization utility | **TODO** | |
-| D-7 | Motor/prop first-order states | **TODO** | After D-3; changes state dim |
-| D-8 | Control allocation / mixer | **TODO** | After / with D-7 |
+| D-7 | Motor/prop first-order states | **Done** | `sim.plant: motors`; +4 ω states; `dynamics/motors.py` |
+| D-8 | Control allocation / mixer | **Done** | X-quad wrench ↔ forces; `dynamics/mixer.py` |
 | D-9 | Wind / process disturbance API | **TODO** | |
 | D-10 | Quaternion (SO(3)) attitude + error-state control path | **Done** | Plant + SO(3) control/metrics + aggressive demo. Native 13-state export optional polish |
 | D-11 | HIL validation seams + companion project | **TODO** | Fixed-step, I/O; parallel with rig build (do not block 5c) |
@@ -128,8 +128,8 @@ Hardware and transport live primarily in a **HIL companion** project; this backl
 
 1. ~~**D-10 / 5c**~~ — **Done** (quat plant, SO(3) control, aggressive F8, `DynamicsModel`).  
 2. ~~**Phase 5d observers**~~ — **Done** (EST-1…5, C-9/C-11: `linear_kf` / `mekf`, channels, `x_hat`).  
-3. **D-7 + D-8** — motor dynamics + mixer ← **Now**.  
-4. **D-13 / V-7** — flexible / elastic lumped states.  
+3. ~~**D-7 + D-8**~~ — **Done** (mixer + first-order motors; `sim.plant: motors`).  
+4. **D-13 / V-7** — flexible / elastic lumped states ← **Now** (or drag D-4/D-5).  
 5. **D-4/D-5** — drag/aero as needed.  
 6. **G-5 / C-5** — registries when plugin ergonomics block experiments.  
 7. **V-8 / D-12 / S-7** — multi-airframe families after mixer + protocol.

@@ -18,3 +18,13 @@ limits:
   thrust_min_n: 0.0
   thrust_max_n: 9.81          # 2 * m * g with m=0.5
   torque_max_nm: 1.0          # |τ| limit per axis
+
+# Propulsion for mixer (D-8) + first-order motors (D-7); optional (code defaults).
+# f = ct * ω² per motor; hover ω ≈ 600 rad/s for this mass with these ct.
+propulsion:
+  layout: x
+  ct_n_s2: 3.405e-6
+  cq_nm_s2: 5.4e-8
+  motor_time_const_s: 0.05
+  omega_min_rad_s: 0.0
+  omega_max_rad_s: 1200.0

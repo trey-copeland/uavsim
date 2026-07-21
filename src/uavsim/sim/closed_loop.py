@@ -51,7 +51,13 @@ def simulate_closed_loop(
     obs = observer if observer is not None else IdentityObserver()
     obs.reset(plant.x_euler(), t0=t0)
 
-    use_fixed = plant.dynamics.attitude == "quat" or not isinstance(obs, IdentityObserver)
+    # RK45 path is Euler-12 wrench only; motors / quat / observers use fixed-step RK4
+    use_fixed = (
+        plant.dynamics.attitude == "quat"
+        or plant.state_dim != STATE_DIM
+        or getattr(plant, "plant_kind", "wrench") == "motors"
+        or not isinstance(obs, IdentityObserver)
+    )
     if use_fixed:
         return _simulate_fixed_step(
             plant,

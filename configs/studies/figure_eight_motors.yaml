@@ -1,0 +1,31 @@
+# Figure-eight under LQR with mixer + first-order motor dynamics (D-7/D-8).
+# Controllers still command body wrench; plant allocates and lags motors.
+schema_version: 1
+study_id: figure_eight_motors
+seed: 0
+
+vehicle: configs/vehicles/default_quadrotor.yaml
+
+controller:
+  type: lqr_hover
+  Q_diag: [100, 100, 100, 10, 10, 1, 10, 10, 10, 1, 1, 0.1]
+  R_diag: [0.1, 1.0, 1.0, 1.0]
+
+guidance:
+  type: waypoints
+  mission_file: configs/missions/figure_eight.yaml
+  method: auto
+  yaw_mode: constant
+  sample_dt_s: 0.01
+  fail_on_infeasible: false
+
+sim:
+  dt_s: 0.01
+  method: rk45
+  rtol: 1.0e-5
+  atol: 1.0e-7
+  attitude: euler
+  plant: motors
+
+metrics:
+  position_bound_m: 0.75

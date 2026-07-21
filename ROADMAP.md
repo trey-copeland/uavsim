@@ -59,7 +59,8 @@ Ship when SPEC §17 holds, especially:
 | Phase 5c Attitude / plant fidelity (quaternions → richer missions) | **Done** (optional native 13-state export still open) |
 | Phase 5d Observer-in-the-loop (KF/EKF) | **Done** (`linear_kf`, `mekf`, partial channels, `x_hat` log) |
 | HIL test rig (hardware order/build) | **In progress (parallel, long lead)** |
-| Next SIL: motors / mixer (D-7, D-8) | **Now** (Track A) |
+| Motors / mixer (D-7, D-8) | **Done** (`sim.plant: motors`, figure_eight_motors) |
+| Next SIL: flex / drag | **Now** (Track A) |
 | Phase 6 nav / Phase 7 HIL software | **Not started** (nav after plant fidelity as needed; HIL when rig ready) |
 
 ---
@@ -100,13 +101,13 @@ Do **not** stall Track A on Track B. Keep HIL **seams** (fixed-step, I/O schemas
 
 ### Now (Track A — SIL)
 1. Keep showcase / gentle figure-eight as regression baseline.  
-2. **Motor dynamics + mixer** (D-7, D-8) — next plant fidelity step after 5c/5d.  
-3. Optional: native 13-state export polish (not blocking).
+2. ~~**Motor dynamics + mixer** (D-7, D-8)~~ — **Done** (`sim.plant: motors`).  
+3. **Flexible / elastic plant** (V-7 / D-13) or drag (D-4/D-5) — next fidelity.  
+4. Optional: native 13-state export polish (not blocking).
 
 ### Next (Track A, still SIL)
-1. Flexible / elastic plant spike (V-7 → lumped modes).  
-2. Phase 6 non-waypoint guidance if mission design needs it more than plant fidelity.  
-3. Deeper estimation (real IMU models, sensor fusion polish) as HIL approaches.
+1. Phase 6 non-waypoint guidance if mission design needs it more than plant fidelity.  
+2. Deeper estimation (real IMU models, sensor fusion polish) as HIL approaches.
 
 ### Later / when rig is ready (Track B + Phase 7)
 1. Companion project: NATS/MQTT, high-rate accels, ESC RPM (COMM-*, INSTR-1).  

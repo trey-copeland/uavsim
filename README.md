@@ -18,7 +18,8 @@
 ### Plant & vehicles
 - Nonlinear **6-DoF** rigid-body dynamics (NED, body wrench)
 - **Euler** (default) or **unit-quaternion** plant (`sim.attitude: quat`) via pluggable [`DynamicsModel`](docs/developer/dynamics.md)
-- YAML vehicles: mass, inertia, arm length, thrust/torque limits — [vehicles guide](docs/developer/vehicles.md)
+- Optional **mixer + first-order motors** (`sim.plant: motors`) — control allocation uses arm length / \(c_T,c_Q\)
+- YAML vehicles: mass, inertia, arm length, limits, propulsion — [vehicles guide](docs/developer/vehicles.md)
 
 ### Guidance
 - **Hold** and **waypoint** missions (interp / min-snap / auto)

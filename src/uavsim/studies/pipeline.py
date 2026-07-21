@@ -119,7 +119,11 @@ def run_closed_loop_trial(
 
     ctrl = controller if controller is not None else prepared.controller
     cfg = prepared.cfg
-    plant = SimPlant(plant_vehicle, attitude=cfg.sim.attitude)
+    plant = SimPlant(
+        plant_vehicle,
+        attitude=cfg.sim.attitude,
+        plant=getattr(cfg.sim, "plant", "wrench"),
+    )
     adapter = InProcessControllerAdapter(ctrl, prepared.reference)
     observer, meas_model = build_observer(cfg.sim.observer, plant_vehicle)
     sim_result = simulate_closed_loop(

@@ -92,6 +92,8 @@ class SimConfig(BaseModel):
     atol: float = 1e-8
     # Phase 5c: plant attitude representation (controllers still see Euler 12-state)
     attitude: Literal["euler", "quat"] = "euler"
+    # D-7/D-8: instantaneous wrench plant vs mixer + first-order motors
+    plant: Literal["wrench", "motors"] = "wrench"
     # Phase 5d: observer-in-the-loop (default none = ideal full state)
     observer: ObserverConfig = Field(default_factory=ObserverConfig)
 

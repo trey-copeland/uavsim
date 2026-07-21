@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import yaml
@@ -37,6 +37,24 @@ class ActuatorLimits(BaseModel):
         return np.array([self.thrust_max_n, t, t, t], dtype=float)
 
 
+class PropulsionParams(BaseModel):
+    """
+    Quadrotor propulsion for mixer + first-order motors (D-7 / D-8).
+
+    Thrust per motor: ``f = ct * ω²``. Reaction |torque| ``= cq * ω²``.
+    Defaults sized so hover ω is ~600 rad/s for the 0.5 kg default vehicle.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    layout: Literal["x"] = "x"
+    ct_n_s2: float = Field(default=3.405e-6, gt=0)  # N / (rad/s)²
+    cq_nm_s2: float = Field(default=5.4e-8, gt=0)  # N·m / (rad/s)²
+    motor_time_const_s: float = Field(default=0.05, gt=0)
+    omega_min_rad_s: float = Field(default=0.0, ge=0)
+    omega_max_rad_s: float = Field(default=1200.0, gt=0)
+
+
 class VehicleParams(BaseModel):
     """Physical params + limits. Does not own equations of motion."""
 
@@ -49,6 +67,7 @@ class VehicleParams(BaseModel):
     arm_length_m: float = Field(gt=0)
     inertia: InertiaParams
     limits: ActuatorLimits
+    propulsion: PropulsionParams = Field(default_factory=PropulsionParams)
 
     @property
     def m(self) -> float:
@@ -94,4 +113,5 @@ def default_vehicle() -> VehicleParams:
             thrust_max_n=2 * 0.5 * 9.81,
             torque_max_nm=1.0,
         ),
+        propulsion=PropulsionParams(),
     )

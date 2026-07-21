@@ -98,11 +98,26 @@ class QuatRigidBodyDynamics:
         return euler_state_to_quat_state(x_euler)
 
 
-def get_dynamics_model(attitude: AttitudeKind = "euler") -> DynamicsModel:
-    """Factory for built-in rigid-body models."""
-    if attitude == "euler":
-        return EulerRigidBodyDynamics()
-    if attitude == "quat":
-        return QuatRigidBodyDynamics()
-    msg = f"Unknown attitude model {attitude!r}"
+PlantKind = Literal["wrench", "motors"]
+
+
+def get_dynamics_model(
+    attitude: AttitudeKind = "euler",
+    *,
+    plant: PlantKind = "wrench",
+) -> DynamicsModel:
+    """Factory for built-in rigid-body (+ optional motor) models."""
+    if plant == "wrench":
+        if attitude == "euler":
+            return EulerRigidBodyDynamics()
+        if attitude == "quat":
+            return QuatRigidBodyDynamics()
+    elif plant == "motors":
+        from uavsim.dynamics.motors import EulerMotorDynamics, QuatMotorDynamics
+
+        if attitude == "euler":
+            return EulerMotorDynamics()
+        if attitude == "quat":
+            return QuatMotorDynamics()
+    msg = f"Unknown dynamics attitude={attitude!r} plant={plant!r}"
     raise ValueError(msg)

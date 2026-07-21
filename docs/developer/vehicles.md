@@ -106,8 +106,9 @@ print(v.mass_kg, v.u_hover())
 | Gap | Why it matters | Status |
 |-----|----------------|--------|
 | Off-diagonal inertia products | Real CAD inertia tensors | **TODO** — model is diagonal-only |
-| Extra vehicle fields (drag coeffs, \(C_T\), battery) | Config for aero / prop models | **TODO** — `extra="forbid"` blocks unknown YAML keys today; need schema extension plan |
-| Control allocation / mixer | Map motor RPM → body wrench; arm length used | **TODO** — plant takes body wrench \(u\) only |
+| Extra vehicle fields (drag coeffs, battery) | Config for aero | **TODO** — `extra="forbid"` until schema extended |
+| Propulsion `ct` / `cq` / motor τ | Mixer + motor plant | **Done** — optional `propulsion:` block |
+| Control allocation / mixer | Map wrench ↔ motor forces; arm length used | **Done** — `sim.plant: motors` |
 | Multi-vehicle / heterogeneous fleets | Formation, different platforms | **Out of core scope** |
 | Validation \(F_\max \ge mg\) as hard error | Catch bad configs early | **TODO** (soft today) |
 
