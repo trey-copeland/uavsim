@@ -48,12 +48,13 @@ Guide: [control.md](control.md)
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| EST-1 | Configurable measurement models (noise) | **Done** | `MeasurementModel` — Gaussian on pos/att/vel/ω |
-| EST-2 | `StateObserver` protocol (predict / update) | **Done** | `estimation/base.py`; wired in closed-loop |
-| EST-3 | Reference filter implementation | **Partial** | `linear_kf` on hover (A,B); MEKF **TODO** |
-| EST-4 | Study config `sim.observer` | **Done** | Default `none`; demo `figure_eight_observer.yaml` |
+| EST-1 | Configurable measurement models (noise) | **Done** | Full or partial channels; `Observation` + H |
+| EST-2 | `StateObserver` protocol (predict / update) | **Done** | Wired in closed-loop |
+| EST-3 | Reference filter implementation | **Done** | `linear_kf` (hover A,B) + `mekf` (error-state / multiplicative att) |
+| EST-4 | Study config `sim.observer` | **Done** | `none` \| `linear_kf` \| `mekf`; `channels` list |
+| EST-5 | Log `x_hat` in run artifacts | **Done** | `nominal/timeseries.npz` key `x_hat` |
 
-**Next estimation:** partial-state H matrix, error-state / MEKF attitude filter (still EST-3 stretch).
+Demos: `figure_eight_observer.yaml`, `figure_eight_mekf.yaml` (partial `pos`+`omega`).
 
 ---
 

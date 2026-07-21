@@ -213,12 +213,14 @@ Use as a living board (check off in PRs or edit this file).
 - [x] **5c.4** `DynamicsModel` protocol + plant injection  
 - [ ] Export / timeseries schema for native 13-state logging (optional; not required for 5c exit)
 
-### M5d — Observer-in-the-loop (**in progress / first cut done**)
+### M5d — Observer-in-the-loop (**done** for stretch goals)
 - [x] Measurement noise model (`MeasurementModel`) on Euler state channels  
 - [x] `StateObserver` protocol wired in closed-loop (plant → measure → observer → controller)  
 - [x] `linear_kf` (hover A/B) + study config `sim.observer` (default `none`)  
 - [x] Soft regression: full-state figure-eight unchanged; observer study tracks with soft RMSE band  
-- [ ] Partial-state sensors / MEKF (stretch)  
+- [x] Partial-state channels + H matrix (`channels: [pos, omega, …]`)  
+- [x] Error-state MEKF (`type: mekf`) + demo study  
+- [x] `x_hat` logged in `nominal/timeseries.npz`
 
 ### M6 — Nav beyond waypoints
 - [ ] First non-waypoint guidance backend + example study  

@@ -57,9 +57,20 @@ def write_json(path: Path, data: Any) -> None:
         f.write("\n")
 
 
-def write_nominal_timeseries(run_dir: Path, t: np.ndarray, x: np.ndarray, u: np.ndarray) -> Path:
+def write_nominal_timeseries(
+    run_dir: Path,
+    t: np.ndarray,
+    x: np.ndarray,
+    u: np.ndarray,
+    *,
+    x_hat: np.ndarray | None = None,
+) -> Path:
+    """Write nominal timeseries. Optional ``x_hat`` is the observer estimate."""
     path = run_dir / "nominal" / "timeseries.npz"
-    np.savez_compressed(path, t=t, x=x, u=u)
+    payload: dict[str, Any] = {"t": t, "x": x, "u": u}
+    if x_hat is not None:
+        payload["x_hat"] = np.asarray(x_hat, dtype=float)
+    np.savez_compressed(path, **payload)
     return path
 
 

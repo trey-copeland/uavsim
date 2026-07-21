@@ -150,6 +150,9 @@ def run_closed_loop_trial(
         metrics["rmse_estimate_position_m"] = float(
             np.sqrt(np.mean(np.sum(e_est[:, 0:3] ** 2, axis=1)))
         )
+        metrics["rmse_estimate_attitude_rad"] = float(
+            np.sqrt(np.mean(np.sum(e_est[:, 3:6] ** 2, axis=1)))
+        )
     return sim_result, metrics
 
 
@@ -446,7 +449,13 @@ def run_nominal_study(
     run_dir = create_run_directory(output_root, cfg.study_id)
     write_yaml(run_dir / "study_config.yaml", cfg.model_dump())
     _write_reference_artifacts(run_dir, prepared)
-    write_nominal_timeseries(run_dir, sim_result.t, sim_result.x, sim_result.u)
+    write_nominal_timeseries(
+        run_dir,
+        sim_result.t,
+        sim_result.x,
+        sim_result.u,
+        x_hat=sim_result.x_hat,
+    )
     write_json(run_dir / "nominal" / "metrics.json", metrics)
     ctrl_summary: dict[str, Any] = {
         "id": prepared.controller.id,

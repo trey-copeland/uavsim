@@ -33,3 +33,22 @@ def test_figure_eight_linear_kf_tracks(tmp_path: Path) -> None:
     # Degraded vs full-state (~0.037) but still bounded
     assert rmse < 0.4, f"observer SIL RMSE {rmse}"
     assert "rmse_estimate_position_m" in r.metrics
+    # x_hat logged in timeseries
+    ts = list((tmp_path / "runs").glob("*/nominal/timeseries.npz"))
+    assert ts
+    data = __import__("numpy").load(ts[0])
+    assert "x_hat" in data.files
+    assert data["x_hat"].shape == data["x"].shape
+
+
+def test_figure_eight_mekf_partial_tracks(tmp_path: Path) -> None:
+    r = run_nominal_study(
+        ROOT / "configs" / "studies" / "figure_eight_mekf.yaml",
+        output_root=tmp_path / "runs",
+        run_mc=False,
+    )
+    assert r.success is True
+    assert r.metrics["observer_id"] == "mekf"
+    rmse = float(r.metrics["rmse_position_m"])
+    assert rmse < 0.75, f"MEKF partial SIL RMSE {rmse}"
+    assert r.metrics.get("success") is True

@@ -9,7 +9,7 @@ from scipy.integrate import solve_ivp
 
 from uavsim.dynamics import CONTROL_DIM, STATE_DIM
 from uavsim.estimation.identity import IdentityObserver
-from uavsim.estimation.measurements import MeasurementModel, apply_measurement_noise
+from uavsim.estimation.measurements import MeasurementModel
 from uavsim.interfaces import MeasurementBus
 from uavsim.sim.adapters import CommandSource
 from uavsim.sim.plant import SimPlant
@@ -184,8 +184,12 @@ def _simulate_fixed_step(
 
         # Observer: predict then update with (noisy) measurements of true state
         observer.predict(dti, ui)
-        y = apply_measurement_noise(x_true, measurement_model)
-        x_hat_out[i + 1] = observer.update(y)
+        if measurement_model is None:
+            x_hat_out[i + 1] = observer.update(x_true)
+        elif isinstance(observer, IdentityObserver):
+            x_hat_out[i + 1] = observer.update(measurement_model.measure(x_true))
+        else:
+            x_hat_out[i + 1] = observer.update(measurement_model.observe(x_true))
 
     # Final control sample
     meas_f = MeasurementBus(t=float(t_out[-1]), x=observer.x_hat)

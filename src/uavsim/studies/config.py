@@ -72,13 +72,15 @@ class ObserverConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["none", "identity", "linear_kf"] = "none"
+    type: Literal["none", "identity", "linear_kf", "mekf"] = "none"
     seed: int = 0
     pos_sigma_m: float = Field(default=0.05, ge=0)
     vel_sigma_m_s: float = Field(default=0.05, ge=0)
     att_sigma_rad: float = Field(default=0.02, ge=0)
     omega_sigma_rad_s: float = Field(default=0.05, ge=0)
     process_sigma: float = Field(default=0.02, ge=0)
+    # Partial-state channels, e.g. ["pos", "omega"] or full default
+    channels: list[str] | None = None
 
 
 class SimConfig(BaseModel):
