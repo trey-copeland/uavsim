@@ -1,9 +1,7 @@
-# Phase 5d demo: figure-eight under linear KF + noisy measurements (LQG-style).
-# Prefer configs/studies/figure_eight_lqg.yaml for the named portfolio LQG study
-# (same recipe; study_id differs). Default figure_eight remains full-state.
+# Monte Carlo robustness under GPS+IMU LQG (same recipe as figure_eight_gps_imu_lqg).
 schema_version: 1
-study_id: figure_eight_observer
-seed: 7
+study_id: figure_eight_gps_imu_lqg_mc
+seed: 42
 
 vehicle: configs/vehicles/default_quadrotor.yaml
 
@@ -29,12 +27,22 @@ sim:
   observer:
     type: linear_kf
     seed: 7
-    pos_sigma_m: 0.03
+    pos_sigma_m: 0.05
     vel_sigma_m_s: 0.05
-    att_sigma_rad: 0.02
-    omega_sigma_rad_s: 0.05
+    att_sigma_rad: 0.03
+    omega_sigma_rad_s: 0.04
     process_sigma: 0.03
-    channels: [pos, att, vel, omega]
+    channels: [pos, omega]
 
 metrics:
   position_bound_m: 0.75
+
+monte_carlo:
+  enabled: true
+  n_trials: 200
+  backend: local
+  shards: 1
+  redesign_controller: false
+  mass_rel_sigma: 0.10
+  inertia_rel_sigma: 0.10
+  arm_rel_sigma: 0.005

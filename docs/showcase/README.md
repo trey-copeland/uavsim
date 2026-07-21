@@ -1,15 +1,27 @@
 # uavsim flight results (React)
 
-Single-page React app that rolls up the **base case** into one document:
+Single-page React app for the portfolio base case: **ideal LQR**, an **estimation/LQG sensor matrix**, PID, Monte Carlo, and a **hover-linearization envelope**.
 
-| Card | Study | Story |
-|------|--------|--------|
-| Figure-eight — LQR | `configs/studies/figure_eight.yaml` | Elevated lemniscate tracking (soft-checked vs ME590 LQR band) |
-| Figure-eight — PID | `configs/studies/figure_eight_pid.yaml` | Second controller on the same mission |
-| Figure-eight Monte Carlo | `configs/studies/figure_eight_mc.yaml` | N≈200 mass/inertia/arm robustness |
+| Card / tab | Study | Story |
+|------------|--------|--------|
+| Ideal LQR | `configs/studies/figure_eight.yaml` | Full true state (upper bound) |
+| GPS+IMU naive | `figure_eight_gps_imu_naive.yaml` | `pos`+`omega`, zeros elsewhere → LQR |
+| GPS+IMU LQG | `figure_eight_gps_imu_lqg.yaml` | Same sensors → linear KF → LQR |
+| AHRS LQG | `figure_eight_ahrs_lqg.yaml` | GPS-denied: `att`+`omega` |
+| IMU-only LQG | `figure_eight_imu_only_lqg.yaml` | Rates only — position not observable |
+| PID | `figure_eight_pid.yaml` | Second controller, full state |
+| MC | `figure_eight_gps_imu_lqg_mc.yaml` | Mass/inertia/arm under GPS+IMU LQG |
+| **Estimation** tab | matrix metadata | Benefit → GPS-denied win → weakness |
+| **Envelope** tab | time-scale sweep | Limits of **idealized** hover LQR |
 
-Mission: [`configs/missions/figure_eight.yaml`](../../configs/missions/figure_eight.yaml) — constant yaw, ≥4 s segments, altitude undulation.  
-(Path-tangent auto-yaw on this class of path is a known failure mode; see `figure_eight_auto_yaw` for that stress case.)
+Mission: [`configs/missions/figure_eight.yaml`](../../configs/missions/figure_eight.yaml) — constant yaw, ≥4 s segments, altitude undulation.
+
+### Two different questions
+
+1. **Estimation tab** — *Do we need a filter when sensors are partial?*  
+   Same mission and \(K\); change only the measurement bus / observer.
+2. **Envelope tab** — *Where does hover-linearized full-state LQR fail as the path gets aggressive?*  
+   Time-scale τ compresses the figure-eight; primary curve is ideal LQR (LQG overlay optional).
 
 Data lives in `data/showcase.json` (browser-safe, downsampled). No build step: React + Plotly load from CDN.
 
@@ -22,6 +34,7 @@ uv sync --extra dev
 uv run uavsim gallery --base-case
 # writes docs/showcase/data/showcase.json (+ SPA files)
 # optional: --n-mc-trials 8 for a quick smoke rebuild
+# optional: --skip-envelope to skip the LQR stress sweep
 ```
 
 Serve locally:
@@ -58,7 +71,9 @@ config with `GITHUB_TOKEN`; if the token lacks permission, set Source in the UI.
 ## What’s in the UI
 
 - **Overview** — metric cards for each base-case run  
+- **Estimation** — LQG teaching matrix (RMSE bars + scenario table)  
 - **Flight 3D** — rotate/zoom path, scrub time, velocity vector, strip charts  
 - **Metrics** — full metric table + feasibility  
-- **Monte Carlo** — summary, RMSE hist/CDF, correlation bars, multi-metric distribution grid, parameter sensitivity grid  
-- **Compare** — LQR vs PID metric deltas + path overlay  
+- **Monte Carlo** — summary, RMSE hist/CDF, sensitivity (GPS+IMU LQG MC)  
+- **Envelope** — ideal LQR time-scale limits (optional LQG overlay)  
+- **Compare** — GPS+IMU **naive vs LQG** metric deltas + path overlay  

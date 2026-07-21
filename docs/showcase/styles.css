@@ -82,5 +82,9 @@ select, input[type="range"] {
   font-size: 0.7rem; background: var(--border);
 }
 .badge.lqr { background: #1e3a5f; color: #7ec8ff; }
+.badge.lqg { background: #3a3218; color: #e6c86e; }
+.badge.naive { background: #4a2020; color: #f0a0a0; }
+.badge.ahrs { background: #1e3040; color: #9ec8e8; }
+.badge.weak { background: #3a3020; color: #d0b090; }
 .badge.pid { background: #3a2a1e; color: #ffc07e; }
 .badge.mc { background: #1e3a2f; color: #7dffb3; }

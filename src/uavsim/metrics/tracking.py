@@ -54,6 +54,12 @@ def compute_metrics(
     peak_thrust = float(np.max(u[:, 0]))
     peak_torque = float(np.max(np.abs(u[:, 1:4])))
 
+    # Absolute plant envelope (not tracking error) — linearization distance proxies
+    peak_roll = float(np.max(np.abs(x[:, 3])))
+    peak_pitch = float(np.max(np.abs(x[:, 4])))
+    peak_tilt = float(max(peak_roll, peak_pitch))
+    peak_speed = float(np.max(np.linalg.norm(x[:, 6:9], axis=1)))
+
     success = bool(
         np.isfinite(x).all()
         and max_pos < max(5.0 * position_bound_m, 1.0)
@@ -73,6 +79,10 @@ def compute_metrics(
         "control_effort_proxy": effort,
         "peak_thrust_n": peak_thrust,
         "peak_torque_nm": peak_torque,
+        "peak_tilt_rad": peak_tilt,
+        "peak_roll_rad": peak_roll,
+        "peak_pitch_rad": peak_pitch,
+        "peak_speed_m_s": peak_speed,
         "success": success,
         "n_samples": int(t.size),
         "t_final_s": float(t[-1]) if t.size else 0.0,

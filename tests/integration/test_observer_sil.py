@@ -52,3 +52,45 @@ def test_figure_eight_mekf_partial_tracks(tmp_path: Path) -> None:
     rmse = float(r.metrics["rmse_position_m"])
     assert rmse < 0.75, f"MEKF partial SIL RMSE {rmse}"
     assert r.metrics.get("success") is True
+
+
+def test_gps_imu_lqg_beats_naive(tmp_path: Path) -> None:
+    """Teaching moment: same sensors, LQG recovers; naive partial diverges."""
+    out = tmp_path / "runs"
+    naive = run_nominal_study(
+        ROOT / "configs" / "studies" / "figure_eight_gps_imu_naive.yaml",
+        output_root=out,
+        run_mc=False,
+    )
+    lqg = run_nominal_study(
+        ROOT / "configs" / "studies" / "figure_eight_gps_imu_lqg.yaml",
+        output_root=out,
+        run_mc=False,
+    )
+    assert naive.metrics["observer_id"] == "partial_raw"
+    assert lqg.metrics["observer_id"] == "linear_kf"
+    assert lqg.metrics["success"] is True
+    assert float(lqg.metrics["rmse_position_m"]) < 0.15
+    # Naive incomplete bus should be dramatically worse
+    assert float(naive.metrics["rmse_position_m"]) > 10.0 * float(
+        lqg.metrics["rmse_position_m"]
+    )
+
+
+def test_ahrs_lqg_finite_imu_only_worse(tmp_path: Path) -> None:
+    out = tmp_path / "runs"
+    ahrs = run_nominal_study(
+        ROOT / "configs" / "studies" / "figure_eight_ahrs_lqg.yaml",
+        output_root=out,
+        run_mc=False,
+    )
+    imu = run_nominal_study(
+        ROOT / "configs" / "studies" / "figure_eight_imu_only_lqg.yaml",
+        output_root=out,
+        run_mc=False,
+    )
+    assert ahrs.metrics["observer_id"] == "linear_kf"
+    assert imu.metrics["observer_id"] == "linear_kf"
+    # AHRS-like stays much closer to the path than rate-only
+    assert float(ahrs.metrics["rmse_position_m"]) < float(imu.metrics["rmse_position_m"])
+    assert float(ahrs.metrics["max_position_error_m"]) < 10.0

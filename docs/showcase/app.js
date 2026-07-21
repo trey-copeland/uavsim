@@ -4,10 +4,17 @@
   const { useState, useEffect, useMemo, useRef } = React;
 
   function roleBadge(role) {
-    if (role && role.includes("pid")) return e("span", { className: "badge pid" }, "PID");
-    if (role && role.includes("mc")) return e("span", { className: "badge mc" }, "MC");
-    if (role && role.includes("lqr")) return e("span", { className: "badge lqr" }, "LQR");
-    return e("span", { className: "badge" }, role || "run");
+    if (!role) return e("span", { className: "badge" }, "run");
+    if (role.includes("pid")) return e("span", { className: "badge pid" }, "PID");
+    if (role.includes("monte_carlo") || role.includes("mc"))
+      return e("span", { className: "badge mc" }, "MC");
+    if (role.includes("naive")) return e("span", { className: "badge naive" }, "naive");
+    if (role.includes("imu_only")) return e("span", { className: "badge weak" }, "IMU-only");
+    if (role.includes("ahrs")) return e("span", { className: "badge ahrs" }, "AHRS");
+    if (role.includes("lqg")) return e("span", { className: "badge lqg" }, "LQG");
+    if (role.includes("ideal") || role.includes("lqr"))
+      return e("span", { className: "badge lqr" }, "LQR");
+    return e("span", { className: "badge" }, role);
   }
 
   function fmt(x, digits) {
@@ -1059,6 +1066,417 @@
     );
   }
 
+  function EstimationTab({ doc, onSelectRun }) {
+    const matrix = doc.estimation_matrix;
+    if (!matrix || !matrix.scenarios || !matrix.scenarios.length) {
+      return e(
+        "div",
+        { className: "card" },
+        e("h2", null, "Estimation / LQG"),
+        e("p", { style: { color: "var(--muted)" } }, "No estimation matrix in this gallery.")
+      );
+    }
+    const scenarios = matrix.scenarios;
+    const barIds = scenarios.map(function (s) {
+      return s.run_id;
+    });
+    const rmse = scenarios.map(function (s) {
+      const m = s.metrics || {};
+      const v = m.rmse_position_m;
+      return v != null && Number.isFinite(+v) ? +v : null;
+    });
+    // Cap bar for naive blow-up so LQG bars stay readable; annotate large values
+    const displayRmse = rmse.map(function (v) {
+      if (v == null) return null;
+      return Math.min(v, 5);
+    });
+    const labels = scenarios.map(function (s) {
+      return s.label;
+    });
+    const colors = scenarios.map(function (s) {
+      if (s.id && s.id.includes("naive")) return "#c07070";
+      if (s.id && s.id.includes("imu")) return "#a08060";
+      if (s.id && s.id.includes("ahrs")) return "#80a0c0";
+      if (s.id && s.id.includes("gps_imu_lqg")) return "#c9a227";
+      return "#5b9fd4";
+    });
+
+    const plotTheme = {
+      paper_bgcolor: "#0c1018",
+      plot_bgcolor: "#0c1018",
+      font: { color: "#e7ecf3", size: 11 },
+      margin: { t: 48, r: 20, b: 80, l: 56 },
+    };
+
+    return e(
+      "div",
+      null,
+      e(
+        "div",
+        { className: "card" },
+        e("h2", null, matrix.title || "Estimation & LQG"),
+        e("p", null, matrix.description || ""),
+        e(
+          "p",
+          { style: { color: "var(--muted)", fontSize: "0.9rem" } },
+          "Bars capped at 5 m RMSE for readability when naive partial feedback diverges. ",
+          "See table for raw values. Click a scenario to open Flight 3D."
+        )
+      ),
+      e(
+        "div",
+        { className: "card" },
+        e(PlotDiv, {
+          id: "est-rmse-bars",
+          data: [
+            {
+              x: labels,
+              y: displayRmse,
+              type: "bar",
+              marker: { color: colors },
+              text: rmse.map(function (v) {
+                return v == null ? "—" : v > 5 ? ">5 (" + fmt(v, 1) + ")" : fmt(v, 3);
+              }),
+              textposition: "outside",
+              hovertemplate: "%{x}<br>RMSE %{text}<extra></extra>",
+            },
+          ],
+          layout: {
+            ...plotTheme,
+            height: 340,
+            title: { text: "Position RMSE by estimation scenario", font: { size: 13 } },
+            yaxis: { title: "RMSE position [m] (display cap 5)", gridcolor: "#2a2f36" },
+            xaxis: { tickangle: -20 },
+          },
+        })
+      ),
+      e(
+        "div",
+        { className: "card" },
+        e("h3", null, "Scenario matrix"),
+        e(
+          "div",
+          { className: "table-wrap" },
+          e(
+            "table",
+            { className: "metrics" },
+            e(
+              "thead",
+              null,
+              e(
+                "tr",
+                null,
+                ["Scenario", "Sensors", "Method", "RMSE [m]", "max |e| [m]", "ok", "Lesson"].map(
+                  function (h) {
+                    return e("th", { key: h }, h);
+                  }
+                )
+              )
+            ),
+            e(
+              "tbody",
+              null,
+              scenarios.map(function (s, i) {
+                const m = s.metrics || {};
+                const ok = m.success;
+                return e(
+                  "tr",
+                  {
+                    key: s.id || i,
+                    style: {
+                      cursor: s.run_id ? "pointer" : "default",
+                      color: ok === false ? "#e07070" : undefined,
+                    },
+                    onClick: function () {
+                      if (s.run_id && onSelectRun) onSelectRun(s.run_id);
+                    },
+                  },
+                  e("td", null, s.label),
+                  e("td", null, s.sensors),
+                  e("td", null, s.method),
+                  e("td", null, fmt(m.rmse_position_m, 4)),
+                  e("td", null, fmt(m.max_position_error_m, 3)),
+                  e("td", null, ok === true ? "yes" : ok === false ? "no" : "—"),
+                  e("td", { style: { maxWidth: "22rem", fontSize: "0.85rem" } }, s.lesson || "")
+                );
+              })
+            )
+          )
+        )
+      ),
+      e(
+        "div",
+        { className: "card" },
+        e("h3", null, "How to read this"),
+        e(
+          "ul",
+          { style: { color: "var(--muted)", lineHeight: 1.5 } },
+          e(
+            "li",
+            null,
+            e("strong", null, "Benefit: "),
+            "GPS+IMU LQG ≪ naive on the same sensors (reconstruction + noise rejection)."
+          ),
+          e(
+            "li",
+            null,
+            e("strong", null, "GPS-denied win: "),
+            "AHRS-like (att+ω) LQG stays finite; still far from ideal without position."
+          ),
+          e(
+            "li",
+            null,
+            e("strong", null, "Weakness: "),
+            "IMU-only (ω) cannot observe position — LQG does not invent GPS."
+          ),
+          e(
+            "li",
+            null,
+            e("strong", null, "Envelope tab: "),
+            "limits of idealized full-state LQR when the path leaves the hover linearization — different question."
+          )
+        )
+      )
+    );
+  }
+
+  function EnvelopeTab({ doc }) {
+    const env = doc.envelope;
+    if (!env || !env.points || !env.points.length) {
+      return e(
+        "div",
+        { className: "card" },
+        e("h2", null, "Linearization envelope"),
+        e(
+          "p",
+          { style: { color: "var(--muted)" } },
+          "No envelope series in this gallery. Rebuild with ",
+          e("code", null, "uv run uavsim gallery --base-case"),
+          " (omit ",
+          e("code", null, "--skip-envelope"),
+          ")."
+        )
+      );
+    }
+
+    const laws = ["lqr", "lqg"];
+    const colors = { lqr: "#5b9fd4", lqg: "#c9a227" };
+    const points = env.points;
+    const plotTheme = {
+      paper_bgcolor: "#0c1018",
+      plot_bgcolor: "#0c1018",
+      font: { color: "#e7ecf3", size: 11 },
+      margin: { t: 36, r: 12, b: 40, l: 48 },
+    };
+
+    function seriesFor(law, xKey, yKey, yScale) {
+      const xs = [];
+      const ys = [];
+      const texts = [];
+      const symbols = [];
+      points
+        .filter(function (p) {
+          return p.law === law;
+        })
+        .sort(function (a, b) {
+          return (a.time_scale || 0) - (b.time_scale || 0);
+        })
+        .forEach(function (p) {
+          const x = p[xKey];
+          const y = p[yKey];
+          if (x == null || y == null) return;
+          if (!Number.isFinite(+x) || !Number.isFinite(+y)) return;
+          xs.push(+x);
+          ys.push(+y * (yScale || 1));
+          texts.push(
+            law.toUpperCase() +
+              " τ=" +
+              p.time_scale +
+              "<br>peak tilt " +
+              fmt(p.peak_tilt_deg, 1) +
+              "°" +
+              "<br>rmse " +
+              fmt(p.rmse_position_m, 3) +
+              " m" +
+              "<br>" +
+              (p.success ? "success" : "FAIL")
+          );
+          symbols.push(p.success ? "circle" : "x");
+        });
+      return {
+        x: xs,
+        y: ys,
+        text: texts,
+        mode: "lines+markers",
+        name: law.toUpperCase(),
+        line: { color: colors[law] || "#aaa", width: 2 },
+        marker: {
+          size: 10,
+          color: colors[law] || "#aaa",
+          symbol: symbols,
+          line: { width: 1, color: "#111" },
+        },
+        hovertemplate: "%{text}<extra></extra>",
+      };
+    }
+
+    const plotRmseVsTau = {
+      data: laws.map(function (law) {
+        return seriesFor(law, "time_scale", "rmse_position_m", 1);
+      }),
+      layout: {
+        ...plotTheme,
+        height: 360,
+        title: { text: "Position RMSE vs time scale τ (1 = portfolio path)", font: { size: 13 } },
+        xaxis: {
+          title: "τ (smaller = faster / more aggressive)",
+          gridcolor: "#2a2f36",
+          autorange: "reversed",
+        },
+        yaxis: { title: "RMSE position [m]", gridcolor: "#2a2f36", type: "log" },
+        legend: { orientation: "h" },
+        margin: { t: 48, r: 20, b: 48, l: 56 },
+      },
+    };
+
+    const plotRmseVsTilt = {
+      data: laws.map(function (law) {
+        return seriesFor(law, "peak_tilt_deg", "rmse_position_m", 1);
+      }),
+      layout: {
+        ...plotTheme,
+        height: 360,
+        title: {
+          text: "Position RMSE vs peak plant tilt (linearization distance)",
+          font: { size: 13 },
+        },
+        xaxis: { title: "Peak |φ| or |θ| [deg]", gridcolor: "#2a2f36" },
+        yaxis: { title: "RMSE position [m]", gridcolor: "#2a2f36", type: "log" },
+        legend: { orientation: "h" },
+        margin: { t: 48, r: 20, b: 48, l: 56 },
+        shapes: [
+          {
+            type: "line",
+            x0: 15,
+            x1: 15,
+            y0: 0,
+            y1: 1,
+            yref: "paper",
+            line: { color: "rgba(200,120,80,0.7)", width: 1, dash: "dot" },
+          },
+        ],
+        annotations: [
+          {
+            x: 15,
+            y: 1,
+            yref: "paper",
+            text: "~15° small-angle ref",
+            showarrow: false,
+            xanchor: "left",
+            font: { size: 10, color: "#c87850" },
+          },
+        ],
+      },
+    };
+
+    const b = env.boundary || {};
+    const rows = points
+      .slice()
+      .sort(function (a, c) {
+        if (a.time_scale !== c.time_scale) return c.time_scale - a.time_scale;
+        return String(a.law).localeCompare(String(c.law));
+      });
+
+    return e(
+      "div",
+      null,
+      e(
+        "div",
+        { className: "card" },
+        e("h2", null, env.title || "Linearization envelope"),
+        e("p", null, env.description || ""),
+        e(
+          "div",
+          { className: "metric-grid" },
+          laws.map(function (law) {
+            const bb = b[law] || {};
+            return e(
+              "div",
+              { key: law, className: "metric" },
+              e("div", { className: "k" }, law.toUpperCase() + " last success τ"),
+              e("div", { className: "v" }, fmt(bb.last_success_time_scale, 2)),
+              e(
+                "div",
+                { className: "k", style: { marginTop: "0.35rem" } },
+                "first fail τ / peak tilt"
+              ),
+              e(
+                "div",
+                { className: "v" },
+                (bb.first_fail_time_scale != null ? fmt(bb.first_fail_time_scale, 2) : "—") +
+                  " / " +
+                  (bb.first_fail_peak_tilt_deg != null
+                    ? fmt(bb.first_fail_peak_tilt_deg, 1) + "°"
+                    : "—")
+              )
+            );
+          })
+        ),
+        (env.notes || []).map(function (n, i) {
+          return e("p", { key: i, style: { color: "var(--muted)", fontSize: "0.9rem" } }, "• " + n);
+        })
+      ),
+      e("div", { className: "card" }, e(PlotDiv, { id: "env-rmse-tau", ...plotRmseVsTau })),
+      e("div", { className: "card" }, e(PlotDiv, { id: "env-rmse-tilt", ...plotRmseVsTilt })),
+      e(
+        "div",
+        { className: "card" },
+        e("h3", null, "Sweep table"),
+        e(
+          "div",
+          { className: "table-wrap" },
+          e(
+            "table",
+            { className: "metrics" },
+            e(
+              "thead",
+              null,
+              e(
+                "tr",
+                null,
+                ["τ", "law", "success", "RMSE pos [m]", "max pos [m]", "peak tilt [°]", "peak v [m/s]"].map(
+                  function (h) {
+                    return e("th", { key: h }, h);
+                  }
+                )
+              )
+            ),
+            e(
+              "tbody",
+              null,
+              rows.map(function (p, i) {
+                return e(
+                  "tr",
+                  {
+                    key: i,
+                    style: p.success ? undefined : { color: "#e07070" },
+                  },
+                  e("td", null, fmt(p.time_scale, 2)),
+                  e("td", null, String(p.law).toUpperCase()),
+                  e("td", null, p.success ? "yes" : "no"),
+                  e("td", null, fmt(p.rmse_position_m, 4)),
+                  e("td", null, fmt(p.max_position_error_m, 3)),
+                  e("td", null, fmt(p.peak_tilt_deg, 1)),
+                  e("td", null, fmt(p.peak_speed_m_s, 2))
+                );
+              })
+            )
+          )
+        )
+      )
+    );
+  }
+
   function App() {
     const [doc, setDoc] = useState(null);
     const [err, setErr] = useState(null);
@@ -1101,14 +1519,24 @@
 
     const tabs = [
       ["overview", "Overview"],
+      ["estimation", "Estimation"],
       ["flight", "Flight 3D"],
       ["metrics", "Metrics"],
       ["monte_carlo", "Monte Carlo"],
+      ["envelope", "Envelope"],
       ["compare", "Compare"],
     ];
 
     let body;
     if (tab === "overview") body = e(Overview, { doc, onSelect: (id) => { setRunId(id); setTab("flight"); } });
+    else if (tab === "estimation")
+      body = e(EstimationTab, {
+        doc,
+        onSelectRun: (id) => {
+          setRunId(id);
+          setTab("flight");
+        },
+      });
     else if (tab === "flight")
       body = e(
         "div",
@@ -1143,7 +1571,8 @@
     else if (tab === "monte_carlo") {
       const mcRun = doc.runs.find((r) => r.mc) || run;
       body = e(McTab, { run: mcRun });
-    } else if (tab === "compare") body = e(CompareTab, { doc });
+    } else if (tab === "envelope") body = e(EnvelopeTab, { doc });
+    else if (tab === "compare") body = e(CompareTab, { doc });
 
     return e(
       "div",

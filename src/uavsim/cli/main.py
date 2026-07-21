@@ -141,6 +141,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Override MC trial count for base-case study (default: study YAML, e.g. 200)",
     )
+    p_gallery.add_argument(
+        "--skip-envelope",
+        action="store_true",
+        help="Skip LQR/LQG linearization envelope sweep (faster smoke builds)",
+    )
 
     p_report = sub.add_parser(
         "report",
@@ -347,6 +352,7 @@ def main(argv: list[str] | None = None) -> int:
                     repo_root=Path.cwd(),
                     out_dir=args.out,
                     n_mc_trials=args.n_mc_trials,
+                    skip_envelope=bool(getattr(args, "skip_envelope", False)),
                 )
                 print(f"[OK] base-case gallery → {path}")
                 print(f"  open {(args.out or Path('docs/showcase')) / 'index.html'}")

@@ -27,15 +27,18 @@
 
 ### Control
 - **LQR hover** design on linearization (heritage Q/R style)
+- **LQG path**: same LQR on KF estimates from realistic partial sensors
 - **PID cascade** for controller compare studies
 - **SO(3) attitude error** in LQR/PID/metrics (not naive Euler subtract)
+- **Linearization envelope**: time-scale sweep for limits of *idealized* hover LQR
 - Controller **export** + reload artifacts — [control guide](docs/developer/control.md)
 
 ### Estimation (optional)
 - Observer-in-the-loop: plant → noisy measurements → filter → controller
+- **`partial_raw`**: naive pack of measured channels (zeros elsewhere) — teaching baseline
 - **`linear_kf`** (hover \(A,B\)) and **`mekf`** (error-state / multiplicative attitude)
-- **Partial sensors** via `channels: [pos, omega, …]`
-- Estimates logged as `x_hat` in run timeseries — [estimation guide](docs/developer/estimation.md)
+- Sensor stories: GPS+IMU (`pos`+`omega`), AHRS-like (`att`+`omega`), IMU-only (`omega`)
+- Estimates logged as `x_hat` — [estimation guide](docs/developer/estimation.md)
 
 ### Studies, robustness & systems
 - Config-driven **`simulate` / `study`** pipelines with seed-stable Monte Carlo
@@ -119,7 +122,7 @@ Interactive React rollup of the portfolio **base case** (elevated figure-eight u
 | **Local** | `python -m http.server 8765 --directory docs/showcase` → http://127.0.0.1:8765/ |
 | **Regenerate** | `uv run uavsim gallery --base-case` · source in [`docs/showcase/`](docs/showcase/) |
 
-Tabs: overview · 3D flight scrubber · metrics · MC distribution/sensitivity grids · LQR vs PID compare. Details: [showcase README](docs/showcase/README.md).
+Tabs: overview · **estimation matrix** · 3D flight · metrics · MC · **envelope (ideal LQR limits)** · naive vs LQG compare. Details: [showcase README](docs/showcase/README.md).
 
 ---
 
@@ -140,6 +143,8 @@ uv run ruff check src tests
 # Hover + waypoints
 uv run uavsim simulate configs/studies/hover_nominal.yaml
 uv run uavsim simulate configs/studies/figure_eight.yaml
+uv run uavsim simulate configs/studies/figure_eight_gps_imu_lqg.yaml
+uv run uavsim simulate configs/studies/figure_eight_gps_imu_naive.yaml
 uv run uavsim simulate configs/studies/figure_eight_pid.yaml
 
 # Monte Carlo (small N for a quick loop)

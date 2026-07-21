@@ -16,16 +16,102 @@ from uavsim.viz.loaders import load_run, ned_to_plot
 
 GALLERY_SCHEMA = 1
 
-# Portfolio base case: figure-eight tracking + second controller + large MC
+# Portfolio base case — estimation teaching matrix + ideal LQR + PID + MC
+# (relative study path, gallery id, role)
 BASE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
-    # (relative study path, gallery id, role)
-    ("configs/studies/figure_eight.yaml", "figure_eight_lqr", "tracking_lqr"),
+    ("configs/studies/figure_eight.yaml", "figure_eight_lqr", "ideal_lqr"),
+    (
+        "configs/studies/figure_eight_gps_imu_naive.yaml",
+        "gps_imu_naive",
+        "est_gps_imu_naive",
+    ),
+    (
+        "configs/studies/figure_eight_gps_imu_lqg.yaml",
+        "gps_imu_lqg",
+        "est_gps_imu_lqg",
+    ),
+    (
+        "configs/studies/figure_eight_ahrs_lqg.yaml",
+        "ahrs_lqg",
+        "est_ahrs_lqg",
+    ),
+    (
+        "configs/studies/figure_eight_imu_only_lqg.yaml",
+        "imu_only_lqg",
+        "est_imu_only_lqg",
+    ),
     ("configs/studies/figure_eight_pid.yaml", "figure_eight_pid", "tracking_pid"),
-    ("configs/studies/figure_eight_mc.yaml", "figure_eight_mc", "monte_carlo"),
+    (
+        "configs/studies/figure_eight_gps_imu_lqg_mc.yaml",
+        "gps_imu_lqg_mc",
+        "monte_carlo",
+    ),
 )
 
 # Browser payload cap (full n_trials still reported in mc.n_trials / summary)
 MC_TRIALS_IN_GALLERY = 400
+
+# Teaching matrix metadata (merged into showcase.json)
+ESTIMATION_MATRIX: dict[str, Any] = {
+    "title": "Estimation & LQG teaching matrix",
+    "description": (
+        "Same elevated figure-eight and hover LQR gains. "
+        "Ideal LQR sees full true state. "
+        "GPS+IMU measures noisy position + body rates only. "
+        "Naive packs those into the control bus with zeros elsewhere; "
+        "LQG runs a linear KF (hover A,B) then the same K on x_hat. "
+        "AHRS-like = attitude + rates (GPS-denied with an attitude reference). "
+        "IMU-only = rates alone — position is not observable; expect drift."
+    ),
+    "scenarios": [
+        {
+            "id": "ideal",
+            "label": "Ideal full state",
+            "sensors": "x_true (no noise)",
+            "method": "LQR",
+            "run_id": "figure_eight_lqr",
+            "lesson": "Upper bound when the plant is fully observed.",
+        },
+        {
+            "id": "gps_imu_naive",
+            "label": "GPS + IMU — naive",
+            "sensors": "pos + omega (noisy)",
+            "method": "partial_raw → LQR",
+            "run_id": "gps_imu_naive",
+            "lesson": "Incomplete bus (zeros for att/vel) breaks hover LQR.",
+        },
+        {
+            "id": "gps_imu_lqg",
+            "label": "GPS + IMU — LQG",
+            "sensors": "pos + omega (noisy)",
+            "method": "linear_kf → LQR",
+            "run_id": "gps_imu_lqg",
+            "lesson": "State reconstruction + noise rejection recovers tracking.",
+        },
+        {
+            "id": "ahrs_lqg",
+            "label": "GPS-denied AHRS — LQG",
+            "sensors": "att + omega (noisy)",
+            "method": "linear_kf → LQR",
+            "run_id": "ahrs_lqg",
+            "lesson": (
+                "No GPS: attitude+rates still let the KF help; "
+                "position tracking degrades but stays finite vs naive blow-up."
+            ),
+        },
+        {
+            "id": "imu_only_lqg",
+            "label": "GPS-denied IMU-only — LQG",
+            "sensors": "omega only (noisy)",
+            "method": "linear_kf → LQR",
+            "run_id": "imu_only_lqg",
+            "lesson": (
+                "Honesty case: rates alone do not observe position; "
+                "filter cannot invent GPS — soft failure / drift."
+            ),
+        },
+    ],
+}
 
 
 def _downsample(n: int, max_points: int) -> np.ndarray:
@@ -116,6 +202,8 @@ def build_gallery_document(
     title: str = "uavsim · flight results",
     description: str = "",
     compare_ids: tuple[str, str] | None = None,
+    envelope: dict[str, Any] | None = None,
+    estimation_matrix: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble top-level showcase.json document."""
     by_id = {r["id"]: r for r in runs}
@@ -135,6 +223,34 @@ def build_gallery_document(
                 "deltas": deltas,
             }
 
+    # Attach metrics into estimation matrix rows when present
+    est = None
+    if estimation_matrix is not None:
+        est = dict(estimation_matrix)
+        scenarios = []
+        for sc in estimation_matrix.get("scenarios") or []:
+            row = dict(sc)
+            rid = row.get("run_id")
+            if rid and rid in by_id:
+                m = by_id[rid].get("metrics") or {}
+                row["metrics"] = {
+                    "rmse_position_m": m.get("rmse_position_m"),
+                    "max_position_error_m": m.get("max_position_error_m"),
+                    "success": m.get("success"),
+                    "observer_id": m.get("observer_id"),
+                    "peak_tilt_deg": (
+                        float(m["peak_tilt_rad"]) * 180.0 / 3.141592653589793
+                        if m.get("peak_tilt_rad") is not None
+                        else None
+                    ),
+                }
+            scenarios.append(row)
+        est["scenarios"] = scenarios
+
+    tabs = ["overview", "estimation", "flight", "metrics", "monte_carlo", "compare"]
+    if envelope is not None:
+        tabs.append("envelope")
+
     return {
         "schema_version": GALLERY_SCHEMA,
         "title": title,
@@ -143,9 +259,11 @@ def build_gallery_document(
         "uavsim_version": __version__,
         "runs": runs,
         "compare": compare,
+        "envelope": envelope,
+        "estimation_matrix": est,
         "ui": {
             "default_run": runs[0]["id"] if runs else None,
-            "tabs": ["overview", "flight", "metrics", "monte_carlo", "compare"],
+            "tabs": tabs,
         },
     }
 
@@ -213,18 +331,23 @@ def generate_base_case_gallery(
     runs_tmp: str | Path | None = None,
     max_points: int = 200,
     n_mc_trials: int | None = None,
+    skip_envelope: bool = False,
+    envelope_time_scales: tuple[float, ...] | None = None,
 ) -> Path:
     """
     Run the portfolio base-case studies and write ``docs/showcase``.
 
     Base case:
-      1. Elevated figure-eight with LQR (tracking demo)
-      2. Same mission with PID cascade (controller compare)
-      3. Figure-eight Monte Carlo under mass/inertia/arm uncertainty
+      1. Ideal full-state LQR
+      2–5. Estimation matrix (GPS+IMU naive/LQG, AHRS LQG, IMU-only LQG)
+      6. PID cascade
+      7. Monte Carlo on GPS+IMU LQG
+      8. Envelope: time-scale limits of idealized full-state LQR
 
     ``n_mc_trials`` overrides the study YAML when set (useful for smoke tests).
     """
     from uavsim.studies import run_nominal_study
+    from uavsim.studies.envelope import SHOWCASE_TIME_SCALES, run_linearization_envelope
 
     root = Path(repo_root or Path.cwd()).resolve()
     out = Path(out_dir or (root / "docs" / "showcase")).resolve()
@@ -233,9 +356,13 @@ def generate_base_case_gallery(
 
     entries: list[dict[str, Any]] = []
     labels = {
-        "figure_eight_lqr": "Figure-eight — LQR",
-        "figure_eight_pid": "Figure-eight — PID cascade",
-        "figure_eight_mc": "Figure-eight Monte Carlo",
+        "figure_eight_lqr": "Ideal LQR (full state)",
+        "gps_imu_naive": "GPS+IMU — naive partial LQR",
+        "gps_imu_lqg": "GPS+IMU — LQG",
+        "ahrs_lqg": "GPS-denied AHRS — LQG",
+        "imu_only_lqg": "GPS-denied IMU-only — LQG",
+        "figure_eight_pid": "PID cascade (full state)",
+        "gps_imu_lqg_mc": "GPS+IMU LQG Monte Carlo",
     }
     for rel, gid, role in BASE_CASE_STUDIES:
         study = root / rel
@@ -260,23 +387,47 @@ def generate_base_case_gallery(
             )
         )
 
+    envelope_doc: dict[str, Any] | None = None
+    if not skip_envelope:
+        scales = envelope_time_scales or SHOWCASE_TIME_SCALES
+        # Emphasize idealized full-state LQR limits; LQG overlay optional contrast
+        envelope_doc = run_linearization_envelope(
+            repo_root=root,
+            base_study_path=root / "configs" / "studies" / "figure_eight.yaml",
+            time_scales=scales,
+            laws=(("lqr", "none"), ("lqg", "linear_kf")),
+            output_root=tmp / "envelope",
+        )
+        envelope_doc["title"] = "Limits of hover-linearized LQR (ideal full state)"
+        envelope_doc["description"] = (
+            "Time-scale τ on the figure-eight (τ=1 portfolio path). "
+            "Primary story: idealized full-state LQR designed on hover A,B — "
+            "where tracking fails as speed/tilt leave the linearization. "
+            "LQG (full-channel KF) is shown as a secondary overlay; "
+            "it is not the sensor-reconstruction teaching case (see Estimation tab)."
+        )
+
     doc = build_gallery_document(
         entries,
         title="uavsim · flight results",
         description=(
-            "Elevated figure-eight under LQR and PID, plus a multi-hundred-trial "
-            "Monte Carlo with mass, inertia, and arm uncertainty. "
-            "Software-in-the-loop only."
+            "Figure-eight SIL: ideal LQR, estimation/LQG sensor matrix "
+            "(GPS+IMU naive vs LQG, GPS-denied AHRS and IMU-only), PID, "
+            "Monte Carlo on GPS+IMU LQG, and a time-scale envelope for "
+            "hover-linearization limits. Simulation only."
         ),
-        compare_ids=("figure_eight_lqr", "figure_eight_pid"),
+        # Primary compare: naive vs LQG on same sensors (teaching win)
+        compare_ids=("gps_imu_naive", "gps_imu_lqg"),
+        envelope=envelope_doc,
+        estimation_matrix=ESTIMATION_MATRIX,
     )
     write_gallery(doc, out, copy_app=True, template_dir=root / "docs" / "showcase")
-    # write meta for README
     meta = {
         "schema_version": GALLERY_SCHEMA,
         "generated_at": doc["generated_at"],
         "uavsim_version": __version__,
         "runs": [e["id"] for e in entries],
+        "has_envelope": envelope_doc is not None,
         "command": "uavsim gallery --base-case",
     }
     with (out / "data" / "meta.json").open("w", encoding="utf-8") as f:

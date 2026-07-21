@@ -1,8 +1,7 @@
-# Phase 5d demo: figure-eight under linear KF + noisy measurements (LQG-style).
-# Prefer configs/studies/figure_eight_lqg.yaml for the named portfolio LQG study
-# (same recipe; study_id differs). Default figure_eight remains full-state.
+# Teaching baseline: LQR on naive partial sensors (GPS pos + gyro), no filter.
+# Unmeasured states (att, vel) are zero on the control bus — expect poor tracking.
 schema_version: 1
-study_id: figure_eight_observer
+study_id: figure_eight_gps_imu_naive
 seed: 7
 
 vehicle: configs/vehicles/default_quadrotor.yaml
@@ -27,14 +26,13 @@ sim:
   atol: 1.0e-7
   attitude: euler
   observer:
-    type: linear_kf
+    type: partial_raw
     seed: 7
-    pos_sigma_m: 0.03
+    pos_sigma_m: 0.05
     vel_sigma_m_s: 0.05
-    att_sigma_rad: 0.02
-    omega_sigma_rad_s: 0.05
-    process_sigma: 0.03
-    channels: [pos, att, vel, omega]
+    att_sigma_rad: 0.03
+    omega_sigma_rad_s: 0.04
+    channels: [pos, omega]
 
 metrics:
-  position_bound_m: 0.75
+  position_bound_m: 1.5

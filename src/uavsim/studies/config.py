@@ -72,7 +72,7 @@ class ObserverConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["none", "identity", "linear_kf", "mekf"] = "none"
+    type: Literal["none", "identity", "linear_kf", "mekf", "partial_raw"] = "none"
     seed: int = 0
     pos_sigma_m: float = Field(default=0.05, ge=0)
     vel_sigma_m_s: float = Field(default=0.05, ge=0)

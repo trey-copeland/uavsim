@@ -9,6 +9,7 @@ from uavsim.estimation.identity import IdentityObserver
 from uavsim.estimation.linear_kf import LinearStateKalmanFilter
 from uavsim.estimation.measurements import MeasurementModel
 from uavsim.estimation.mekf import ErrorStateMekf
+from uavsim.estimation.partial_raw import PartialRawObserver
 from uavsim.vehicles.params import VehicleParams
 
 
@@ -66,6 +67,9 @@ def build_observer(
         omega_sigma_rad_s=common["omega_sigma_rad_s"],
         channels=ch_list,
     )
+
+    if otype in ("partial_raw", "naive_partial", "raw_partial"):
+        return PartialRawObserver(channels=ch_list), meas
 
     if otype == "linear_kf":
         kf = LinearStateKalmanFilter(vehicle, **common)

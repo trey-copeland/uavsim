@@ -1,8 +1,7 @@
-# Phase 5d demo: figure-eight under linear KF + noisy measurements (LQG-style).
-# Prefer configs/studies/figure_eight_lqg.yaml for the named portfolio LQG study
-# (same recipe; study_id differs). Default figure_eight remains full-state.
+# Full-channel noisy LQG (all 12 states measured, filtered). Prefer the
+# GPS+IMU teaching studies (figure_eight_gps_imu_*) for the portfolio showcase.
 schema_version: 1
-study_id: figure_eight_observer
+study_id: figure_eight_lqg
 seed: 7
 
 vehicle: configs/vehicles/default_quadrotor.yaml

@@ -1,11 +1,16 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-19T16:30:50.716001+00:00",
+  "generated_at": "2026-07-21T04:47:06.345074+00:00",
   "uavsim_version": "0.1.0",
   "runs": [
     "figure_eight_lqr",
+    "gps_imu_naive",
+    "gps_imu_lqg",
+    "ahrs_lqg",
+    "imu_only_lqg",
     "figure_eight_pid",
-    "figure_eight_mc"
+    "gps_imu_lqg_mc"
   ],
+  "has_envelope": true,
   "command": "uavsim gallery --base-case"
 }
