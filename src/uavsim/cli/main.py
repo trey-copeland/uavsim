@@ -253,7 +253,7 @@ def main(argv: list[str] | None = None) -> int:
         if not study_path.is_file():
             print(f"Study file not found: {study_path}", file=sys.stderr)
             return 1
-        result = run_nominal_study(study_path, output_root=args.output, run_mc=False)
+        result = run_nominal_study(study_path, output_root=args.output, run_mc=False, progress=True)
         _print_study_result(result)
         return 0 if result.success else 1
 
@@ -290,6 +290,7 @@ def main(argv: list[str] | None = None) -> int:
                 n_shards=args.shards,
                 docker_image=args.image,
                 repo_root=Path.cwd(),
+                progress=True,
             )
         except (NotImplementedError, ValueError, RuntimeError, FileNotFoundError) as exc:
             print(str(exc), file=sys.stderr)

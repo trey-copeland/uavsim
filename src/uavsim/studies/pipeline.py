@@ -249,6 +249,7 @@ def run_mc_for_prepared(
     *,
     n_shards: int = 1,
     shards_root: Path | None = None,
+    progress: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], Any]:
     """
     Run MC trials for a prepared study, optionally partitioned into shards.
@@ -268,6 +269,12 @@ def run_mc_for_prepared(
         if not ids:
             shard_trials: list[dict[str, Any]] = []
         else:
+            if progress and n_shards > 1:
+                print(
+                    f"  MC shard {shard_id + 1}/{n_shards}  "
+                    f"trials {ids[0]}–{ids[-1]} ({len(ids)} runs)",
+                    flush=True,
+                )
             mc_result = run_monte_carlo(
                 nominal_vehicle=prepared.vehicle_nominal,
                 base_seed=cfg.seed,
@@ -276,6 +283,7 @@ def run_mc_for_prepared(
                 spec=cfg.monte_carlo.perturbation_spec(),
                 redesign_controller=redesign,
                 trial_ids=ids,
+                progress=progress,
             )
             shard_trials = mc_result.trials
         all_trials.extend(shard_trials)
@@ -359,12 +367,14 @@ def run_nominal_study(
     n_shards: int | None = None,
     docker_image: str | None = None,
     repo_root: Path | None = None,
+    progress: bool = False,
 ) -> StudyRunResult:
     """
     Run nominal SIL study (+ optional MC if config enables it).
 
     ``backend`` / ``n_shards`` override config when provided.
     ``docker`` backend runs the whole study inside a container (local sharding inside).
+    ``progress``: print study/MC status to stdout (CLI sets True).
     """
     study_path = Path(study_path)
     cfg, vehicle_path, cfg_hash, _mission_path = load_study(study_path)
@@ -440,10 +450,27 @@ def run_nominal_study(
             backend="docker",
         )
 
+    plant_kind = getattr(cfg.sim, "plant", "wrench")
+    if progress:
+        print(
+            f"[uavsim] study={cfg.study_id}  plant={plant_kind}  "
+            f"attitude={cfg.sim.attitude}  seed={cfg.seed}",
+            flush=True,
+        )
+        print("[uavsim] nominal closed-loop…", flush=True)
+
     prepared = prepare_study(cfg, vehicle_path, cfg_hash)
     sim_result, metrics = run_closed_loop_trial(prepared, prepared.vehicle_nominal)
     metrics["feasibility_ok"] = prepared.feasibility.ok
     overall_ok = bool(sim_result.success and metrics.get("success", False))
+
+    if progress:
+        print(
+            f"[uavsim] nominal done  rmse_pos="
+            f"{metrics.get('rmse_position_m', float('nan')):.4f} m  "
+            f"success={metrics.get('success')}",
+            flush=True,
+        )
 
     mc_summary: dict[str, Any] | None = None
     n_trials = 0
@@ -481,11 +508,22 @@ def run_nominal_study(
         n_trials = cfg.monte_carlo.n_trials
         mc_dir = run_dir / "monte_carlo"
         shards_root = mc_dir / "shards" if shards > 1 else None
+        if progress:
+            print(
+                f"[uavsim] Monte Carlo  n_trials={n_trials}  "
+                f"shards={shards}  redesign_controller="
+                f"{cfg.monte_carlo.redesign_controller}  "
+                f"(fixed K on nominal vehicle)",
+                flush=True,
+            )
         mc_trials, mc_summary, plan = run_mc_for_prepared(
             prepared,
             n_shards=shards,
             shards_root=shards_root,
+            progress=progress,
         )
+        if progress:
+            print("[uavsim] Monte Carlo done", flush=True)
         write_merged_mc_artifacts(mc_dir, mc_trials, mc_summary, plan=plan if shards > 1 else None)
         # Keep single-shard path writing same layout as Phase 3
         if shards == 1:
@@ -544,6 +582,7 @@ def run_study(
     n_shards: int | None = None,
     docker_image: str | None = None,
     repo_root: Path | None = None,
+    progress: bool = True,
 ) -> StudyRunResult:
     """CLI entry for ``uavsim study`` (MC when enabled in config)."""
     return run_nominal_study(
@@ -555,4 +594,5 @@ def run_study(
         n_shards=n_shards,
         docker_image=docker_image,
         repo_root=repo_root,
+        progress=progress,
     )
