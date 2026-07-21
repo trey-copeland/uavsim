@@ -132,6 +132,7 @@ Requires [uv](https://docs.astral.sh/uv/) and Python 3.11+.
 
 ```bash
 uv sync --extra dev
+uv run pre-commit install   # once per clone: ruff lint+format on commit
 uv run uavsim --help
 uv run pytest
 uv run ruff check src tests

@@ -192,6 +192,7 @@ Prefer implementing against `docs/ARCHITECTURE.md`; if reality forces a change, 
 
 - **Layout:** `src/uavsim/` only; configs under `configs/`; tests under `tests/unit` and `tests/integration`.
 - **Tooling:** `uv sync --extra dev` · `uv run pytest` · `uv run ruff check src tests` · `uv run ruff format src tests`.
+- **Pre-commit (ruff):** after sync, once per clone: `uv run pre-commit install`. Hooks run `ruff` + `ruff-format` on staged files at commit (see `.pre-commit-config.yaml`). Bypass only when needed: `git commit --no-verify`. CI still runs full-tree check/format.
 - **Style:** Ruff lint + format (see `pyproject.toml`); target Python 3.11+.
 - **Types:** Prefer type hints on public APIs; `mypy` optional until types stabilize.
 - **CLI:** Thin wrappers in `uavsim.cli` — no business logic.

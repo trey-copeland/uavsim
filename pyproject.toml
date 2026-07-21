@@ -25,6 +25,7 @@ dependencies = [
 dev = [
   "pytest>=8.0",
   "ruff>=0.6",
+  "pre-commit>=4.0",
   "matplotlib>=3.8",
   "plotly>=5.18",
 ]

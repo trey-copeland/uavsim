@@ -1,0 +1,18 @@
+# https://pre-commit.com — install: uv sync --extra dev && uv run pre-commit install
+# Runs on staged files at commit time (fast). CI still enforces full-tree ruff.
+
+default_language_version:
+  python: python3.12
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Keep roughly in range with pyproject dev dep ruff>=0.6
+    rev: v0.12.0
+    hooks:
+      # Linter (auto-fix safe issues when possible)
+      - id: ruff
+        args: [--fix]
+        types_or: [python, pyi]
+      # Formatter (matches `ruff format`)
+      - id: ruff-format
+        types_or: [python, pyi]
