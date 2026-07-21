@@ -74,6 +74,8 @@ class SimConfig(BaseModel):
     method: str = "rk45"
     rtol: float = 1e-6
     atol: float = 1e-8
+    # Phase 5c: plant attitude representation (controllers still see Euler 12-state)
+    attitude: Literal["euler", "quat"] = "euler"
 
 
 class MetricsConfig(BaseModel):

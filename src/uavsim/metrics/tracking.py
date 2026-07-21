@@ -6,6 +6,10 @@ from typing import Any
 
 import numpy as np
 
+from uavsim.dynamics.attitude_error import (
+    geodesic_attitude_error_rad,
+    rotation_error_vector_from_euler,
+)
 from uavsim.reference import ReferenceTrajectory
 
 
@@ -19,8 +23,15 @@ def compute_metrics(
 ) -> dict[str, Any]:
     x_ref = np.vstack([reference.evaluate(float(ti)).x_ref for ti in t])
     e_pos = x[:, 0:3] - x_ref[:, 0:3]
-    e_att = x[:, 3:6] - x_ref[:, 3:6]
     e_vel = x[:, 6:9] - x_ref[:, 6:9]
+
+    # SO(3) attitude error (geodesic angle + rotation-vector components)
+    e_att_vec = np.vstack(
+        [rotation_error_vector_from_euler(x[i, 3:6], x_ref[i, 3:6]) for i in range(x.shape[0])]
+    )
+    att_angle = np.array(
+        [geodesic_attitude_error_rad(x[i, 3:6], x_ref[i, 3:6]) for i in range(x.shape[0])]
+    )
 
     pos_err_norm = np.linalg.norm(e_pos, axis=1)
     rmse_pos = float(np.sqrt(np.mean(pos_err_norm**2)))
@@ -28,8 +39,10 @@ def compute_metrics(
     final_pos = float(pos_err_norm[-1])
     time_in_bounds = float(np.mean(pos_err_norm <= position_bound_m))
 
-    rmse_att = float(np.sqrt(np.mean(np.sum(e_att**2, axis=1))))
-    max_att = float(np.max(np.abs(e_att)))
+    # rmse_attitude_rad: RMS of geodesic angle (principal rotation)
+    rmse_att = float(np.sqrt(np.mean(att_angle**2)))
+    max_att = float(np.max(att_angle))
+    rmse_att_vec = float(np.sqrt(np.mean(np.sum(e_att_vec**2, axis=1))))
     rmse_vel = float(np.sqrt(np.mean(np.sum(e_vel**2, axis=1))))
 
     # Control effort proxy: integral of ||u|| roughly via trapz on samples
@@ -55,6 +68,7 @@ def compute_metrics(
         "position_bound_m": position_bound_m,
         "rmse_attitude_rad": rmse_att,
         "max_attitude_error_rad": max_att,
+        "rmse_attitude_rotvec_rad": rmse_att_vec,
         "rmse_velocity_m_s": rmse_vel,
         "control_effort_proxy": effort,
         "peak_thrust_n": peak_thrust,
@@ -62,4 +76,5 @@ def compute_metrics(
         "success": success,
         "n_samples": int(t.size),
         "t_final_s": float(t[-1]) if t.size else 0.0,
+        "attitude_error_model": "so3_geodesic",
     }

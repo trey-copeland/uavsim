@@ -9,6 +9,7 @@ from scipy.linalg import solve_continuous_are
 
 from uavsim.control.base import saturate
 from uavsim.dynamics import CONTROL_DIM, STATE_DIM, hover_linearization
+from uavsim.dynamics.attitude_error import tracking_error_state
 from uavsim.interfaces import ActuatorCommand, MeasurementBus
 from uavsim.reference import ReferenceSample
 from uavsim.vehicles.params import VehicleParams
@@ -20,7 +21,7 @@ DEFAULT_R_DIAG = np.array([0.1, 1.0, 1.0, 1.0], dtype=float)
 
 @dataclass
 class LqrHoverController:
-    """u = u_hover - K (x - x_ref), with actuator saturation."""
+    """u = u_hover - K e, with e an error-state (SO(3) attitude), actuator saturation."""
 
     id: str
     vehicle: VehicleParams
@@ -40,7 +41,8 @@ class LqrHoverController:
         reference: ReferenceSample,
     ) -> ActuatorCommand:
         _ = t
-        e = measurements.x - reference.x_ref
+        # Error-state: δθ from R_ref^T R (matches linearization near hover)
+        e = tracking_error_state(measurements.x, reference.x_ref)
         u = self.u_hover - self.k @ e
         u = saturate(u, self.vehicle.limits.u_min(), self.vehicle.limits.u_max())
         return ActuatorCommand(u=u)

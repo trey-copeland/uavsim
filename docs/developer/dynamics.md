@@ -44,7 +44,21 @@ Gentle figure-eight / square demos remain valid regression under Euler until 5c 
 | Layout bridges | `euler_state_to_quat_state` / `quat_state_to_euler_state` |
 | Convention | Scalar-first unit quat; \(R_{b\to i}(q)\); \( \dot q = \tfrac12 q \otimes [0,\omega] \) |
 
-**Not yet:** closed-loop / LQR / study pipeline still use the Euler 12-state path (5c.2+).
+### Phase 5c.2–5c.3 status (error-state + optional quat plant)
+
+| Item | Status |
+|------|--------|
+| SO(3) rotation-vector attitude error | `dynamics/attitude_error.py` — used by LQR, PID, metrics |
+| Metrics | `rmse_attitude_rad` = RMS geodesic angle; `attitude_error_model: so3_geodesic` |
+| LQR | `u = u_h - K e` with `e = tracking_error_state` (δθ not Euler subtract) |
+| Study plant | `sim.attitude: euler` (default) or `quat` — controllers always see Euler 12-state |
+| Quat closed-loop | Fixed-step RK4 + renorm; artifacts remain Euler timeseries |
+
+```yaml
+sim:
+  dt_s: 0.01
+  attitude: quat   # optional Phase 5c plant
+```
 
 ### Where it is used
 

@@ -190,9 +190,9 @@ Use as a living board (check off in PRs or edit this file).
 
 ### M5c — Quaternion attitude & plant fidelity (**in progress**)
 - [x] **5c.1** Quaternion plant kinematics + renorm; Euler gentle open-loop parity (`state_derivative_quat`, unit tests)  
-- [ ] **5c.2** Error-state / geodesic attitude error in control + metrics (no naive \(q-q_\mathrm{ref}\))  
-- [ ] **5c.3** LQR (or hybrid) and PID paths updated for new attitude representation  
-- [ ] Export / timeseries schema documented for new state layout  
+- [x] **5c.2** Error-state / geodesic attitude error in control + metrics (`tracking_error_state`, SO(3) metrics)  
+- [x] **5c.3** LQR + PID use SO(3) attitude error; optional `sim.attitude: quat` closed-loop plant  
+- [ ] Export / timeseries schema documented for native 13-state logging (artifacts still Euler 12)  
 - [ ] At least one mission profile that exceeds comfortable Euler/small-angle use  
 - [ ] `DynamicsModel` protocol + plant injection (enables motors/flex next)  
 

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from uavsim.control.base import saturate
+from uavsim.dynamics.attitude_error import rotation_error_vector_from_euler
 from uavsim.interfaces import ActuatorCommand, MeasurementBus
 from uavsim.reference import ReferenceSample
 from uavsim.vehicles.params import VehicleParams
@@ -109,9 +110,9 @@ class PidCascadeController:
             theta_des = 0.5 * theta_des + 0.5 * float(euler_ref_traj[1])
         psi_des = float(euler_ref_traj[2])
 
-        e_att = np.array([phi_des, theta_des, psi_des], dtype=float) - euler
-        # wrap yaw error roughly
-        e_att[2] = (e_att[2] + np.pi) % (2 * np.pi) - np.pi
+        euler_des = np.array([phi_des, theta_des, psi_des], dtype=float)
+        # SO(3) error from actual → desired (≈ euler_des - euler near hover)
+        e_att = rotation_error_vector_from_euler(euler_des, euler)
         tau = gains.kp_att * e_att - gains.kd_rate * omega
 
         u = np.array([f_cmd, tau[0], tau[1], tau[2]], dtype=float)

@@ -1,5 +1,10 @@
 """Plant dynamics: f(x, u, p), linearization, trim helpers."""
 
+from uavsim.dynamics.attitude_error import (
+    geodesic_attitude_error_rad,
+    rotation_error_vector_from_euler,
+    tracking_error_state,
+)
 from uavsim.dynamics.linearize import hover_linearization
 from uavsim.dynamics.nonlinear import (
     CONTROL_DIM,
@@ -26,6 +31,7 @@ __all__ = [
     "STATE_DIM_QUAT",
     "euler_state_to_quat_state",
     "euler_to_quat",
+    "geodesic_attitude_error_rad",
     "hover_linearization",
     "integrate_fixed_step",
     "quat_normalize",
@@ -34,6 +40,8 @@ __all__ = [
     "renormalize_quat_state",
     "rotation_body_to_inertial",
     "rotation_body_to_inertial_quat",
+    "rotation_error_vector_from_euler",
     "state_derivative",
     "state_derivative_quat",
+    "tracking_error_state",
 ]

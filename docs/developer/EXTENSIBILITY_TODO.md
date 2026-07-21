@@ -74,7 +74,7 @@ Guide: [guidance.md](guidance.md)
 | D-7 | Motor/prop first-order states | **TODO** | After D-3; changes state dim |
 | D-8 | Control allocation / mixer | **TODO** | After / with D-7 |
 | D-9 | Wind / process disturbance API | **TODO** | |
-| D-10 | Quaternion (SO(3)) attitude + error-state control path | **Partial** | **5c.1 done:** `state_derivative_quat` + parity tests. Control/metrics/export still Euler |
+| D-10 | Quaternion (SO(3)) attitude + error-state control path | **Partial** | **5c.1–5c.3:** quat plant + SO(3) LQR/PID/metrics; optional `sim.attitude: quat`. Native 13-state export + aggressive demo still open |
 | D-11 | HIL validation seams + companion project | **TODO** | Fixed-step, I/O; parallel with rig build (do not block 5c) |
 | D-12 | Multi-airframe dynamics extensions | **TODO** | Tilt mechanisms, mode transitions, hybrid aero (after mixer) |
 | D-13 | Flexible / elastic body (lumped modes) | **TODO** | After D-3 (+ ideally D-10); extends V-7 into plant states |

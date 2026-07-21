@@ -117,7 +117,7 @@ def run_closed_loop_trial(
     """Simulate one closed-loop run; returns (sim_result, metrics)."""
     ctrl = controller if controller is not None else prepared.controller
     cfg = prepared.cfg
-    plant = SimPlant(plant_vehicle)
+    plant = SimPlant(plant_vehicle, attitude=cfg.sim.attitude)
     adapter = InProcessControllerAdapter(ctrl, prepared.reference)
     sim_result = simulate_closed_loop(
         plant,
