@@ -24,7 +24,8 @@ Public **quadrotor simulation & GNC framework** for portfolio-quality demos: dyn
 | `ROADMAP.md` | Sequencing, milestones, now/next/later |
 | `GROK.md` | How we work (this file) |
 | `docs/ARCHITECTURE.md` | How: packages, protocols, SIL/HIL seams, results/compare |
-| `README.md` | Human entry / project status |
+| `docs/developer/` | How-to extend (vehicles, dynamics, control, estimation, guidance, …) |
+| `README.md` | Human entry / features / CLI / doc index |
 | Language convention notes (TBD) | Idioms, tooling, lint/format per language (after skeleton) |
 
 **Product workflow to honor in design reviews:**  

@@ -45,7 +45,8 @@ Study YAML
 |------|------------|
 | Inertial | **NED** (North, East, Down); \(z>0\) toward Earth |
 | Body | FRD-like; **thrust along −body-\(z\)** |
-| State \(x \in \mathbb{R}^{12}\) | \([p_N, p_E, p_D, \phi, \theta, \psi, v_N, v_E, v_D, p, q, r]\) |
+| State \(x \in \mathbb{R}^{12}\) (control / metrics bus) | \([p_N, p_E, p_D, \phi, \theta, \psi, v_N, v_E, v_D, p, q, r]\) |
+| Plant \(x \in \mathbb{R}^{13}\) (optional) | `sim.attitude: quat` — pos, \(q_{wxyz}\), vel, \(\omega\); see [dynamics.md](dynamics.md) |
 | Control \(u \in \mathbb{R}^{4}\) | \([F, \tau_\phi, \tau_\theta, \tau_\psi]\) (N, N·m) |
 | Angles | radians in code/config unless a figure says deg |
 
@@ -65,11 +66,12 @@ uv run pytest -q
 ```text
 src/uavsim/
   vehicles/     # params only
-  dynamics/     # f, linearize, rotations
+  dynamics/     # f, linearize, DynamicsModel, SO(3) error
+  estimation/   # observers (KF/MEKF), measurements
   reference/    # ReferenceTrajectory, feasibility
   guidance/     # planners + registry
   control/      # laws + factory + export
-  sim/          # plant + closed loop
+  sim/          # plant + closed loop (+ optional observer)
   studies/      # study YAML + pipeline
   monte_carlo/  # perturbations + MC engine
   results/      # run dirs

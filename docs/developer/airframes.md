@@ -11,23 +11,25 @@
 
 | Family | Model | Actuation | Status |
 |--------|--------|-----------|--------|
-| Quadrotor | Rigid **6-DoF** NED / FRD-like, **ZYX Euler** | Body wrench \([F, \tau]\) (mixer **TODO** D-8) | **Shipped** — default vehicle + studies |
+| Quadrotor | Rigid **6-DoF** NED / FRD-like; Euler default or optional **quat** plant | Body wrench \([F, \tau]\) (mixer **TODO** D-8) | **Shipped** — default vehicle + studies |
 
 See [vehicles.md](vehicles.md) and [dynamics.md](dynamics.md) for today’s contracts.
 
 ---
 
-## Near-term SIL (Phase 5c — before multi-airframe)
+## SIL foundation (Phase 5c/5d — landed)
 
-While the HIL test rig is ordered/built, advance the plant in software:
+Shipped while the HIL rig is ordered/built:
 
-1. **D-10** — quaternion / SO(3) attitude + error-state control/metrics (wider mission profiles).  
-2. **D-3** — `DynamicsModel` protocol (motors, flex, other airframes plug in cleanly).  
-3. **D-7/D-8 → D-13** — motors/mixer, then flexible/elastic lumped states.
+1. ~~**D-10**~~ — quaternion / SO(3) attitude + error-state control/metrics.  
+2. ~~**D-3**~~ — `DynamicsModel` protocol.  
+3. ~~**5d observers**~~ — `linear_kf` / `mekf` in the loop (default full-state unchanged).  
+
+**Next before multi-airframe:** **D-7/D-8 → D-13** — motors/mixer, then flexible/elastic lumped states.
 
 ---
 
-## Planned (additive, after 5c foundation)
+## Planned (additive, after motors/mixer)
 
 | Family | Sketch | Design notes |
 |--------|--------|--------------|

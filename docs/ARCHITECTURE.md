@@ -1,6 +1,6 @@
 # Architecture — `uavsim` / quadrotor-sim
 
-**Status:** v0.5 (stand-up map)  
+**Status:** v0.6 (stand-up map)  
 **Last updated:** 2026-07-20  
 **Normative product intent:** [`SPEC.md`](../SPEC.md) (v0.2+)  
 **Working agreements:** [`GROK.md`](../GROK.md)  
@@ -44,7 +44,7 @@ Non-goals here: freezing every numerical library version, or specifying line-lev
 | Containers | Docker + Compose | Single study + worker shards |
 | License | MIT | |
 
-**Still open (do not block skeleton):** min-snap QP backend, timeseries on-disk format (lean: Parquet), first polyglot hotspot, alternate controller type (PID cascade vs geometric).
+**Still open (do not block demos):** min-snap QP backend swap, timeseries on-disk format (lean: Parquet), first polyglot hotspot, geometric / SE(3) controller (PID cascade shipped as second law).
 
 ---
 
@@ -76,14 +76,16 @@ quadrotor-sim/
     control/
       base.py
       lqr.py                  # design uses dynamics.linearize + vehicle params
-      # alternate.py          # Should
-    sim/                      # ClosedLoopSim / ODE wiring
+      pid.py                  # cascade alternate (shipped)
+      export.py
+    estimation/               # StateObserver, linear_kf, mekf, measurements
+    sim/                      # ClosedLoopSim / ODE wiring (+ optional observer)
     metrics/
     studies/                  # load/resolve study → plan → sim → write run
     monte_carlo/
       engine.py
       shard.py
-      merge.py
+      summary.py
     results/                  # run dir I/O, manifest
     viz/                      # consumers of run dirs only
   containers/
@@ -103,8 +105,9 @@ quadrotor-sim/
 | `uavsim.dynamics` | `f(x, u, p) → xdot`, linearization, hover/trim helpers for the plant | Controller gains, mission files |
 | `uavsim.reference` | Reference trajectory types, `evaluate(t)`, feasibility checks, reference serialization | Planners / waypoint algorithms |
 | `uavsim.guidance` | Guidance backends (`plan` / `update`), mission→reference algorithms | Sim loop, metrics, controller internals |
-| `uavsim.control` | Controller protocol, LQR (and alternate), gain design | Plant ODEs, guidance backends |
-| `uavsim.sim` | Closed-loop integration, plant step, SIL adapter | Config loading, run-dir layout policy, device drivers |
+| `uavsim.control` | Controller protocol, LQR + PID, gain design, export | Plant ODEs, guidance backends |
+| `uavsim.estimation` | Observers (`none` / KF / MEKF), measurement models, channels | Plant ODEs, guidance, transport drivers |
+| `uavsim.sim` | Closed-loop integration, plant step, SIL adapter, observer wire-up | Config loading, run-dir layout policy, device drivers |
 | `uavsim.interfaces` (or `plant_io`) | `ActuatorCommand`, `MeasurementBus`, shared I/O schemas | Transport/drivers |
 | `uavsim.hil` | Post-core: link adapters, pacing, HIL fixtures | Control law math, guidance |
 | `uavsim.studies` | Study resolve + nominal pipeline orchestration | Low-level numerics |
@@ -124,6 +127,7 @@ Allowed edges only (lower must not import upper):
 cli → studies → monte_carlo
               → sim → control → reference
               │         ↘ dynamics ← vehicles
+              │         ↘ estimation → dynamics, vehicles, interfaces
               │         ↘ vehicles
               │         ↘ interfaces   (commands / measurements)
               → guidance → reference
@@ -171,9 +175,9 @@ viz → results
          └───────────────────┼───────────────────┘
                              v
                     ClosedLoopSim (sim)
-                    dynamics.f / optional guidance.update
+                    dynamics.f / optional observer / optional guidance.update
                              │
-              timeseries + per-run metrics
+              timeseries (+ x_hat) + per-run metrics
                              │
               ┌──────────────┼──────────────┐
               v              v              v
@@ -190,7 +194,8 @@ viz → results
 
 Frames and vectors are defined in SPEC §5. Summarized:
 
-- State `x ∈ R¹²`: position NED, ZYX Euler, velocity NED, body rates  
+- Control / metrics bus `x ∈ R¹²`: position NED, ZYX Euler, velocity NED, body rates  
+- Optional plant `x ∈ R¹³` (`sim.attitude: quat`): position, unit quaternion, velocity, body rates  
 - Control `u ∈ R⁴`: thrust `F`, body torques  
 - NED / FRD / thrust along −body-z  
 
@@ -486,7 +491,7 @@ For HIL-ready design:
 
 - Define **`MeasurementBus`** early even if SIL fills it from full state (`x` → ideal measurements).
 - Controllers that need full state take measurements (SIL may fill from `x_true`).  
-- **Phase 5d (scoped):** optional `StateObserver` (KF/EKF) between plant outputs and `Controller.compute` — default remains ideal full state.
+- **Phase 5d (shipped):** optional `StateObserver` (`linear_kf` / `mekf`) between plant outputs and `Controller.compute` — default remains ideal full state (`none`).
 - Avoid baking `compute(t, x, …)` as the *only* possible signature forever — prefer:
 
 ```text
@@ -551,9 +556,17 @@ Phase 1 may keep a simple closed-loop function **if** plant step + command appli
 ### 8.2 Dynamics (`uavsim.dynamics`)
 
 - Pure functions where practical: `f(x, u, p) -> xdot`.
+- `DynamicsModel` protocol with Euler and quaternion rigid-body implementations (D-3).
+- SO(3) / geodesic attitude error helpers for control and metrics.
 - `linearize(p, equilibrium) -> (A, B)` and hover/trim helpers used by LQR design.
 - Saturation applied **before** dynamics in the sim loop (SPEC), using limits from `vehicles`.
 - Does **not** load configs or own controller gains.
+
+### 8.2.1 Estimation (`uavsim.estimation`)
+
+- Optional **observer-in-the-loop**: plant truth → noisy / partial measurements → filter → controller bus.
+- Types: identity (`none`), hover linear KF, error-state MEKF; partial `channels` selection.
+- Logs `x_hat` on timeseries when active. See [developer/estimation.md](developer/estimation.md).
 
 ### 8.3 Simulation (`uavsim.sim`)
 
@@ -809,8 +822,10 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | `docs/results_schema.md` (later) | Frozen artifact schemas |
 | `docs/study_authoring.md` (later) | Config how-to |
 | `docs/containers.md` | Image + shards |
-| `docs/developer/` | Research extend guides (vehicles, control, guidance, dynamics, airframes) |
+| `docs/developer/` | Research extend guides (vehicles, control, guidance, dynamics, estimation, airframes) |
 | `docs/developer/EXTENSIBILITY_TODO.md` | Plugin / airframe / HIL-rig backlog |
+| `docs/viz.md` · `docs/showcase/` | Report figures + portfolio React showcase |
+| `README.md` | Human entry / feature overview |
 
 ---
 
@@ -824,6 +839,10 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | 3 | Metrics polish + local MC + `study` | seed-stable MC smoke |
 | 4 | Docker + shards + assemble | F12–F13 style demos |
 | 5 | **Export (S9) + compare (S10)** + multi-run viz; controller compare study | workflow demo without hardware |
+| 5b | Visualization pack + showcase | interactive 3D, MC plots, Pages gallery |
+| 5c | Quaternion plant + SO(3) error + `DynamicsModel` | aggressive mission path; plant seams |
+| 5d | Observer-in-the-loop (KF/MEKF) | control from estimates; default full-state |
+| — | Motors / mixer (D-7/D-8) | **next** SIL plant fidelity |
 | 6 | Post-core: non-waypoint guidance | — |
 | 7 | Post-core: fixed-step + HIL transport + SIL↔HIL compare | — |
 
@@ -850,6 +869,7 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | 2026-07-18 | Align with SPEC v0.2 refined expectations and S9–S11 |
 | 2026-07-20 | Multi-airframe extensibility (§8.6): additive dynamics/params; HIL companion for rig; preserve MC/compare/viz |
 | 2026-07-20 | Phase **5c** priority: quaternion attitude (D-10) + `DynamicsModel` (D-3) while HIL rig is built in parallel; Euler 12-state remains shipped default until 5c exit |
+| 2026-07-20 | Docs audit: `estimation` package + 5c/5d as shipped; layout/DAG/phase table synced |
 
 ---
 
@@ -863,6 +883,7 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | v0.3 | 2026-07-18 | Workflow goal; controller export §7.5; compare CLI; ties to SPEC user stories |
 | v0.4 | 2026-07-18 | §10.4–10.5 compare/artifact quality; phase table with export/compare before HIL; SPEC v0.2 alignment |
 | v0.5 | 2026-07-20 | §8.6 multi-airframe extensibility + developer airframes guide; guardrails for motor/HIL/comms |
+| v0.6 | 2026-07-20 | `uavsim.estimation`; DynamicsModel/quat/observer status; doc map + phase rows for 5b–5d |
 
 ---
 

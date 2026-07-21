@@ -2,9 +2,9 @@
 
 **Working title / repo:** `quadrotor-sim`  
 **CLI / product name:** `uavsim`  
-**Status:** Living core specification (v0.2.1)  
+**Status:** Living core specification (v0.2.3)  
 **Author:** Trey Copeland  
-**Last updated:** 2026-07-18  
+**Last updated:** 2026-07-20  
 **License (intent):** MIT  
 
 **Companion docs**
@@ -15,7 +15,8 @@
 | `ROADMAP.md` | Sequencing, milestones, now/next/later |
 | `GROK.md` | How we work (GSD, tests, heritage rules) |
 | `docs/ARCHITECTURE.md` | Languages layout, packages, FFI, module APIs |
-| Language conventions (TBD) | Per-language tooling and idioms |
+| `docs/developer/` | How-to extend (vehicles, dynamics, control, estimation, …) |
+| `README.md` | Human entry / features / CLI |
 
 ---
 
@@ -214,7 +215,7 @@ Prior work lives under ME590 `code/` (MATLAB). Useful as **domain reference**, n
 
 | Area | Heritage capability | Port posture |
 |------|---------------------|--------------|
-| 6DOF nonlinear plant | Rigid-body quadrotor, NED, full Euler kinematics | **Keep as shipped core**; Phase **5c** moves toward quaternion/SO(3) kinematics for larger-attitude missions (see ROADMAP) |
+| 6DOF nonlinear plant | Rigid-body quadrotor, NED, full Euler kinematics | **Keep as shipped core** (Euler default); optional unit-quaternion plant + SO(3) error control/metrics (**Phase 5c done**) |
 | Linear hover model + LQR | A/B linearization, Riccati gains, hover trim | **Keep as first controller** |
 | Waypoints → trajectory | JSON `.wpt`, MAKIMA vs minimum-snap, auto select | **Keep as first guidance backend; redesign as pluggable APIs** |
 | Feasibility checks | Yaw rate/accel, attitude vs linearization validity | **Keep; make first-class on reference trajectories** |
@@ -1017,6 +1018,7 @@ Phases are sequential **capability gates**, not strict calendar. Systems work is
 | v0.2 | 2026-07-18 | Refined expectations §1.3.1; closed decisions for layout/workflow/export/compare; S9–S11; phased epic map; core acceptance includes export + multi-run compare Shoulds |
 | v0.2.1 | 2026-07-18 | Link `ROADMAP.md` as sequencing home; §19 points to roadmap |
 | v0.2.2 | 2026-07-19 | §11A visualization pack V1–V8; S5b interactive 3D; Phase 5b |
+| v0.2.3 | 2026-07-20 | Docs audit: heritage plant posture = 5c done; companion docs map includes developer hub + README; sensor/EKF still deferred → 5d (see ROADMAP) |
 
 ---
 

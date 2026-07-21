@@ -1,8 +1,8 @@
 # ROADMAP — `uavsim` / quadrotor-sim
 
 **Status:** Active  
-**Last updated:** 2026-07-18  
-**Normative detail:** [`SPEC.md`](SPEC.md) (requirements, stories, acceptance) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (how) · [`GROK.md`](GROK.md) (process)
+**Last updated:** 2026-07-20  
+**Normative detail:** [`SPEC.md`](SPEC.md) (requirements, stories, acceptance) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (how) · [`GROK.md`](GROK.md) (process) · [developer hub](docs/developer/README.md)
 
 This roadmap is the **sequencing and prioritization** view. It does not replace the SPEC.
 
@@ -59,7 +59,8 @@ Ship when SPEC §17 holds, especially:
 | Phase 5c Attitude / plant fidelity (quaternions → richer missions) | **Done** (optional native 13-state export still open) |
 | Phase 5d Observer-in-the-loop (KF/EKF) | **Done** (`linear_kf`, `mekf`, partial channels, `x_hat` log) |
 | HIL test rig (hardware order/build) | **In progress (parallel, long lead)** |
-| Phase 6 nav / Phase 7 HIL software | **Not started** (after or interleaved with 5c) |
+| Next SIL: motors / mixer (D-7, D-8) | **Now** (Track A) |
+| Phase 6 nav / Phase 7 HIL software | **Not started** (nav after plant fidelity as needed; HIL when rig ready) |
 
 ---
 
@@ -76,9 +77,10 @@ Phases are **capability gates**, not calendar dates. Prefer finishing a gate’s
 | **4** | Systems | F | Docker study + sharded MC assemble | Done |
 | **5** | Workflow polish | D, E-SIL | **Export** + **`compare`** two SIL runs; second controller if not done | Done |
 | **5b** | Visualization | S5 | Interactive 3D + MC pack + showcase | Done |
-| **5c** | Attitude & plant fidelity | A+ | Quaternion kinematics + error-state control; large-attitude demo; `DynamicsModel` for flex/motors | **Now** |
-| **5d** | Observer-in-the-loop | C+, E | Noisy measurements + filter (e.g. EKF/KF) feeding control; ideal full-state remains default | After 5c core; before heavy HIL |
-| **6** | Nav expansion | B+ | First non-waypoint guidance | After 5c (or light parallel) |
+| **5c** | Attitude & plant fidelity | A+ | Quaternion kinematics + error-state control; large-attitude demo; `DynamicsModel` for flex/motors | **Done** |
+| **5d** | Observer-in-the-loop | C+, E | Noisy measurements + filter (KF/MEKF) feeding control; ideal full-state remains default | **Done** |
+| **—** | Plant fidelity (motors) | A+ | Motor dynamics + mixer (D-7, D-8) | **Now** |
+| **6** | Nav expansion | B+ | First non-waypoint guidance | After motors/flex or when mission design needs it |
 | **7** | HIL / PIL | E | Fixed-step + transport + SIL↔HIL via export/compare | Parallel with rig build; software when rig ready |
 
 Detail and MoSCoW: SPEC §6, §19. Module map: ARCH §3, §16. Backlog IDs: [`docs/developer/EXTENSIBILITY_TODO.md`](docs/developer/EXTENSIBILITY_TODO.md).
@@ -204,7 +206,7 @@ Use as a living board (check off in PRs or edit this file).
 - [x] V7 `uavsim report --interactive`  
 - [x] V8 3D still PNG export  
 
-### M5c — Quaternion attitude & plant fidelity (**in progress**)
+### M5c — Quaternion attitude & plant fidelity (**done**; optional export polish open)
 - [x] **5c.1** Quaternion plant kinematics + renorm; Euler gentle open-loop parity  
 - [x] **5c.2** Error-state / geodesic attitude error in control + metrics  
 - [x] **5c.3a** LQR + PID SO(3) error; optional `sim.attitude: quat` plant  
@@ -302,3 +304,4 @@ Per `GROK.md` GSD: non-trivial work gets a SPEC note before a large implementati
 | 2026-07-20 | Promote Phase **5c** (quaternions + plant fidelity) to **Now**; HIL rig parallel Track B; flex/motors after 5c |
 | 2026-07-21 | Promote **observer-in-the-loop (5d)** from deferred to scoped SIL (KF/EKF); order after 5c plant seams |
 | 2026-07-21 | 5c/5d marked done in status; README + estimation.md updated for observers/quat |
+| 2026-07-20 | Docs audit: phase table + Now track → motors/mixer; M5c title Done; cross-link developer hub |

@@ -36,7 +36,7 @@ Guide: [vehicles.md](vehicles.md) · [airframes.md](airframes.md)
 | C-6 | Export / load for LQR + PID | **Done** | |
 | C-7 | Export for arbitrary new laws | **Partial** | Must extend export module |
 | C-8 | Geometric / SE(3) controller | **TODO** | |
-| C-9 | Partial-state / noisy measurements | **Partial** | Additive noise on full state (**5d.1**); true partial sensors later |
+| C-9 | Partial-state / noisy measurements | **Done** | Noise + `channels` selection / \(H\); richer IMU physics still open |
 | C-10 | Entry-point plugins for third-party laws | **TODO** | |
 | C-11 | Control from state estimate (not only x_true) | **Done** | Closed-loop: plant → measure → observer → controller |
 
@@ -80,7 +80,7 @@ Guide: [guidance.md](guidance.md)
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| D-1 | Nonlinear 6DOF body-wrench plant | **Done** | Euler kinematics today; no drag |
+| D-1 | Nonlinear 6DOF body-wrench plant | **Done** | Euler default + optional quat plant; no drag |
 | D-2 | Hover analytic linearization for LQR | **Done** | Small-angle; revisit with D-10 |
 | D-3 | `DynamicsModel` protocol + plant injection | **Done** | `dynamics/model.py`; `SimPlant(dynamics=…)` / `get_dynamics_model` |
 | D-4 | Vehicle aero params (drag, damping) | **TODO** | Plan D1 |
@@ -89,7 +89,7 @@ Guide: [guidance.md](guidance.md)
 | D-7 | Motor/prop first-order states | **TODO** | After D-3; changes state dim |
 | D-8 | Control allocation / mixer | **TODO** | After / with D-7 |
 | D-9 | Wind / process disturbance API | **TODO** | |
-| D-10 | Quaternion (SO(3)) attitude + error-state control path | **Partial** | Plant + SO(3) control/metrics + aggressive demo. Native 13-state export optional |
+| D-10 | Quaternion (SO(3)) attitude + error-state control path | **Done** | Plant + SO(3) control/metrics + aggressive demo. Native 13-state export optional polish |
 | D-11 | HIL validation seams + companion project | **TODO** | Fixed-step, I/O; parallel with rig build (do not block 5c) |
 | D-12 | Multi-airframe dynamics extensions | **TODO** | Tilt mechanisms, mode transitions, hybrid aero (after mixer) |
 | D-13 | Flexible / elastic body (lumped modes) | **TODO** | After D-3 (+ ideally D-10); extends V-7 into plant states |
@@ -105,7 +105,7 @@ Guide: [dynamics.md](dynamics.md) · [airframes.md](airframes.md) · ROADMAP Pha
 | S-1 | Study composes vehicle + controller + guidance | **Done** | |
 | S-2 | MC param perturbation of vehicle | **Done** | mass/I/arm |
 | S-3 | MC redesign non-LQR controllers | **Partial** | Factory re-run; validate per law |
-| S-4 | Study-selected dynamics backend | **TODO** | Depends on D-3 |
+| S-4 | Study-selected dynamics backend | **Partial** | `sim.attitude: euler\|quat` wired; arbitrary named `dynamics.type` still open |
 | S-7 | Airframe selector in studies + MC perturbations | **TODO** | Comparative robustness (e.g. quad vs tilt-rotor) |
 
 ---
@@ -126,9 +126,9 @@ Hardware and transport live primarily in a **HIL companion** project; this backl
 
 **SIL (Track A — do now while HIL rig is ordered/built):**
 
-1. **Finish D-10 / 5c** — aggressive mission demo + **D-3** `DynamicsModel`.  
-2. **Phase 5d observers** — EST-1…4 + C-9/C-11 (KF/EKF in the loop; default full-state unchanged).  
-3. **D-7 + D-8** — motor dynamics + mixer.  
+1. ~~**D-10 / 5c**~~ — **Done** (quat plant, SO(3) control, aggressive F8, `DynamicsModel`).  
+2. ~~**Phase 5d observers**~~ — **Done** (EST-1…5, C-9/C-11: `linear_kf` / `mekf`, channels, `x_hat`).  
+3. **D-7 + D-8** — motor dynamics + mixer ← **Now**.  
 4. **D-13 / V-7** — flexible / elastic lumped states.  
 5. **D-4/D-5** — drag/aero as needed.  
 6. **G-5 / C-5** — registries when plugin ergonomics block experiments.  
@@ -141,7 +141,7 @@ Hardware and transport live primarily in a **HIL companion** project; this backl
 3. Companion: NATS/MQTT + dashboard (COMM-1); DDS/CAN later (COMM-2).  
 4. Phase 7 transport + SIL↔HIL compare (**uses 5d observer path**).
 
-Do **not** block 5c on the rig. Do **not** skip 5d before claiming HIL-ready control.
+Do **not** block SIL plant work on the rig. Prefer finishing motors/mixer (and observers already shipped) before claiming HIL-ready control.
 
 ---
 
