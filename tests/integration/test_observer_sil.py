@@ -72,9 +72,7 @@ def test_gps_imu_lqg_beats_naive(tmp_path: Path) -> None:
     assert lqg.metrics["success"] is True
     assert float(lqg.metrics["rmse_position_m"]) < 0.15
     # Naive incomplete bus should be dramatically worse
-    assert float(naive.metrics["rmse_position_m"]) > 10.0 * float(
-        lqg.metrics["rmse_position_m"]
-    )
+    assert float(naive.metrics["rmse_position_m"]) > 10.0 * float(lqg.metrics["rmse_position_m"])
 
 
 def test_ahrs_lqg_finite_imu_only_worse(tmp_path: Path) -> None:
