@@ -848,6 +848,7 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | 2026-07-18 | Multi-run compare is a results consumer (§10.4); export + compare are Phase 5 (pre-HIL) |
 | 2026-07-18 | Align with SPEC v0.2 refined expectations and S9–S11 |
 | 2026-07-20 | Multi-airframe extensibility (§8.6): additive dynamics/params; HIL companion for rig; preserve MC/compare/viz |
+| 2026-07-20 | Phase **5c** priority: quaternion attitude (D-10) + `DynamicsModel` (D-3) while HIL rig is built in parallel; Euler 12-state remains shipped default until 5c exit |
 
 ---
 

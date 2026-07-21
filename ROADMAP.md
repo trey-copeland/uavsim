@@ -55,7 +55,10 @@ Ship when SPEC §17 holds, especially:
 | Phase 4 Systems (Docker + sharded MC) | **Done** |
 | Phase 5 Workflow polish (export / compare / 2nd controller) | **Done** |
 | Phase 5b Visualization pack (S5 / §11A V1–V8) | **Done** |
-| HIL / post-core nav | **Not started** ← **now Phase 6+** |
+| Portfolio advertise (Pages + LinkedIn) | **Done** |
+| Phase 5c Attitude / plant fidelity (quaternions → richer missions) | **Next** ← SIL advance while HIL rig is built |
+| HIL test rig (hardware order/build) | **In progress (parallel, long lead)** |
+| Phase 6 nav / Phase 7 HIL software | **Not started** (after or interleaved with 5c) |
 
 ---
 
@@ -65,49 +68,75 @@ Phases are **capability gates**, not calendar dates. Prefer finishing a gate’s
 
 | Phase | Name | Epics | Exit signals (short) | Priority |
 |-------|------|-------|----------------------|----------|
-| **0** | Stand-up | — | `uv` package `uavsim`, pytest, ruff, CI stub, thin CLI | **Now** |
-| **1** | SIL physics loop | A, C | Vehicle + dynamics + LQR + trivial reference + run dir + `simulate`; SIL adapter seam | **Next** |
-| **2** | Guidance + control interface | B, C | Waypoints, interp/min-snap, feasibility, registries, ≥3 missions | Core |
-| **3** | Robustness | C, F | Local MC, `study`, seed-stable smoke, plots-as-consumer | Core |
-| **4** | Systems | F | Docker study + sharded MC assemble | Core (systems-heavy) |
-| **5** | Workflow polish | D, E-SIL | **Export** + **`compare`** two SIL runs; second controller if not done | Core Should |
-| **6** | Nav expansion | B+ | First non-waypoint guidance | Post-core |
-| **7** | HIL / PIL | E | Fixed-step + transport + SIL↔HIL via export/compare | Post-core |
+| **0** | Stand-up | — | `uv` package `uavsim`, pytest, ruff, CI stub, thin CLI | Done |
+| **1** | SIL physics loop | A, C | Vehicle + dynamics + LQR + trivial reference + run dir + `simulate`; SIL adapter seam | Done |
+| **2** | Guidance + control interface | B, C | Waypoints, interp/min-snap, feasibility, registries, ≥3 missions | Done |
+| **3** | Robustness | C, F | Local MC, `study`, seed-stable smoke, plots-as-consumer | Done |
+| **4** | Systems | F | Docker study + sharded MC assemble | Done |
+| **5** | Workflow polish | D, E-SIL | **Export** + **`compare`** two SIL runs; second controller if not done | Done |
+| **5b** | Visualization | S5 | Interactive 3D + MC pack + showcase | Done |
+| **5c** | Attitude & plant fidelity | A+ | Quaternion kinematics + error-state control path; unlock large-attitude missions; dynamics protocol ready for flex | **Now** |
+| **6** | Nav expansion | B+ | First non-waypoint guidance | After 5c (or light parallel) |
+| **7** | HIL / PIL | E | Fixed-step + transport + SIL↔HIL via export/compare | Parallel with rig build; software when rig ready |
 
-Detail and MoSCoW: SPEC §6, §19. Module map: ARCH §3, §16.
+Detail and MoSCoW: SPEC §6, §19. Module map: ARCH §3, §16. Backlog IDs: [`docs/developer/EXTENSIBILITY_TODO.md`](docs/developer/EXTENSIBILITY_TODO.md).
 
 ---
 
 ## 5. Now / next / later
 
-### Now
-1. **Phase 6** — first non-waypoint guidance (optional portfolio extender).  
-2. Keep SPEC/ARCH/ROADMAP in sync when decisions change.
+### Parallel tracks (2026-07 decision)
 
-### Next
-1. Phase 7 HIL path (fixed-step + transport + SIL↔HIL compare).  
-2. Freeze timeseries format lean (Parquet) when needed (NPZ today).
+| Track | Cadence | Why |
+|-------|---------|-----|
+| **A — SIL platform** | Active coding now | Advance modeling (quats → motors/flex) without waiting on hardware |
+| **B — HIL test rig** | Long lead (order, build, wire) | myDAQ, sensors, frame; blocks Phase 7 **hardware** validation but not SIL |
 
-### Later (post-core, prioritize by portfolio need)
-1. Phase 6 non-waypoint guidance (geometric is a likely first step).  
-2. Phase 7 HIL transport (UDP loopback fixture before real FC).  
-3. Optional polyglot hotspot (min-snap / dynamics).  
-4. Queue backends, richer gallery UI.  
-5. Multi-airframe / lab-rig research track (parallel; see §5.1).
+Do **not** stall Track A on Track B. Keep HIL **seams** (fixed-step, I/O schemas) thin until the rig exists.
 
-### 5.1 Multi-airframe & advanced research (post-core / parallel)
+### Now (Track A — SIL)
+1. **Phase 5c** — quaternion attitude + control/metrics error path (D-10); unlocks aggressive / large-tilt mission profiles.  
+2. **D-3** — `DynamicsModel` protocol so plant variants (motors, flex) plug in without forking the sim loop.  
+3. Keep showcase / figure-eight as regression baseline (Euler-era metrics soft bands until rebaselined).
 
-Not a numbered Phase gate; track against [`docs/developer/EXTENSIBILITY_TODO.md`](docs/developer/EXTENSIBILITY_TODO.md) and [`docs/developer/airframes.md`](docs/developer/airframes.md).
+### Next (Track A, still SIL)
+1. Motor dynamics + mixer (D-7, D-8).  
+2. Flexible / elastic plant spike (V-7 → lumped modes), still software-only.  
+3. Phase 6 non-waypoint guidance if mission design needs it more than plant fidelity.
+
+### Later / when rig is ready (Track B + Phase 7)
+1. Companion project: NATS/MQTT, high-rate accels, ESC RPM (COMM-*, INSTR-1).  
+2. Phase 7 fixed-step plant + transport + SIL↔HIL compare.  
+3. Multi-airframe families (V-8, D-12, S-7) once mixer + dynamics protocol exist.
+
+### 5.1 Phase 5c — attitude & plant fidelity (detail)
+
+**Goal:** Stop treating ZYX Euler + small-angle LQR as the ceiling for *which missions we can model*. Quaternions (or equivalent SO(3) kinematics + error-state control) come **before** waiting on the HIL bench.
+
+| Slice | Exit signals | Backlog |
+|-------|--------------|---------|
+| **5c.1** Plant kinematics | Unit-quat integration + renorm; parity tests vs Euler on gentle missions | D-10 |
+| **5c.2** Control / metrics | Attitude error not component-wise Euler; LQR error-state or documented hybrid; PID/ref updated | D-10, metrics |
+| **5c.3** Missions | At least one large-attitude or high-tilt demo study that would stress Euler | configs + soft goldens |
+| **5c.4** Extensibility | `DynamicsModel` injection (D-3) so flex/motor states are additive | D-3 |
+
+**Then (still Track A):** motors/mixer → flexible body → richer MC; **not** blocked on Phase 7 hardware.
+
+**Why not HIL-first:** Rig procurement/build is multi-week; SIL can ship meaningful capability (mission envelope + model fidelity) in that window. Flexible HIL later benefits from quat + extra states already landing in SIL.
+
+### 5.2 Multi-airframe & lab research (after 5c foundation)
+
+Track against [`docs/developer/EXTENSIBILITY_TODO.md`](docs/developer/EXTENSIBILITY_TODO.md) and [`docs/developer/airframes.md`](docs/developer/airframes.md).
 
 | Theme | Intent | Notes |
 |-------|--------|-------|
-| Pluggable airframe families | Tilt-rotor VTOL, hybrids, etc. | Leverage `DynamicsModel` (D-3) + additive params (V-8, D-12) |
-| Motor / mixer foundation | First-order motor states + allocation | D-7, D-8 — do before multi-airframe deep work |
-| HIL companion + rig | myDAQ, high-rate sensors, NATS/MQTT | D-11, COMM-*, INSTR-1; hardware stays out of this repo |
-| Heterogeneous swarm | Multi-vehicle / multi-airframe | Deferred; do not block single-vehicle HIL |
+| Motor / mixer foundation | First-order motor states + allocation | D-7, D-8 — after D-3 |
+| Flexible body | Lumped elasticity / arm modes | V-7; needs extra states on DynamicsModel |
+| Pluggable airframe families | Tilt-rotor VTOL, hybrids, etc. | V-8, D-12; after mixer |
+| HIL companion + rig | myDAQ, high-rate sensors, NATS/MQTT | D-11, COMM-*, INSTR-1; Track B |
 | Comparative MC | Airframe selector in studies | S-7 |
 
-**Priority alignment:** motor/observer/HIL seams before tilt-rotor cosmetics. Preserve quad core, MC, export/compare, and viz.
+**Priority alignment:** **quaternions + dynamics protocol first** → motors/flex → multi-airframe → full HIL software. Preserve MC, export/compare, and viz; rebaseline soft metrics when the state layout changes.
 
 ---
 
@@ -159,13 +188,22 @@ Use as a living board (check off in PRs or edit this file).
 - [x] V7 `uavsim report --interactive`  
 - [x] V8 3D still PNG export  
 
+### M5c — Quaternion attitude & plant fidelity (**next**)
+- [ ] Quaternion (or SO(3)) plant kinematics + renorm; Euler gentle-mission parity  
+- [ ] Error-state / geodesic attitude error in control + metrics (no naive \(q-q_\mathrm{ref}\))  
+- [ ] LQR (or hybrid) and PID paths updated for new attitude representation  
+- [ ] Export / timeseries schema documented for new state layout  
+- [ ] At least one mission profile that exceeds comfortable Euler/small-angle use  
+- [ ] `DynamicsModel` protocol + plant injection (enables motors/flex next)  
+
 ### M6 — Nav beyond waypoints
 - [ ] First non-waypoint guidance backend + example study  
 
-### M7 — HIL path
+### M7 — HIL path (software; rig is parallel Track B)
 - [ ] Fixed-step plant + I/O schemas  
 - [ ] Transport adapter + timeout policy  
 - [ ] SIL vs HIL compare on gentle mission  
+- [ ] Rig companion: sensors + bus (when hardware exists)  
 
 ---
 
@@ -179,6 +217,8 @@ Use as a living board (check off in PRs or edit this file).
 | MC flaky numerics | Soft tolerances; seed discipline; small CI N |
 | Scope creep (sensors, multi-vehicle) | Stay in SPEC deferred list until epic prioritized |
 | MATLAB heritage pull | Domain reference only; no runtime / no layout copy |
+| HIL rig long lead | Advance Phase 5c SIL (quats/plant) while hardware is ordered/built |
+| Quaternion breaks 12-state export/MC | Schema version + soft rebaseline; keep Euler path until parity tests green |
 
 ---
 
@@ -194,8 +234,9 @@ Rough relative effort for planning only (not estimates to calendar):
 | 3 | M | Parallelism + schemas |
 | 4 | M | Ops/Docker learning curve |
 | 5 | S–M | High leverage for workflow story |
+| 5c | M–L | State layout + control/metrics; unlocks mission envelope |
 | 6 | M | Depends on chosen nav mode |
-| 7 | L | Hardware + timing + comparison honesty |
+| 7 | L | Hardware + timing + comparison honesty (rig lead time dominates) |
 
 ---
 
@@ -233,3 +274,4 @@ Per `GROK.md` GSD: non-trivial work gets a SPEC note before a large implementati
 | 2026-07-18 | Phase 5 / M5 complete: controller export, compare, PID cascade second law |
 | 2026-07-19 | Phase 5b / M5b: viz pack V1–V8 (interactive 3D, MC plots, feasibility, stills) |
 | 2026-07-20 | Document multi-airframe / HIL-rig research track (§5.1); developer airframes guide |
+| 2026-07-20 | Promote Phase **5c** (quaternions + plant fidelity) to **Now**; HIL rig parallel Track B; flex/motors after 5c |

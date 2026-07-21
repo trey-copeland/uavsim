@@ -11,13 +11,23 @@
 
 | Family | Model | Actuation | Status |
 |--------|--------|-----------|--------|
-| Quadrotor | Rigid **6-DoF** NED / FRD-like | Body wrench \([F, \tau]\) (mixer **TODO** D-8) | **Shipped** — default vehicle + studies |
+| Quadrotor | Rigid **6-DoF** NED / FRD-like, **ZYX Euler** | Body wrench \([F, \tau]\) (mixer **TODO** D-8) | **Shipped** — default vehicle + studies |
 
 See [vehicles.md](vehicles.md) and [dynamics.md](dynamics.md) for today’s contracts.
 
 ---
 
-## Planned (additive)
+## Near-term SIL (Phase 5c — before multi-airframe)
+
+While the HIL test rig is ordered/built, advance the plant in software:
+
+1. **D-10** — quaternion / SO(3) attitude + error-state control/metrics (wider mission profiles).  
+2. **D-3** — `DynamicsModel` protocol (motors, flex, other airframes plug in cleanly).  
+3. **D-7/D-8 → D-13** — motors/mixer, then flexible/elastic lumped states.
+
+---
+
+## Planned (additive, after 5c foundation)
 
 | Family | Sketch | Design notes |
 |--------|--------|--------------|

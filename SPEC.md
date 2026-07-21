@@ -214,7 +214,7 @@ Prior work lives under ME590 `code/` (MATLAB). Useful as **domain reference**, n
 
 | Area | Heritage capability | Port posture |
 |------|---------------------|--------------|
-| 6DOF nonlinear plant | Rigid-body quadrotor, NED, full Euler kinematics | **Keep as core physics** |
+| 6DOF nonlinear plant | Rigid-body quadrotor, NED, full Euler kinematics | **Keep as shipped core**; Phase **5c** moves toward quaternion/SO(3) kinematics for larger-attitude missions (see ROADMAP) |
 | Linear hover model + LQR | A/B linearization, Riccati gains, hover trim | **Keep as first controller** |
 | Waypoints → trajectory | JSON `.wpt`, MAKIMA vs minimum-snap, auto select | **Keep as first guidance backend; redesign as pluggable APIs** |
 | Feasibility checks | Yaw rate/accel, attitude vs linearization validity | **Keep; make first-class on reference trajectories** |
@@ -263,7 +263,7 @@ The public project must read as **GNC engineering plus systems engineering**, no
 2. **Coordinate conventions**
    - Inertial: NED (North-East-Down)
    - Body: forward-right-down
-   - Attitude: ZYX Euler (yaw–pitch–roll), body rates `p,q,r`
+   - Attitude: **ZYX Euler** (yaw–pitch–roll) in core v1; body rates `p,q,r`. **Planned (Phase 5c):** unit-quaternion / SO(3) plant kinematics with an error-state control path so aggressive mission profiles are first-class (not blocked on HIL hardware).
    - Thrust along −body-z; gravity along +inertial-z
 
 3. **Guidance / navigation subsystem** (extensible; see §5.4, §7)

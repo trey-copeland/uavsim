@@ -9,7 +9,7 @@
 
 ## Model today (what is implemented)
 
-Rigid-body 6DOF quadrotor, **no aerodynamic drag**, **no propeller lag**, **body wrench control**.
+Rigid-body 6DOF quadrotor, **no aerodynamic drag**, **no propeller lag**, **body wrench control**, **ZYX Euler** attitude.
 
 ### State and control
 
@@ -21,6 +21,18 @@ Rigid-body 6DOF quadrotor, **no aerodynamic drag**, **no propeller lag**, **body
 | Gravity | \(+mg\) along NED \(+z\) (down) |
 | Inertia | Diagonal `Ixx, Iyy, Izz` from vehicle |
 | Torque eq. | \(I\dot\omega = \tau - \omega \times I\omega\) |
+
+### Planned next (Phase 5c — ROADMAP)
+
+While the HIL test rig is ordered/built, SIL priority is **attitude representation + plant plug points**, not waiting on hardware:
+
+| ID | Change | Why |
+|----|--------|-----|
+| **D-10** | Quaternion (SO(3)) kinematics + error-state control/metrics | Large-attitude / aggressive missions without Euler singularities |
+| **D-3** | `DynamicsModel` protocol | Motors, flex, airframes as additive plants |
+| **D-7/D-8** then **D-13** | Motors/mixer → flexible/elastic states | Fidelity for later HIL; model in SIL first |
+
+Gentle figure-eight / square demos remain valid regression under Euler until 5c lands and soft goldens are rebaselined.
 
 ### Where it is used
 

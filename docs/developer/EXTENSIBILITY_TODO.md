@@ -65,19 +65,21 @@ Guide: [guidance.md](guidance.md)
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| D-1 | Nonlinear 6DOF body-wrench plant | **Done** | No drag |
-| D-2 | Hover analytic linearization for LQR | **Done** | |
-| D-3 | `DynamicsModel` protocol + plant injection | **TODO** | High leverage for airframes; see dynamics.md plan D2 |
+| D-1 | Nonlinear 6DOF body-wrench plant | **Done** | Euler kinematics today; no drag |
+| D-2 | Hover analytic linearization for LQR | **Done** | Small-angle; revisit with D-10 |
+| D-3 | `DynamicsModel` protocol + plant injection | **TODO** | **High priority** with D-10; motors/flex/airframes |
 | D-4 | Vehicle aero params (drag, damping) | **TODO** | Plan D1 |
 | D-5 | Drag / damping in \(f(x,u,p)\) | **TODO** | Plan D3 |
 | D-6 | Numeric linearization utility | **TODO** | |
-| D-7 | Motor/prop first-order states | **TODO** | Changes state dim; foundational for multi-airframe |
-| D-8 | Control allocation / mixer | **TODO** | |
+| D-7 | Motor/prop first-order states | **TODO** | After D-3; changes state dim |
+| D-8 | Control allocation / mixer | **TODO** | After / with D-7 |
 | D-9 | Wind / process disturbance API | **TODO** | |
-| D-11 | HIL validation seams + companion project | **TODO** | Fixed-step, I/O contracts; hardware out of this repo |
-| D-12 | Multi-airframe dynamics extensions | **TODO** | Tilt mechanisms, mode transitions, hybrid aero (additive to core) |
+| D-10 | Quaternion (SO(3)) attitude + error-state control path | **TODO** | **Phase 5c Now** — unlock large-attitude missions; metrics/export schema |
+| D-11 | HIL validation seams + companion project | **TODO** | Fixed-step, I/O; parallel with rig build (do not block 5c) |
+| D-12 | Multi-airframe dynamics extensions | **TODO** | Tilt mechanisms, mode transitions, hybrid aero (after mixer) |
+| D-13 | Flexible / elastic body (lumped modes) | **TODO** | After D-3 (+ ideally D-10); extends V-7 into plant states |
 
-Guide: [dynamics.md](dynamics.md) · [airframes.md](airframes.md)
+Guide: [dynamics.md](dynamics.md) · [airframes.md](airframes.md) · ROADMAP Phase 5c
 
 ---
 
@@ -105,29 +107,36 @@ Hardware and transport live primarily in a **HIL companion** project; this backl
 
 ---
 
-## Suggested implementation order (research enablement)
+## Suggested implementation order
 
-Prefer this order when prioritizing post-core / lab work (still subject to portfolio need):
+**SIL (Track A — do now while HIL rig is ordered/built):**
 
-1. **Motor dynamics + mixer** (D-7, D-8) — foundational for all airframes and motor-level studies.  
-2. **Observer + high-speed sensors** (C-9, INSTR-1) — partial-state path; myDAQ integration in companion.  
-3. **NATS rig comms + React dashboard** (COMM-1) — lab loop without pretending it is flight DDS.  
-4. **HIL companion project seams** (D-11, ARCH §7A) — fixed-step plant + I/O contracts.  
-5. **Multi-airframe extensions** (V-8, D-12, S-7) — tilt-rotor etc.; additive, no core refactor.  
-6. **G-5 / C-5** — registry-driven guidance/control when experiments need zero pipeline edits.  
-7. **D-3 + D-4/D-5** — pluggable dynamics + drag when plant variants are the research ask.
+1. **D-10** — quaternion / SO(3) plant + attitude error for control/metrics (Phase 5c). Unlocks mission profiles beyond small-angle Euler.  
+2. **D-3** — `DynamicsModel` protocol + plant injection (can land with or right after D-10).  
+3. **D-7 + D-8** — motor dynamics + mixer.  
+4. **D-13 / V-7** — flexible / elastic lumped states (richer HIL *later*; model in SIL first).  
+5. **D-4/D-5** — drag/aero as needed.  
+6. **G-5 / C-5** — registries when plugin ergonomics block experiments.  
+7. **V-8 / D-12 / S-7** — multi-airframe families after mixer + protocol.
 
-Earlier GSD enablement (registry + drag) remains valid when the ask is software plugins without hardware.
+**HIL rig (Track B — parallel, long lead; software when hardware exists):**
+
+1. Order/build frame, myDAQ, high-rate sensors, ESCs (INSTR-1).  
+2. Thin **D-11** fixed-step / I/O seams in this repo (does not wait for full D-10 if needed earlier).  
+3. Companion: NATS/MQTT + dashboard (COMM-1); DDS/CAN later (COMM-2).  
+4. Phase 7 transport + SIL↔HIL compare.
+
+Do **not** block D-10 on the rig. Do **not** start multi-airframe cosmetics ahead of D-10/D-3.
 
 ---
 
 ## Vision note (2026-07)
 
-Design all extensions to support **heterogeneous airframes** and **HIL** without breaking:
+Design extensions so we can grow **mission envelope** (quaternions), **plant fidelity** (motors, flex), and **HIL** without breaking:
 
-- quadrotor core 6-DoF  
+- default quadrotor SIL demos and showcase regression  
 - Monte Carlo / export / compare  
-- viz and showcase consumers  
+- viz consumers (schema-versioned timeseries)  
 
 Document airframe families in [`airframes.md`](airframes.md) as prototypes land.
 
