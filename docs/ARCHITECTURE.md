@@ -1,7 +1,7 @@
 # Architecture — `uavsim` / quadrotor-sim
 
-**Status:** v0.4 (stand-up map)  
-**Last updated:** 2026-07-19  
+**Status:** v0.5 (stand-up map)  
+**Last updated:** 2026-07-20  
 **Normative product intent:** [`SPEC.md`](../SPEC.md) (v0.2+)  
 **Working agreements:** [`GROK.md`](../GROK.md)  
 **How to extend (research users):** [`docs/developer/`](developer/README.md) · backlog [`EXTENSIBILITY_TODO.md`](developer/EXTENSIBILITY_TODO.md)
@@ -573,6 +573,31 @@ Phase 1 may keep a simple closed-loop function **if** plant step + command appli
 - Nominal path: load vehicle → build controller → `guidance.plan` → feasibility → `ClosedLoopSim` → metrics → `results` write.
 - CLI and MC call into this layer rather than re-orchestrating ad hoc.
 
+### 8.6 Multi-airframe extensibility
+
+The architecture is intended to grow **beyond a single quadrotor** without rewriting the SIL core. See [`docs/developer/airframes.md`](developer/airframes.md) and backlog IDs **V-8**, **D-3**, **D-7/D-8**, **D-11/D-12**, **S-7**.
+
+**Seams**
+
+- Pluggable **`DynamicsModel`** (D-3) for custom \(f(x, u, p)\) with optional extra states (tilt angles, airspeed, motor speeds, …).
+- Generalized **`VehicleParams`** and actuator **mixer** (D-7/D-8) so allocation is not hard-coded as body-wrench forever.
+- Mode-aware guidance / controllers and trim conditions where the airframe needs them.
+- **Airframe selector** in study configs (S-7) so MC and compare can span families.
+
+**Examples (planned, not core-complete)**
+
+- **Tilt-rotor / hybrid VTOL:** variable thrust vectoring, hover / transition / cruise modes, hybrid aero.
+- **Others:** fixed-wing, coaxial, etc., as research needs justify.
+
+**Design guardrails** (apply to high-priority work — motor dynamics, observers, HIL rig, comms):
+
+1. Keep core **6-DoF rigid-body quadrotor** as the reusable base and default demo path.  
+2. Prefer **additive** states / params — do not break the shipped 12-state NED Euler plant.  
+3. Preserve **MC perturbations**, **export/compare**, and **viz** compatibility (consumers of run dirs).  
+4. Put hardware-specific concerns (myDAQ, NATS, CAN/DDS bridge, ESC RPM) in a **HIL companion** project; this repo owns fixed-step plant + I/O contracts (§7A, D-11).
+
+This enables comparative robustness studies across airframes once S-7 lands, without a core refactor.
+
 ---
 
 ## 9. Configuration model
@@ -782,7 +807,9 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | `docs/theory.md` (later) | Frames, linearization, LQR, min-snap pointer |
 | `docs/results_schema.md` (later) | Frozen artifact schemas |
 | `docs/study_authoring.md` (later) | Config how-to |
-| `docs/containers.md` (later) | Image + shards |
+| `docs/containers.md` | Image + shards |
+| `docs/developer/` | Research extend guides (vehicles, control, guidance, dynamics, airframes) |
+| `docs/developer/EXTENSIBILITY_TODO.md` | Plugin / airframe / HIL-rig backlog |
 
 ---
 
@@ -820,6 +847,7 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | 2026-07-18 | SIL remains default design loop; fixed-step plant option reserved for HIL/PIL |
 | 2026-07-18 | Multi-run compare is a results consumer (§10.4); export + compare are Phase 5 (pre-HIL) |
 | 2026-07-18 | Align with SPEC v0.2 refined expectations and S9–S11 |
+| 2026-07-20 | Multi-airframe extensibility (§8.6): additive dynamics/params; HIL companion for rig; preserve MC/compare/viz |
 
 ---
 
@@ -832,6 +860,7 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | v0.2 | 2026-07-18 | §7A SIL/PIL/HIL modes; plant step + MeasurementBus/ActuatorCommand; hil package hooks |
 | v0.3 | 2026-07-18 | Workflow goal; controller export §7.5; compare CLI; ties to SPEC user stories |
 | v0.4 | 2026-07-18 | §10.4–10.5 compare/artifact quality; phase table with export/compare before HIL; SPEC v0.2 alignment |
+| v0.5 | 2026-07-20 | §8.6 multi-airframe extensibility + developer airframes guide; guardrails for motor/HIL/comms |
 
 ---
 

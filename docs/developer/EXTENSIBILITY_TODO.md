@@ -17,8 +17,10 @@ Legend: **Done** · **Partial** · **TODO** · **Out of scope (core)**
 | V-4 | Optional aero / drag coefficients on vehicle schema | **TODO** | Blocked by `extra="forbid"` until fields added |
 | V-5 | Enforce \(F_\max \ge mg\) at validate | **TODO** | Soft expectation today |
 | V-6 | Motor mixer uses `arm_length_m` | **TODO** | Field stored unused by plant |
+| V-7 | Arm mechanics / elasticity params | **TODO** | Parametric + lumped states |
+| V-8 | Multi-airframe families (tilt-rotor, hybrid VTOL, etc.) | **TODO** (low priority) | Pluggable dynamics + extended `VehicleParams` / mixer; preserve core 6-DoF base. Guide: [airframes.md](airframes.md) |
 
-Guide: [vehicles.md](vehicles.md)
+Guide: [vehicles.md](vehicles.md) · [airframes.md](airframes.md)
 
 ---
 
@@ -65,15 +67,17 @@ Guide: [guidance.md](guidance.md)
 |----|------|--------|-------|
 | D-1 | Nonlinear 6DOF body-wrench plant | **Done** | No drag |
 | D-2 | Hover analytic linearization for LQR | **Done** | |
-| D-3 | `DynamicsModel` protocol + plant injection | **TODO** | See dynamics.md plan D2 |
+| D-3 | `DynamicsModel` protocol + plant injection | **TODO** | High leverage for airframes; see dynamics.md plan D2 |
 | D-4 | Vehicle aero params (drag, damping) | **TODO** | Plan D1 |
 | D-5 | Drag / damping in \(f(x,u,p)\) | **TODO** | Plan D3 |
 | D-6 | Numeric linearization utility | **TODO** | |
-| D-7 | Motor/prop first-order states | **TODO** | Changes state dim |
+| D-7 | Motor/prop first-order states | **TODO** | Changes state dim; foundational for multi-airframe |
 | D-8 | Control allocation / mixer | **TODO** | |
 | D-9 | Wind / process disturbance API | **TODO** | |
+| D-11 | HIL validation seams + companion project | **TODO** | Fixed-step, I/O contracts; hardware out of this repo |
+| D-12 | Multi-airframe dynamics extensions | **TODO** | Tilt mechanisms, mode transitions, hybrid aero (additive to core) |
 
-Guide: [dynamics.md](dynamics.md)
+Guide: [dynamics.md](dynamics.md) · [airframes.md](airframes.md)
 
 ---
 
@@ -85,16 +89,47 @@ Guide: [dynamics.md](dynamics.md)
 | S-2 | MC param perturbation of vehicle | **Done** | mass/I/arm |
 | S-3 | MC redesign non-LQR controllers | **Partial** | Factory re-run; validate per law |
 | S-4 | Study-selected dynamics backend | **TODO** | Depends on D-3 |
+| S-7 | Airframe selector in studies + MC perturbations | **TODO** | Comparative robustness (e.g. quad vs tilt-rotor) |
 
 ---
 
-## Suggested implementation order (if enabling research extensions)
+## Comms & instrumentation
 
-1. **G-5** — registry-driven guidance in pipeline (unblocks nav experiments without core edits).  
-2. **C-5** — controller registry (same pattern).  
-3. **D-3 + D-1/D-4/D-5** — pluggable dynamics + drag params (the usual research ask).  
-4. **G-6** — online `update` hook in sim (replan / reactive nav).  
-5. **D-8** — mixer if motor-level studies matter.
+Hardware and transport live primarily in a **HIL companion** project; this backlog tracks the seams `uavsim` must stay ready for.
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| COMM-1 | NATS/MQTT for rig (myDAQ ↔ React) | **TODO** | Lightweight pub/sub on the lab rig |
+| COMM-2 | DDS/CAN for flight system | **TODO** | Future-proof layering beyond lab bus |
+| INSTR-1 | High-bandwidth accels (>1 kHz) + ESC RPM | **TODO** | e.g. ICM-42688 / ADXL + myDAQ |
+
+---
+
+## Suggested implementation order (research enablement)
+
+Prefer this order when prioritizing post-core / lab work (still subject to portfolio need):
+
+1. **Motor dynamics + mixer** (D-7, D-8) — foundational for all airframes and motor-level studies.  
+2. **Observer + high-speed sensors** (C-9, INSTR-1) — partial-state path; myDAQ integration in companion.  
+3. **NATS rig comms + React dashboard** (COMM-1) — lab loop without pretending it is flight DDS.  
+4. **HIL companion project seams** (D-11, ARCH §7A) — fixed-step plant + I/O contracts.  
+5. **Multi-airframe extensions** (V-8, D-12, S-7) — tilt-rotor etc.; additive, no core refactor.  
+6. **G-5 / C-5** — registry-driven guidance/control when experiments need zero pipeline edits.  
+7. **D-3 + D-4/D-5** — pluggable dynamics + drag when plant variants are the research ask.
+
+Earlier GSD enablement (registry + drag) remains valid when the ask is software plugins without hardware.
+
+---
+
+## Vision note (2026-07)
+
+Design all extensions to support **heterogeneous airframes** and **HIL** without breaking:
+
+- quadrotor core 6-DoF  
+- Monte Carlo / export / compare  
+- viz and showcase consumers  
+
+Document airframe families in [`airframes.md`](airframes.md) as prototypes land.
 
 ---
 

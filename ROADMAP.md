@@ -92,7 +92,22 @@ Detail and MoSCoW: SPEC §6, §19. Module map: ARCH §3, §16.
 1. Phase 6 non-waypoint guidance (geometric is a likely first step).  
 2. Phase 7 HIL transport (UDP loopback fixture before real FC).  
 3. Optional polyglot hotspot (min-snap / dynamics).  
-4. Queue backends, richer gallery UI.
+4. Queue backends, richer gallery UI.  
+5. Multi-airframe / lab-rig research track (parallel; see §5.1).
+
+### 5.1 Multi-airframe & advanced research (post-core / parallel)
+
+Not a numbered Phase gate; track against [`docs/developer/EXTENSIBILITY_TODO.md`](docs/developer/EXTENSIBILITY_TODO.md) and [`docs/developer/airframes.md`](docs/developer/airframes.md).
+
+| Theme | Intent | Notes |
+|-------|--------|-------|
+| Pluggable airframe families | Tilt-rotor VTOL, hybrids, etc. | Leverage `DynamicsModel` (D-3) + additive params (V-8, D-12) |
+| Motor / mixer foundation | First-order motor states + allocation | D-7, D-8 — do before multi-airframe deep work |
+| HIL companion + rig | myDAQ, high-rate sensors, NATS/MQTT | D-11, COMM-*, INSTR-1; hardware stays out of this repo |
+| Heterogeneous swarm | Multi-vehicle / multi-airframe | Deferred; do not block single-vehicle HIL |
+| Comparative MC | Airframe selector in studies | S-7 |
+
+**Priority alignment:** motor/observer/HIL seams before tilt-rotor cosmetics. Preserve quad core, MC, export/compare, and viz.
 
 ---
 
@@ -217,3 +232,4 @@ Per `GROK.md` GSD: non-trivial work gets a SPEC note before a large implementati
 | 2026-07-18 | Phase 4 / M4 complete: Docker image, sharded MC + merge, compose demo |
 | 2026-07-18 | Phase 5 / M5 complete: controller export, compare, PID cascade second law |
 | 2026-07-19 | Phase 5b / M5b: viz pack V1–V8 (interactive 3D, MC plots, feasibility, stills) |
+| 2026-07-20 | Document multi-airframe / HIL-rig research track (§5.1); developer airframes guide |
