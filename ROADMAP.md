@@ -56,8 +56,8 @@ Ship when SPEC §17 holds, especially:
 | Phase 5 Workflow polish (export / compare / 2nd controller) | **Done** |
 | Phase 5b Visualization pack (S5 / §11A V1–V8) | **Done** |
 | Portfolio advertise (Pages + LinkedIn) | **Done** |
-| Phase 5c Attitude / plant fidelity (quaternions → richer missions) | **Essentially complete** (optional 13-state export left) |
-| Phase 5d Observer-in-the-loop (KF/EKF) | **First cut done** (`linear_kf`); MEKF/partial sensors later |
+| Phase 5c Attitude / plant fidelity (quaternions → richer missions) | **Done** (optional native 13-state export still open) |
+| Phase 5d Observer-in-the-loop (KF/EKF) | **Done** (`linear_kf`, `mekf`, partial channels, `x_hat` log) |
 | HIL test rig (hardware order/build) | **In progress (parallel, long lead)** |
 | Phase 6 nav / Phase 7 HIL software | **Not started** (after or interleaved with 5c) |
 
@@ -97,15 +97,14 @@ Detail and MoSCoW: SPEC §6, §19. Module map: ARCH §3, §16. Backlog IDs: [`do
 Do **not** stall Track A on Track B. Keep HIL **seams** (fixed-step, I/O schemas) thin until the rig exists.
 
 ### Now (Track A — SIL)
-1. **Finish Phase 5c** — aggressive/high-tilt mission demo; `DynamicsModel` (D-3); optional native 13-state logging.  
-2. Keep showcase / gentle figure-eight as regression baseline.  
-3. **Phase 5d (scoped)** — observer-in-the-loop (Kalman/EKF class): not optional forever; required for honest HIL and partial-state control (see §5.3).
+1. Keep showcase / gentle figure-eight as regression baseline.  
+2. **Motor dynamics + mixer** (D-7, D-8) — next plant fidelity step after 5c/5d.  
+3. Optional: native 13-state export polish (not blocking).
 
 ### Next (Track A, still SIL)
-1. **Phase 5d** — measurement noise models + KF/EKF in the control loop (C-9 / EST-*).  
-2. Motor dynamics + mixer (D-7, D-8).  
-3. Flexible / elastic plant spike (V-7 → lumped modes).  
-4. Phase 6 non-waypoint guidance if mission design needs it more than plant fidelity.
+1. Flexible / elastic plant spike (V-7 → lumped modes).  
+2. Phase 6 non-waypoint guidance if mission design needs it more than plant fidelity.  
+3. Deeper estimation (real IMU models, sensor fusion polish) as HIL approaches.
 
 ### Later / when rig is ready (Track B + Phase 7)
 1. Companion project: NATS/MQTT, high-rate accels, ESC RPM (COMM-*, INSTR-1).  
@@ -302,3 +301,4 @@ Per `GROK.md` GSD: non-trivial work gets a SPEC note before a large implementati
 | 2026-07-20 | Document multi-airframe / HIL-rig research track (§5.1); developer airframes guide |
 | 2026-07-20 | Promote Phase **5c** (quaternions + plant fidelity) to **Now**; HIL rig parallel Track B; flex/motors after 5c |
 | 2026-07-21 | Promote **observer-in-the-loop (5d)** from deferred to scoped SIL (KF/EKF); order after 5c plant seams |
+| 2026-07-21 | 5c/5d marked done in status; README + estimation.md updated for observers/quat |

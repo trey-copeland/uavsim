@@ -263,7 +263,7 @@ The public project must read as **GNC engineering plus systems engineering**, no
 2. **Coordinate conventions**
    - Inertial: NED (North-East-Down)
    - Body: forward-right-down
-   - Attitude: **ZYX Euler** (yaw–pitch–roll) in core v1; body rates `p,q,r`. **Planned (Phase 5c):** unit-quaternion / SO(3) plant kinematics with an error-state control path so aggressive mission profiles are first-class (not blocked on HIL hardware).
+   - Attitude: **ZYX Euler** (yaw–pitch–roll) remains the control/metrics bus; optional **unit-quaternion plant** (`sim.attitude: quat`, Phase 5c) with SO(3) attitude error in LQR/PID/metrics. Body rates `p,q,r`.
    - Thrust along −body-z; gravity along +inertial-z
 
 3. **Guidance / navigation subsystem** (extensible; see §5.4, §7)

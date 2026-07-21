@@ -8,8 +8,9 @@ Guides for **using** and **extending** `uavsim` without reading the whole tree.
 | [Airframe families](airframes.md) | Quad today; tilt-rotor / multi-airframe vision; HIL rig tie-in |
 | [Control](control.md) | Built-in LQR & PID, tuning, adding a new control law |
 | [Guidance & navigation](guidance.md) | Hold / waypoints, missions, adding a guidance backend |
-| [Dynamics](dynamics.md) | State model today; drag / aero / alternate plant (gaps + plan) |
-| [Extensibility backlog](EXTENSIBILITY_TODO.md) | Consolidated **TODOs** (plugins, airframes, HIL/comms) |
+| [Dynamics](dynamics.md) | Euler/quat plants, `DynamicsModel`, SO(3) error; drag/flex plan |
+| [Estimation](estimation.md) | KF/MEKF observers, partial sensors, `sim.observer` |
+| [Extensibility backlog](EXTENSIBILITY_TODO.md) | Consolidated **TODOs** (plugins, observers, airframes, HIL) |
 
 **Related product docs**
 
@@ -27,7 +28,7 @@ Study YAML
   ├─ vehicle        → VehicleParams (configs/vehicles/)
   ├─ controller     → Controller protocol (lqr_hover | pid_cascade | …)
   ├─ guidance       → GuidanceBackend.plan → ReferenceTrajectory
-  └─ sim / metrics  → ClosedLoopSim + run artifacts
+  └─ sim            → plant (euler|quat) → optional observer → control → metrics/artifacts
 ```
 
 **Hard rules (do not violate when extending)**

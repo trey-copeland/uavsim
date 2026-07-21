@@ -2,7 +2,7 @@
 
 Modern **quadrotor simulation and GNC analysis** framework for portfolio-quality demos: flight dynamics (NED), guidance, control, Monte Carlo robustness, and reproducible study pipelines — including containerized and sharded execution.
 
-**Status:** Core SIL through Phase 5b + **React showcase**. **Next (SIL):** finish Phase **5c** (quat plant / aggressive missions / `DynamicsModel`), then Phase **5d** observer-in-the-loop (KF/EKF). HIL test rig builds in parallel; HIL software uses the estimate path.
+**Status:** Core SIL through Phase 5b + **React showcase**. Phase **5c** (quat plant, SO(3) attitude error, `DynamicsModel`, aggressive figure-eight) and Phase **5d** (observer-in-the-loop: `linear_kf` / `mekf`, partial measurements, `x_hat` logging) are in tree. **Next:** motors/mixer and flex plant, or HIL when the lab rig is ready.
 
 **Live showcase:** [https://trey-copeland.github.io/uavsim/](https://trey-copeland.github.io/uavsim/)
 
@@ -31,9 +31,10 @@ Tabs: overview · 3D flight scrubber · metrics · MC distribution/sensitivity g
 | [`SPEC.md`](SPEC.md) | What we build, scope, acceptance |
 | [`ROADMAP.md`](ROADMAP.md) | Phases, milestones, now/next/later |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How we structure code, interfaces, systems |
-| [`docs/developer/README.md`](docs/developer/README.md) | **Extend & research:** vehicles, airframes, control, guidance, dynamics |
+| [`docs/developer/README.md`](docs/developer/README.md) | **Extend & research:** vehicles, airframes, control, guidance, dynamics, estimation |
+| [`docs/developer/estimation.md`](docs/developer/estimation.md) | Observers (KF/MEKF), partial sensors, `sim.observer` config |
 | [`docs/developer/airframes.md`](docs/developer/airframes.md) | Airframe families (quad now; multi-airframe / HIL vision) |
-| [`docs/developer/EXTENSIBILITY_TODO.md`](docs/developer/EXTENSIBILITY_TODO.md) | Gaps / enablement backlog (plugins, airframes, HIL/comms) |
+| [`docs/developer/EXTENSIBILITY_TODO.md`](docs/developer/EXTENSIBILITY_TODO.md) | Gaps / enablement backlog (plugins, observers, airframes, HIL) |
 | [`docs/viz.md`](docs/viz.md) | Interactive 3D + report figure pack (§11A) |
 | [`docs/showcase/README.md`](docs/showcase/README.md) | React showcase + Pages hosting |
 | [`docs/containers.md`](docs/containers.md) | Docker + sharded MC |
@@ -89,6 +90,14 @@ uv run uavsim simulate configs/studies/figure_eight_pid.yaml
 uv run uavsim export-controller runs/<lqr_run> --out artifacts/controllers/lqr.yaml
 uv run uavsim compare runs/<lqr_run> runs/<pid_run> --figures
 
+# Attitude plant / stress (Phase 5c) — docs/developer/dynamics.md
+uv run uavsim simulate configs/studies/figure_eight_aggressive.yaml   # sim.attitude: quat
+
+# Observer-in-the-loop (Phase 5d) — docs/developer/estimation.md
+uv run uavsim simulate configs/studies/figure_eight_observer.yaml     # linear_kf
+uv run uavsim simulate configs/studies/figure_eight_mekf.yaml         # mekf, partial pos+omega
+# → nominal/timeseries.npz includes x_hat when an observer is active
+
 # Visualization pack (SPEC §11A V1–V8)
 uv run uavsim report runs/<study_id>_<timestamp>/ --interactive
 # → figures/flight_3d.html (rotate, play, vectors + HUD)
@@ -100,6 +109,5 @@ uv run uavsim gallery --base-case
 python -m http.server 8765 --directory docs/showcase
 ```
 
-
-Run artifacts land under `runs/<study_id>_<timestamp>/` (gitignored). Monte Carlo writes `monte_carlo/trials.csv`, `summary.json`. Viz extras: `uv sync --extra viz` (matplotlib + plotly).
+Run artifacts land under `runs/<study_id>_<timestamp>/` (gitignored). Monte Carlo writes `monte_carlo/trials.csv`, `summary.json`. Observer runs also store `x_hat` in `nominal/timeseries.npz`. Viz extras: `uv sync --extra viz` (matplotlib + plotly).
 
