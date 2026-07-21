@@ -34,6 +34,18 @@ While the HIL test rig is ordered/built, SIL priority is **attitude representati
 
 Gentle figure-eight / square demos remain valid regression under Euler until 5c lands and soft goldens are rebaselined.
 
+### Phase 5c.1 status (plant kinematics — landed)
+
+| Item | API |
+|------|-----|
+| Euler plant (default) | `state_derivative` — \(x \in \mathbb{R}^{12}\) |
+| Quaternion plant | `state_derivative_quat` — \(x \in \mathbb{R}^{13}\): pos, \(q_wxyz\), vel, \(\omega\) |
+| Renorm after steps | `renormalize_quat_state` (also used by `integrate_fixed_step(..., attitude="quat")`) |
+| Layout bridges | `euler_state_to_quat_state` / `quat_state_to_euler_state` |
+| Convention | Scalar-first unit quat; \(R_{b\to i}(q)\); \( \dot q = \tfrac12 q \otimes [0,\omega] \) |
+
+**Not yet:** closed-loop / LQR / study pipeline still use the Euler 12-state path (5c.2+).
+
 ### Where it is used
 
 ```text

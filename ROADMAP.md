@@ -188,10 +188,10 @@ Use as a living board (check off in PRs or edit this file).
 - [x] V7 `uavsim report --interactive`  
 - [x] V8 3D still PNG export  
 
-### M5c — Quaternion attitude & plant fidelity (**next**)
-- [ ] Quaternion (or SO(3)) plant kinematics + renorm; Euler gentle-mission parity  
-- [ ] Error-state / geodesic attitude error in control + metrics (no naive \(q-q_\mathrm{ref}\))  
-- [ ] LQR (or hybrid) and PID paths updated for new attitude representation  
+### M5c — Quaternion attitude & plant fidelity (**in progress**)
+- [x] **5c.1** Quaternion plant kinematics + renorm; Euler gentle open-loop parity (`state_derivative_quat`, unit tests)  
+- [ ] **5c.2** Error-state / geodesic attitude error in control + metrics (no naive \(q-q_\mathrm{ref}\))  
+- [ ] **5c.3** LQR (or hybrid) and PID paths updated for new attitude representation  
 - [ ] Export / timeseries schema documented for new state layout  
 - [ ] At least one mission profile that exceeds comfortable Euler/small-angle use  
 - [ ] `DynamicsModel` protocol + plant injection (enables motors/flex next)  
