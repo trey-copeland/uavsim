@@ -58,9 +58,7 @@ def state_derivative(x: np.ndarray, u: np.ndarray, vehicle: VehicleParams) -> np
     return x_dot
 
 
-def state_derivative_quat(
-    x: np.ndarray, u: np.ndarray, vehicle: VehicleParams
-) -> np.ndarray:
+def state_derivative_quat(x: np.ndarray, u: np.ndarray, vehicle: VehicleParams) -> np.ndarray:
     """
     Compute ẋ for rigid-body quadrotor with unit-quaternion attitude.
 

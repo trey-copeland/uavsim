@@ -61,9 +61,7 @@ def _vee_log_so3(r_err: np.ndarray) -> np.ndarray:
     return (theta / (2.0 * np.sin(theta))) * w
 
 
-def rotation_error_vector_from_euler(
-    euler: np.ndarray, euler_ref: np.ndarray
-) -> np.ndarray:
+def rotation_error_vector_from_euler(euler: np.ndarray, euler_ref: np.ndarray) -> np.ndarray:
     """δθ from ZYX Euler attitudes (rad)."""
     e = np.asarray(euler, dtype=float).reshape(3)
     er = np.asarray(euler_ref, dtype=float).reshape(3)

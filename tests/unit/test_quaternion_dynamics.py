@@ -86,9 +86,7 @@ def test_open_loop_parity_euler_vs_quat_gentle() -> None:
     t_e, xs_e = integrate_fixed_step(
         x0_e, u_fn, vehicle, t0=0.0, tf=2.0, dt=0.005, attitude="euler"
     )
-    t_q, xs_q = integrate_fixed_step(
-        x0_q, u_fn, vehicle, t0=0.0, tf=2.0, dt=0.005, attitude="quat"
-    )
+    t_q, xs_q = integrate_fixed_step(x0_q, u_fn, vehicle, t0=0.0, tf=2.0, dt=0.005, attitude="quat")
     np.testing.assert_allclose(t_e, t_q)
 
     # Convert quat trajectory to Euler for comparison
@@ -150,9 +148,7 @@ def test_quat_stays_unit_under_spin() -> None:
     def u_fn(_t: float, _x: np.ndarray) -> np.ndarray:
         return vehicle.u_hover()
 
-    _t, xs = integrate_fixed_step(
-        x0, u_fn, vehicle, t0=0.0, tf=5.0, dt=0.01, attitude="quat"
-    )
+    _t, xs = integrate_fixed_step(x0, u_fn, vehicle, t0=0.0, tf=5.0, dt=0.01, attitude="quat")
     norms = np.linalg.norm(xs[:, 3:7], axis=1)
     np.testing.assert_allclose(norms, 1.0, atol=1e-11)
     # Should not collapse to NaN

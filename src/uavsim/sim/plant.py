@@ -32,8 +32,8 @@ class SimPlant:
     ) -> None:
         self.vehicle = vehicle
         self.apply_saturation = apply_saturation
-        self.dynamics: DynamicsModel = dynamics if dynamics is not None else get_dynamics_model(
-            attitude
+        self.dynamics: DynamicsModel = (
+            dynamics if dynamics is not None else get_dynamics_model(attitude)
         )
         self.attitude: AttitudeMode = self.dynamics.attitude  # type: ignore[assignment]
         self._t = 0.0

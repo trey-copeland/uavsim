@@ -195,11 +195,7 @@ def _simulate_fixed_step(
     meas_f = MeasurementBus(t=float(t_out[-1]), x=observer.x_hat)
     u_out[-1] = plant.apply_command(command_source.command(float(t_out[-1]), meas_f))
 
-    finite = (
-        np.isfinite(x_out).all()
-        and np.isfinite(u_out).all()
-        and np.isfinite(x_hat_out).all()
-    )
+    finite = np.isfinite(x_out).all() and np.isfinite(u_out).all() and np.isfinite(x_hat_out).all()
     att = plant.dynamics.attitude
     oid = getattr(observer, "id", "unknown")
     return ClosedLoopResult(

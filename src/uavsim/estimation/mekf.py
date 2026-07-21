@@ -170,9 +170,7 @@ class ErrorStateMekf:
         for ch in obs.channels:
             if ch == "att":
                 eul_meas = y[offset : offset + 3]
-                q_meas = euler_to_quat(
-                    float(eul_meas[0]), float(eul_meas[1]), float(eul_meas[2])
-                )
+                q_meas = euler_to_quat(float(eul_meas[0]), float(eul_meas[1]), float(eul_meas[2]))
                 q_err = quat_multiply(quat_conjugate(self._q), q_meas)
                 if q_err[0] < 0.0:
                     q_err = -q_err
