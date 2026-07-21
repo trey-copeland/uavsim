@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from uavsim.monte_carlo.perturb import PerturbationSpec, perturb_vehicle
+from uavsim.monte_carlo.progress import McProgressBar
 from uavsim.monte_carlo.summary import summarize_trials
 from uavsim.vehicles.params import VehicleParams
 
@@ -22,7 +23,7 @@ class MonteCarloResult:
 
 
 def default_mc_progress(completed: int, total: int, trial_id: int, row: dict[str, Any]) -> None:
-    """Stdout progress line (flush for live terminals)."""
+    """Simple fallback: multi-line log (used if bar not constructed)."""
     ok = row.get("success")
     rmse = row.get("rmse_position_m")
     rmse_s = f"{float(rmse):.4f}" if rmse is not None else "—"
@@ -49,22 +50,23 @@ def run_monte_carlo(
     ``trial_fn(trial_id, plant_vehicle, param_dict) -> metrics row`` must be
     deterministic given those inputs (and fixed controller/reference outside).
 
-    ``progress``: ``True`` → default stdout lines; callable for custom hooks;
-    ``None``/``False`` → silent (tests).
+    ``progress``: ``True`` → single-line progress bar for this id list;
+    callable for custom hooks; ``None``/``False`` → silent (tests).
     """
     if n_trials < 1:
         msg = "n_trials must be >= 1"
         raise ValueError(msg)
 
+    ids = list(trial_ids) if trial_ids is not None else list(range(n_trials))
+    total = len(ids)
+
     if progress is True:
-        progress_fn: ProgressFn | None = default_mc_progress
+        progress_fn: ProgressFn | None = McProgressBar(total)
     elif callable(progress):
         progress_fn = progress
     else:
         progress_fn = None
 
-    ids = list(trial_ids) if trial_ids is not None else list(range(n_trials))
-    total = len(ids)
     trials: list[dict[str, Any]] = []
     for i, trial_id in enumerate(ids, start=1):
         plant, params = perturb_vehicle(

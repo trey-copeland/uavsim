@@ -38,7 +38,7 @@ def test_hover_mc_smoke_seed_stable(runs_tmp: Path) -> None:
         assert a["rmse_position_m"] == pytest.approx(b["rmse_position_m"], rel=0, abs=1e-9)
 
     assert (r1.run_dir / "monte_carlo" / "summary.json").is_file()
-    assert r1.mc_summary["schema_version"] == 1
+    assert r1.mc_summary["schema_version"] == 2
     assert "rmse_position_m" in r1.mc_summary["metrics"]
 
 

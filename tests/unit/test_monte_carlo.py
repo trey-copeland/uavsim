@@ -111,7 +111,7 @@ def test_run_monte_carlo_seed_stable() -> None:
     )
     assert r1.trials == r2.trials
     assert r1.summary["n_trials"] == 3
-    assert r1.summary["schema_version"] == 1
+    assert r1.summary["schema_version"] == 2
     assert "rmse_position_m" in r1.summary["metrics"]
 
 
@@ -141,3 +141,9 @@ def test_summarize_and_csv_roundtrip(tmp_path: Path) -> None:
     summary = summarize_trials(trials)
     assert summary["n_success"] == 1
     assert abs(summary["failure_rate"] - 0.5) < 1e-12
+    # Primary metrics are success-only (ignore the failed trial's 0.2)
+    assert summary["metrics"]["rmse_position_m"]["n"] == 1
+    assert abs(summary["metrics"]["rmse_position_m"]["mean"] - 0.1) < 1e-12
+    # Full population still available
+    assert summary["metrics_all_trials"]["rmse_position_m"]["n"] == 2
+    assert abs(summary["metrics_all_trials"]["rmse_position_m"]["mean"] - 0.15) < 1e-12

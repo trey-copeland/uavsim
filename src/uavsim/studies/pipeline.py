@@ -264,17 +264,31 @@ def run_mc_for_prepared(
     plan = partition_trials(n_trials, n_shards)
 
     all_trials: list[dict[str, Any]] = []
+    # Sequential local shards: one progress bar for the full study (global total).
+    # Parallel workers (mc-shard CLI) each run a separate process with their own bar.
+    completed_offset = 0
+    bar = None
+    if progress:
+        from uavsim.monte_carlo.progress import McProgressBar
+
+        bar = McProgressBar(
+            n_trials,
+            label="MC",
+            n_shards=n_shards,
+            shard_id=0 if n_shards == 1 else None,
+        )
+
     for shard_id in range(n_shards):
         ids = plan.trial_ids(shard_id)
         if not ids:
             shard_trials: list[dict[str, Any]] = []
         else:
-            if progress and n_shards > 1:
-                print(
-                    f"  MC shard {shard_id + 1}/{n_shards}  "
-                    f"trials {ids[0]}–{ids[-1]} ({len(ids)} runs)",
-                    flush=True,
-                )
+            if progress and bar is not None:
+                bar.completed_offset = completed_offset
+                bar.shard_id = shard_id if n_shards > 1 else None
+                prog: Any = bar
+            else:
+                prog = False
             mc_result = run_monte_carlo(
                 nominal_vehicle=prepared.vehicle_nominal,
                 base_seed=cfg.seed,
@@ -283,9 +297,10 @@ def run_mc_for_prepared(
                 spec=cfg.monte_carlo.perturbation_spec(),
                 redesign_controller=redesign,
                 trial_ids=ids,
-                progress=progress,
+                progress=prog,
             )
             shard_trials = mc_result.trials
+            completed_offset += len(ids)
         all_trials.extend(shard_trials)
         if shards_root is not None and n_shards > 1:
             write_shard_artifacts(
@@ -296,6 +311,9 @@ def run_mc_for_prepared(
                 plan=plan,
                 extra_meta={"base_seed": cfg.seed, "study_id": cfg.study_id},
             )
+
+    if progress and bar is not None and not bar._finished:
+        bar.finish()
 
     all_trials.sort(key=lambda r: int(r["trial_id"]))
     from uavsim.monte_carlo import summarize_trials

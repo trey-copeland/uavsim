@@ -215,27 +215,54 @@ def _not_implemented(command: str, phase_hint: str) -> int:
     return 2
 
 
+def _fmt_rate(x: Any) -> str:
+    try:
+        return f"{100.0 * float(x):.1f}%"
+    except (TypeError, ValueError):
+        return "—"
+
+
+def _print_rmse_block(label: str, rmse: dict[str, Any]) -> None:
+    if not rmse:
+        return
+    print(
+        f"  {label}: mean={rmse.get('mean'):.4f}  "
+        f"p50={rmse.get('p50'):.4f}  p95={rmse.get('p95'):.4f}  "
+        f"max={rmse.get('max'):.4f} m  (n={rmse.get('n')})"
+    )
+
+
 def _print_study_result(result: Any) -> None:
     status = "OK" if result.success else "FAILED"
     print(f"[{status}] run_dir={result.run_dir}")
     m = result.metrics
     if m:
         print(
-            f"  rmse_pos={m.get('rmse_position_m', float('nan')):.4f} m  "
+            f"  nominal  rmse_pos={m.get('rmse_position_m', float('nan')):.4f} m  "
             f"max_pos={m.get('max_position_error_m', float('nan')):.4f} m  "
             f"success={m.get('success')}"
         )
     if result.mc_summary is not None:
         s = result.mc_summary
+        n = s.get("n_trials")
+        n_ok = s.get("n_success")
         print(
-            f"  MC n={s.get('n_trials')}  "
-            f"success={s.get('n_success')}/{s.get('n_trials')}  "
-            f"fail_rate={s.get('failure_rate')}  "
+            f"  MC n={n}  success={n_ok}/{n}  "
+            f"fail_rate={_fmt_rate(s.get('failure_rate'))}  "
             f"backend={result.backend}  shards={result.n_shards}"
         )
-        rmse = (s.get("metrics") or {}).get("rmse_position_m") or {}
-        if rmse:
-            print(f"  MC rmse_pos mean={rmse.get('mean'):.4f}  p95={rmse.get('p95'):.4f} m")
+        # Primary stats are success-only (schema v2); avoid blow-up-skewed means
+        rmse_ok = (s.get("metrics") or {}).get("rmse_position_m") or {}
+        rmse_all = (s.get("metrics_all_trials") or {}).get("rmse_position_m") or {}
+        pop = s.get("metrics_population", "success_only")
+        if rmse_ok:
+            _print_rmse_block(f"rmse_pos on successes ({pop})", rmse_ok)
+        if rmse_all and n_ok is not None and n is not None and n_ok < n:
+            _print_rmse_block("rmse_pos all trials (includes failures)", rmse_all)
+            print(
+                "  note: all-trial mean/p95 can be dominated by a few divergences; "
+                "use success stats + trials.csv for plant-parameter studies."
+            )
 
 
 def main(argv: list[str] | None = None) -> int:

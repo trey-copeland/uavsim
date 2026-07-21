@@ -4,6 +4,7 @@ from uavsim.monte_carlo.docker_run import default_image_name, docker_available, 
 from uavsim.monte_carlo.engine import MonteCarloResult, default_mc_progress, run_monte_carlo
 from uavsim.monte_carlo.io import read_trials_csv, write_trials_csv, write_trials_json
 from uavsim.monte_carlo.perturb import PerturbationSpec, perturb_vehicle, trial_rng
+from uavsim.monte_carlo.progress import McProgressBar
 from uavsim.monte_carlo.shard import (
     ShardPlan,
     merge_shard_directories,
@@ -16,6 +17,7 @@ from uavsim.monte_carlo.shard import (
 from uavsim.monte_carlo.summary import summarize_trials
 
 __all__ = [
+    "McProgressBar",
     "MonteCarloResult",
     "PerturbationSpec",
     "ShardPlan",
