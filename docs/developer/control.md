@@ -182,7 +182,7 @@ If the law needs synthesis (like LQR), expose `design_my_law(vehicle, **weights)
 | Plugin discovery (entry points / external packages) | **TODO** |
 | Geometric / SE(3) controller | **TODO** (SPEC Should alternate — PID shipped first) |
 | Discrete-time / sample-rate aware laws | **TODO** — continuous ODE + hold for now |
-| Measurement-based laws (partial state, noise) | **TODO** — `MeasurementBus` is full-state ideal |
+| Measurement-based laws / observers | **Phase 5d** — `sim.observer: none \| linear_kf`; noise via `MeasurementModel`; see `uavsim.estimation` |
 | Per-trial redesign of non-LQR laws in MC | Partial — `redesign_controller` re-runs factory; document per law |
 
 See [EXTENSIBILITY_TODO.md](EXTENSIBILITY_TODO.md).

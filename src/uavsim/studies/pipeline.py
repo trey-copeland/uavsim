@@ -115,10 +115,13 @@ def run_closed_loop_trial(
     controller: AnyController | None = None,
 ) -> tuple[ClosedLoopResult, dict[str, Any]]:
     """Simulate one closed-loop run; returns (sim_result, metrics)."""
+    from uavsim.estimation import build_observer
+
     ctrl = controller if controller is not None else prepared.controller
     cfg = prepared.cfg
     plant = SimPlant(plant_vehicle, attitude=cfg.sim.attitude)
     adapter = InProcessControllerAdapter(ctrl, prepared.reference)
+    observer, meas_model = build_observer(cfg.sim.observer, plant_vehicle)
     sim_result = simulate_closed_loop(
         plant,
         adapter,
@@ -128,6 +131,8 @@ def run_closed_loop_trial(
         max_step=cfg.sim.dt_s,
         rtol=cfg.sim.rtol,
         atol=cfg.sim.atol,
+        observer=observer,
+        measurement_model=meas_model,
     )
     metrics = compute_metrics(
         sim_result.t,
@@ -138,6 +143,13 @@ def run_closed_loop_trial(
     )
     metrics["sim_success"] = sim_result.success
     metrics["sim_message"] = sim_result.message
+    metrics["observer_id"] = sim_result.observer_id
+    metrics["sim_attitude"] = sim_result.attitude
+    if sim_result.x_hat is not None and sim_result.x is not None:
+        e_est = sim_result.x_hat - sim_result.x
+        metrics["rmse_estimate_position_m"] = float(
+            np.sqrt(np.mean(np.sum(e_est[:, 0:3] ** 2, axis=1)))
+        )
     return sim_result, metrics
 
 

@@ -57,7 +57,7 @@ Ship when SPEC §17 holds, especially:
 | Phase 5b Visualization pack (S5 / §11A V1–V8) | **Done** |
 | Portfolio advertise (Pages + LinkedIn) | **Done** |
 | Phase 5c Attitude / plant fidelity (quaternions → richer missions) | **Essentially complete** (optional 13-state export left) |
-| Phase 5d Observer-in-the-loop (KF/EKF) | **Scoped next** |
+| Phase 5d Observer-in-the-loop (KF/EKF) | **First cut done** (`linear_kf`); MEKF/partial sensors later |
 | HIL test rig (hardware order/build) | **In progress (parallel, long lead)** |
 | Phase 6 nav / Phase 7 HIL software | **Not started** (after or interleaved with 5c) |
 
@@ -213,11 +213,12 @@ Use as a living board (check off in PRs or edit this file).
 - [x] **5c.4** `DynamicsModel` protocol + plant injection  
 - [ ] Export / timeseries schema for native 13-state logging (optional; not required for 5c exit)
 
-### M5d — Observer-in-the-loop (**scoped next after 5c**)
-- [ ] Measurement noise / partial sensors filling `MeasurementBus`  
-- [ ] `StateObserver` protocol wired in closed-loop (plant → observer → controller)  
-- [ ] At least one KF/EKF implementation + study config switch (`observer: none` default)  
-- [ ] Soft regression: full-state path unchanged; observer path tracks with degraded-but-finite metrics  
+### M5d — Observer-in-the-loop (**in progress / first cut done**)
+- [x] Measurement noise model (`MeasurementModel`) on Euler state channels  
+- [x] `StateObserver` protocol wired in closed-loop (plant → measure → observer → controller)  
+- [x] `linear_kf` (hover A/B) + study config `sim.observer` (default `none`)  
+- [x] Soft regression: full-state figure-eight unchanged; observer study tracks with soft RMSE band  
+- [ ] Partial-state sensors / MEKF (stretch)  
 
 ### M6 — Nav beyond waypoints
 - [ ] First non-waypoint guidance backend + example study  

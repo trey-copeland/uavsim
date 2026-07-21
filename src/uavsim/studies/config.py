@@ -67,6 +67,20 @@ GuidanceConfig = Annotated[
 ]
 
 
+class ObserverConfig(BaseModel):
+    """Phase 5d: state observer between plant measurements and controller."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["none", "identity", "linear_kf"] = "none"
+    seed: int = 0
+    pos_sigma_m: float = Field(default=0.05, ge=0)
+    vel_sigma_m_s: float = Field(default=0.05, ge=0)
+    att_sigma_rad: float = Field(default=0.02, ge=0)
+    omega_sigma_rad_s: float = Field(default=0.05, ge=0)
+    process_sigma: float = Field(default=0.02, ge=0)
+
+
 class SimConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -76,6 +90,8 @@ class SimConfig(BaseModel):
     atol: float = 1e-8
     # Phase 5c: plant attitude representation (controllers still see Euler 12-state)
     attitude: Literal["euler", "quat"] = "euler"
+    # Phase 5d: observer-in-the-loop (default none = ideal full state)
+    observer: ObserverConfig = Field(default_factory=ObserverConfig)
 
 
 class MetricsConfig(BaseModel):

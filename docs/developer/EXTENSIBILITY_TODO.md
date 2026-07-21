@@ -36,24 +36,24 @@ Guide: [vehicles.md](vehicles.md) · [airframes.md](airframes.md)
 | C-6 | Export / load for LQR + PID | **Done** | |
 | C-7 | Export for arbitrary new laws | **Partial** | Must extend export module |
 | C-8 | Geometric / SE(3) controller | **TODO** | |
-| C-9 | Partial-state / noisy measurements | **TODO** | **Phase 5d** — bus is ideal full state today |
+| C-9 | Partial-state / noisy measurements | **Partial** | Additive noise on full state (**5d.1**); true partial sensors later |
 | C-10 | Entry-point plugins for third-party laws | **TODO** | |
-| C-11 | Control from state estimate (not only x_true) | **TODO** | **Phase 5d** — closed-loop: plant → observer → controller |
+| C-11 | Control from state estimate (not only x_true) | **Done** | Closed-loop: plant → measure → observer → controller |
 
 Guide: [control.md](control.md)
 
 ---
 
-## Estimation / observers (Phase 5d — in scope)
+## Estimation / observers (Phase 5d)
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| EST-1 | Configurable measurement models (noise, partial outputs) | **TODO** | IMU-like rates, position, etc. on `MeasurementBus` |
-| EST-2 | `StateObserver` protocol (predict / update) | **TODO** | Pluggable in `simulate_closed_loop` |
-| EST-3 | Reference filter implementation | **TODO** | Linear KF and/or error-state EKF (MEKF-class) |
-| EST-4 | Study config `sim.observer` | **TODO** | Default `none` = full-state SIL (preserves goldens) |
+| EST-1 | Configurable measurement models (noise) | **Done** | `MeasurementModel` — Gaussian on pos/att/vel/ω |
+| EST-2 | `StateObserver` protocol (predict / update) | **Done** | `estimation/base.py`; wired in closed-loop |
+| EST-3 | Reference filter implementation | **Partial** | `linear_kf` on hover (A,B); MEKF **TODO** |
+| EST-4 | Study config `sim.observer` | **Done** | Default `none`; demo `figure_eight_observer.yaml` |
 
-**Not** optional for HIL honesty: hardware will not feed full x. SIL must exercise the estimate path before Phase 7.
+**Next estimation:** partial-state H matrix, error-state / MEKF attitude filter (still EST-3 stretch).
 
 ---
 
