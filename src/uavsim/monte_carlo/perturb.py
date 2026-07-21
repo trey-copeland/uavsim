@@ -6,19 +6,32 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from uavsim.vehicles.params import InertiaParams, VehicleParams
+from uavsim.vehicles.params import InertiaParams, PropulsionParams, VehicleParams
 
 
 @dataclass(frozen=True)
 class PerturbationSpec:
-    """Relative Gaussian noise on mass / inertia / arm (heritage-inspired defaults)."""
+    """Relative Gaussian noise on vehicle params (heritage mass/I/arm + propulsion).
+
+    Propulsion sigmas default to 0 so wrench-only studies are unchanged; set
+    them on motors-plant MC studies (``sim.plant: motors``).
+    """
 
     mass_rel_sigma: float = 0.05
     inertia_rel_sigma: float = 0.075
     arm_rel_sigma: float = 0.02
+    # Propulsion (D-7/D-8); only affect plant when motors are active
+    ct_rel_sigma: float = 0.0
+    cq_rel_sigma: float = 0.0
+    motor_tau_rel_sigma: float = 0.0
+    omega_max_rel_sigma: float = 0.0
     min_mass_kg: float = 0.05
     min_inertia_kg_m2: float = 1e-6
     min_arm_m: float = 0.05
+    min_ct_n_s2: float = 1e-12
+    min_cq_nm_s2: float = 1e-14
+    min_motor_tau_s: float = 1e-4
+    min_omega_max_rad_s: float = 50.0
 
 
 def trial_rng(base_seed: int, trial_id: int) -> np.random.Generator:
@@ -72,12 +85,34 @@ def perturb_vehicle(
     thrust_scale = mass / nominal.mass_kg
     thrust_max = max(nominal.limits.thrust_max_n * thrust_scale, mass * nominal.gravity_m_s2 * 1.2)
 
+    prop_nom = nominal.propulsion
+    ct = _positive_normal(rng, prop_nom.ct_n_s2, spec.ct_rel_sigma, spec.min_ct_n_s2)
+    cq = _positive_normal(rng, prop_nom.cq_nm_s2, spec.cq_rel_sigma, spec.min_cq_nm_s2)
+    motor_tau = _positive_normal(
+        rng, prop_nom.motor_time_const_s, spec.motor_tau_rel_sigma, spec.min_motor_tau_s
+    )
+    omega_max = _positive_normal(
+        rng, prop_nom.omega_max_rad_s, spec.omega_max_rel_sigma, spec.min_omega_max_rad_s
+    )
+    # Keep omega_max strictly above min spin floor
+    omega_max = max(omega_max, float(prop_nom.omega_min_rad_s) + 1.0)
+
+    propulsion = PropulsionParams(
+        layout=prop_nom.layout,
+        ct_n_s2=ct,
+        cq_nm_s2=cq,
+        motor_time_const_s=motor_tau,
+        omega_min_rad_s=prop_nom.omega_min_rad_s,
+        omega_max_rad_s=omega_max,
+    )
+
     vehicle = nominal.model_copy(
         update={
             "mass_kg": mass,
             "arm_length_m": arm,
             "inertia": InertiaParams(ixx_kg_m2=ixx, iyy_kg_m2=iyy, izz_kg_m2=izz),
             "limits": nominal.limits.model_copy(update={"thrust_max_n": thrust_max}),
+            "propulsion": propulsion,
             "vehicle_id": f"{nominal.vehicle_id}_trial{trial_id}",
         }
     )
@@ -88,5 +123,9 @@ def perturb_vehicle(
         "izz_kg_m2": izz,
         "arm_length_m": arm,
         "thrust_max_n": thrust_max,
+        "ct_n_s2": ct,
+        "cq_nm_s2": cq,
+        "motor_time_const_s": motor_tau,
+        "omega_max_rad_s": omega_max,
     }
     return vehicle, params

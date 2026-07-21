@@ -135,12 +135,21 @@ class MonteCarloConfig(BaseModel):
     mass_rel_sigma: float = Field(default=0.05, ge=0)
     inertia_rel_sigma: float = Field(default=0.075, ge=0)
     arm_rel_sigma: float = Field(default=0.02, ge=0)
+    # Propulsion scatter (default 0: no-op for wrench-only plant MC)
+    ct_rel_sigma: float = Field(default=0.0, ge=0)
+    cq_rel_sigma: float = Field(default=0.0, ge=0)
+    motor_tau_rel_sigma: float = Field(default=0.0, ge=0)
+    omega_max_rel_sigma: float = Field(default=0.0, ge=0)
 
     def perturbation_spec(self) -> PerturbationSpec:
         return PerturbationSpec(
             mass_rel_sigma=self.mass_rel_sigma,
             inertia_rel_sigma=self.inertia_rel_sigma,
             arm_rel_sigma=self.arm_rel_sigma,
+            ct_rel_sigma=self.ct_rel_sigma,
+            cq_rel_sigma=self.cq_rel_sigma,
+            motor_tau_rel_sigma=self.motor_tau_rel_sigma,
+            omega_max_rel_sigma=self.omega_max_rel_sigma,
         )
 
 

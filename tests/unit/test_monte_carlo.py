@@ -41,10 +41,48 @@ def test_perturb_vehicle_changes_mass() -> None:
 
 def test_perturb_respects_zero_sigma() -> None:
     nom = default_vehicle()
-    spec = PerturbationSpec(mass_rel_sigma=0.0, inertia_rel_sigma=0.0, arm_rel_sigma=0.0)
-    v, _ = perturb_vehicle(nom, base_seed=0, trial_id=0, spec=spec)
+    spec = PerturbationSpec(
+        mass_rel_sigma=0.0,
+        inertia_rel_sigma=0.0,
+        arm_rel_sigma=0.0,
+        ct_rel_sigma=0.0,
+        cq_rel_sigma=0.0,
+        motor_tau_rel_sigma=0.0,
+        omega_max_rel_sigma=0.0,
+    )
+    v, p = perturb_vehicle(nom, base_seed=0, trial_id=0, spec=spec)
     assert v.mass_kg == nom.mass_kg
     assert v.inertia.ixx_kg_m2 == nom.inertia.ixx_kg_m2
+    assert v.propulsion.ct_n_s2 == nom.propulsion.ct_n_s2
+    assert p["ct_n_s2"] == nom.propulsion.ct_n_s2
+    assert p["omega_max_rad_s"] == nom.propulsion.omega_max_rad_s
+
+
+def test_perturb_propulsion_when_sigma_set() -> None:
+    nom = default_vehicle()
+    spec = PerturbationSpec(
+        mass_rel_sigma=0.0,
+        inertia_rel_sigma=0.0,
+        arm_rel_sigma=0.0,
+        ct_rel_sigma=0.2,
+        cq_rel_sigma=0.2,
+        motor_tau_rel_sigma=0.25,
+        omega_max_rel_sigma=0.15,
+    )
+    v0, p0 = perturb_vehicle(nom, base_seed=7, trial_id=0, spec=spec)
+    v1, p1 = perturb_vehicle(nom, base_seed=7, trial_id=1, spec=spec)
+    assert "ct_n_s2" in p0 and "omega_max_rad_s" in p0
+    assert v0.propulsion.ct_n_s2 > 0
+    assert v0.propulsion.omega_max_rad_s >= 50.0
+    # Different trials differ on propulsion for large sigma
+    assert (
+        p0["ct_n_s2"] != p1["ct_n_s2"]
+        or p0["motor_time_const_s"] != p1["motor_time_const_s"]
+        or p0["omega_max_rad_s"] != p1["omega_max_rad_s"]
+    )
+    # Reproducible
+    v0b, p0b = perturb_vehicle(nom, base_seed=7, trial_id=0, spec=spec)
+    assert p0 == p0b
 
 
 def test_run_monte_carlo_seed_stable() -> None:
