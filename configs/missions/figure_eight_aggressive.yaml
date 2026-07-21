@@ -1,0 +1,17 @@
+# Aggressive elevated figure-eight: shorter segments + larger altitude swing.
+# Stresses LQR hover linearization and benefits from singularity-free plant
+# (sim.attitude: quat). Constant yaw — path-tangent auto-yaw remains a fail case.
+schema_version: 1
+name: figure_eight_aggressive
+description: Fast elevated figure-eight for Phase 5c high-tilt / tracking stress
+frame: NED
+waypoints:
+  - {label: start_rest, time: 0.0, x: 0.0, y: 0.0, z: 1.5, yaw: 0.0}
+  - {label: right_begin, time: 2.0, x: 1.2, y: 0.7, z: 1.9, yaw: 0.0}
+  - {label: right_peak, time: 4.0, x: 2.5, y: 0.0, z: 2.4, yaw: 0.0}
+  - {label: right_bottom, time: 6.0, x: 1.2, y: -0.7, z: 1.9, yaw: 0.0}
+  - {label: center_cross, time: 8.0, x: 0.0, y: 0.0, z: 1.5, yaw: 0.0}
+  - {label: left_bottom, time: 10.0, x: -1.2, y: -0.7, z: 1.1, yaw: 0.0}
+  - {label: left_peak, time: 12.0, x: -2.5, y: 0.0, z: 0.7, yaw: 0.0}
+  - {label: left_top, time: 14.0, x: -1.2, y: 0.7, z: 1.1, yaw: 0.0}
+  - {label: end_rest, time: 16.0, x: 0.0, y: 0.0, z: 1.5, yaw: 0.0}

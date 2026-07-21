@@ -6,6 +6,12 @@ from uavsim.dynamics.attitude_error import (
     tracking_error_state,
 )
 from uavsim.dynamics.linearize import hover_linearization
+from uavsim.dynamics.model import (
+    DynamicsModel,
+    EulerRigidBodyDynamics,
+    QuatRigidBodyDynamics,
+    get_dynamics_model,
+)
 from uavsim.dynamics.nonlinear import (
     CONTROL_DIM,
     STATE_DIM,
@@ -27,11 +33,15 @@ from uavsim.dynamics.rotations import (
 
 __all__ = [
     "CONTROL_DIM",
+    "DynamicsModel",
+    "EulerRigidBodyDynamics",
+    "QuatRigidBodyDynamics",
     "STATE_DIM",
     "STATE_DIM_QUAT",
     "euler_state_to_quat_state",
     "euler_to_quat",
     "geodesic_attitude_error_rad",
+    "get_dynamics_model",
     "hover_linearization",
     "integrate_fixed_step",
     "quat_normalize",

@@ -8,7 +8,6 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 from uavsim.dynamics import CONTROL_DIM, STATE_DIM
-from uavsim.dynamics.nonlinear import renormalize_quat_state
 from uavsim.interfaces import MeasurementBus
 from uavsim.sim.adapters import CommandSource
 from uavsim.sim.plant import SimPlant
@@ -41,8 +40,9 @@ def simulate_closed_loop(
     preserved. Euler plants keep SciPy RK45. Output ``x`` is always Euler 12-state.
     """
     plant.reset(x0, t0=t0)
-    if plant.attitude == "quat":
-        return _simulate_quat_fixed_step(
+    # Unit-quaternion (and future constrained) plants need fixed-step + project
+    if plant.dynamics.attitude == "quat":
+        return _simulate_projected_fixed_step(
             plant, command_source, t0=t0, tf=tf, max_step=max_step
         )
     return _simulate_euler_ivp(
@@ -114,7 +114,7 @@ def _simulate_euler_ivp(
     )
 
 
-def _simulate_quat_fixed_step(
+def _simulate_projected_fixed_step(
     plant: SimPlant,
     command_source: CommandSource,
     *,
@@ -122,18 +122,18 @@ def _simulate_quat_fixed_step(
     tf: float,
     max_step: float,
 ) -> ClosedLoopResult:
-    """RK4 on 13-state quaternion plant; record Euler 12-state samples."""
+    """RK4 with per-stage/state projection (e.g. unit quaternion); Euler samples out."""
     dt = float(max_step)
     if dt <= 0:
-        msg = "max_step must be > 0 for quaternion integration"
+        msg = "max_step must be > 0 for projected integration"
         raise ValueError(msg)
 
     n = max(int(np.ceil((tf - t0) / dt)) + 1, 2)
     t_out = np.linspace(t0, tf, n)
-    # ensure exact endpoint
     t_out[-1] = tf
     x_out = np.zeros((n, STATE_DIM))
     u_out = np.zeros((n, CONTROL_DIM))
+    project = plant.dynamics.project
 
     x = plant.x.copy()
     x_out[0] = plant.x_euler()
@@ -152,23 +152,23 @@ def _simulate_quat_fixed_step(
             return plant.derivatives(tt, xx, uu)
 
         k1 = f_at(ti, x)
-        k2 = f_at(ti + 0.5 * dti, renormalize_quat_state(x + 0.5 * dti * k1))
-        k3 = f_at(ti + 0.5 * dti, renormalize_quat_state(x + 0.5 * dti * k2))
-        k4 = f_at(ti + dti, renormalize_quat_state(x + dti * k3))
-        x = renormalize_quat_state(x + (dti / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4))
+        k2 = f_at(ti + 0.5 * dti, project(x + 0.5 * dti * k1))
+        k3 = f_at(ti + 0.5 * dti, project(x + 0.5 * dti * k2))
+        k4 = f_at(ti + dti, project(x + dti * k3))
+        x = project(x + (dti / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4))
         plant.set_state(float(t_out[i + 1]), x)
         x_out[i + 1] = plant.x_euler()
 
-    # Final control sample
     meas_f = MeasurementBus(t=float(t_out[-1]), x=x_out[-1])
     u_out[-1] = plant.apply_command(command_source.command(float(t_out[-1]), meas_f))
 
     finite = np.isfinite(x_out).all() and np.isfinite(u_out).all()
+    att = plant.dynamics.attitude
     return ClosedLoopResult(
         t=t_out,
         x=x_out,
         u=u_out,
         success=bool(finite),
-        message="quat RK4 ok" if finite else "non-finite state/control",
-        attitude="quat",
+        message=f"{att} RK4 ok" if finite else "non-finite state/control",
+        attitude=att,
     )

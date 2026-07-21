@@ -2,7 +2,7 @@
 
 Modern **quadrotor simulation and GNC analysis** framework for portfolio-quality demos: flight dynamics (NED), guidance, control, Monte Carlo robustness, and reproducible study pipelines — including containerized and sharded execution.
 
-**Status:** Core SIL workflow complete (through Phase 5b) + **React results showcase**. **Next (SIL):** Phase 5c — quaternion attitude / plant fidelity while the HIL test rig is built in parallel. Then motors/flex modeling; HIL software when the rig is ready.
+**Status:** Core SIL through Phase 5b + **React showcase**. **Next (SIL):** finish Phase **5c** (quat plant / aggressive missions / `DynamicsModel`), then Phase **5d** observer-in-the-loop (KF/EKF). HIL test rig builds in parallel; HIL software uses the estimate path.
 
 **Live showcase:** [https://trey-copeland.github.io/uavsim/](https://trey-copeland.github.io/uavsim/)
 

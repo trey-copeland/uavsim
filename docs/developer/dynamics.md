@@ -44,21 +44,24 @@ Gentle figure-eight / square demos remain valid regression under Euler until 5c 
 | Layout bridges | `euler_state_to_quat_state` / `quat_state_to_euler_state` |
 | Convention | Scalar-first unit quat; \(R_{b\to i}(q)\); \( \dot q = \tfrac12 q \otimes [0,\omega] \) |
 
-### Phase 5c.2–5c.3 status (error-state + optional quat plant)
+### Phase 5c.2–5c.4 status
 
 | Item | Status |
 |------|--------|
-| SO(3) rotation-vector attitude error | `dynamics/attitude_error.py` — used by LQR, PID, metrics |
-| Metrics | `rmse_attitude_rad` = RMS geodesic angle; `attitude_error_model: so3_geodesic` |
-| LQR | `u = u_h - K e` with `e = tracking_error_state` (δθ not Euler subtract) |
-| Study plant | `sim.attitude: euler` (default) or `quat` — controllers always see Euler 12-state |
-| Quat closed-loop | Fixed-step RK4 + renorm; artifacts remain Euler timeseries |
+| SO(3) rotation-vector attitude error | `dynamics/attitude_error.py` — LQR, PID, metrics |
+| Metrics | geodesic `rmse_attitude_rad`; `attitude_error_model: so3_geodesic` |
+| LQR / PID | error-state SO(3) attitude |
+| `DynamicsModel` (D-3) | `dynamics/model.py` — `EulerRigidBodyDynamics`, `QuatRigidBodyDynamics`; `SimPlant` injects model |
+| Study plant | `sim.attitude: euler` \| `quat` |
+| Stress demo | `configs/studies/figure_eight_aggressive.yaml` (quat plant default) |
 
 ```yaml
 sim:
   dt_s: 0.01
   attitude: quat   # optional Phase 5c plant
 ```
+
+**Next SIL:** Phase **5d** observer-in-the-loop (KF/EKF) — see ROADMAP §5.3.
 
 ### Where it is used
 

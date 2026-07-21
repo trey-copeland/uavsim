@@ -485,7 +485,8 @@ Heritage SIL often assumes full-state feedback (`x` into LQR). That is fine for 
 For HIL-ready design:
 
 - Define **`MeasurementBus`** early even if SIL fills it from full state (`x` → ideal measurements).
-- Controllers that need full state can take a “state from measurements” helper; EKF stays post-core.
+- Controllers that need full state take measurements (SIL may fill from `x_true`).  
+- **Phase 5d (scoped):** optional `StateObserver` (KF/EKF) between plant outputs and `Controller.compute` — default remains ideal full state.
 - Avoid baking `compute(t, x, …)` as the *only* possible signature forever — prefer:
 
 ```text

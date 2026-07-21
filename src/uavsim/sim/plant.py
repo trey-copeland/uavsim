@@ -7,12 +7,8 @@ from typing import Literal
 import numpy as np
 
 from uavsim.control.base import saturate
-from uavsim.dynamics import STATE_DIM, STATE_DIM_QUAT, state_derivative, state_derivative_quat
-from uavsim.dynamics.nonlinear import (
-    euler_state_to_quat_state,
-    quat_state_to_euler_state,
-    renormalize_quat_state,
-)
+from uavsim.dynamics import STATE_DIM, STATE_DIM_QUAT
+from uavsim.dynamics.model import DynamicsModel, get_dynamics_model
 from uavsim.interfaces import ActuatorCommand, MeasurementBus, PlantOutput
 from uavsim.vehicles.params import VehicleParams
 
@@ -22,9 +18,8 @@ AttitudeMode = Literal["euler", "quat"]
 class SimPlant:
     """In-process plant. Command source is external (SIL adapter or HIL).
 
-    Controllers always observe **Euler 12-state** measurements. With
-    ``attitude=\"quat\"``, the internal state is the 13-state quaternion plant
-    and is converted for the measurement bus / exported timeseries.
+    Controllers always observe **Euler 12-state** measurements. Plant state
+    dimension and kinematics come from a :class:`DynamicsModel` (D-3).
     """
 
     def __init__(
@@ -33,33 +28,38 @@ class SimPlant:
         apply_saturation: bool = True,
         *,
         attitude: AttitudeMode = "euler",
+        dynamics: DynamicsModel | None = None,
     ) -> None:
-        if attitude not in ("euler", "quat"):
-            msg = f"attitude must be 'euler' or 'quat', got {attitude!r}"
-            raise ValueError(msg)
         self.vehicle = vehicle
         self.apply_saturation = apply_saturation
-        self.attitude: AttitudeMode = attitude
+        self.dynamics: DynamicsModel = dynamics if dynamics is not None else get_dynamics_model(
+            attitude
+        )
+        self.attitude: AttitudeMode = self.dynamics.attitude  # type: ignore[assignment]
         self._t = 0.0
-        self._x = np.zeros(STATE_DIM_QUAT if attitude == "quat" else STATE_DIM)
+        self._x = np.zeros(self.dynamics.state_dim)
 
     @property
     def state_dim(self) -> int:
-        return STATE_DIM_QUAT if self.attitude == "quat" else STATE_DIM
+        return self.dynamics.state_dim
 
     def reset(self, x0: np.ndarray, t0: float = 0.0) -> PlantOutput:
         self._t = float(t0)
         x0 = np.asarray(x0, dtype=float).reshape(-1)
-        if self.attitude == "quat":
-            if x0.size == STATE_DIM:
-                self._x = euler_state_to_quat_state(x0)
-            else:
-                self._x = renormalize_quat_state(x0)
+        if x0.size == STATE_DIM and self.dynamics.state_dim != STATE_DIM:
+            self._x = self.dynamics.from_euler_state(x0)
+        elif x0.size == self.dynamics.state_dim:
+            self._x = self.dynamics.project(x0)
+        elif x0.size == STATE_DIM_QUAT and self.dynamics.attitude == "euler":
+            from uavsim.dynamics.nonlinear import quat_state_to_euler_state
+
+            self._x = quat_state_to_euler_state(x0)
         else:
-            if x0.size == STATE_DIM_QUAT:
-                self._x = quat_state_to_euler_state(x0)
-            else:
-                self._x = x0.reshape(STATE_DIM).copy()
+            msg = (
+                f"x0 length {x0.size} incompatible with dynamics "
+                f"{self.dynamics.id} (dim={self.dynamics.state_dim})"
+            )
+            raise ValueError(msg)
         return self._output()
 
     @property
@@ -68,14 +68,12 @@ class SimPlant:
 
     @property
     def x(self) -> np.ndarray:
-        """Internal plant state (12 or 13)."""
+        """Internal plant state."""
         return self._x.copy()
 
     def x_euler(self) -> np.ndarray:
         """Euler 12-state for control / metrics / artifacts."""
-        if self.attitude == "quat":
-            return quat_state_to_euler_state(self._x)
-        return self._x.copy()
+        return self.dynamics.to_euler_state(self._x)
 
     def apply_command(self, command: ActuatorCommand) -> np.ndarray:
         u = command.u
@@ -85,17 +83,11 @@ class SimPlant:
 
     def derivatives(self, t: float, x: np.ndarray, u: np.ndarray) -> np.ndarray:
         _ = t
-        if self.attitude == "quat":
-            return state_derivative_quat(x, u, self.vehicle)
-        return state_derivative(x, u, self.vehicle)
+        return self.dynamics.f(x, u, self.vehicle)
 
     def set_state(self, t: float, x: np.ndarray) -> None:
         self._t = float(t)
-        x = np.asarray(x, dtype=float).reshape(-1)
-        if self.attitude == "quat":
-            self._x = renormalize_quat_state(x)
-        else:
-            self._x = x.reshape(STATE_DIM).copy()
+        self._x = self.dynamics.project(x)
 
     def _output(self) -> PlantOutput:
         x_e = self.x_euler()

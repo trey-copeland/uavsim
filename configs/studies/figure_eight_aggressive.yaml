@@ -1,0 +1,31 @@
+# Phase 5c high-stress tracking demo (elevated aggressive figure-eight).
+# Prefer sim.attitude: quat for plant; controllers remain Euler 12-state + SO(3) error.
+schema_version: 1
+study_id: figure_eight_aggressive
+seed: 0
+
+vehicle: configs/vehicles/default_quadrotor.yaml
+
+controller:
+  type: lqr_hover
+  Q_diag: [100, 100, 100, 10, 10, 1, 10, 10, 10, 1, 1, 0.1]
+  R_diag: [0.1, 1.0, 1.0, 1.0]
+
+guidance:
+  type: waypoints
+  mission_file: configs/missions/figure_eight_aggressive.yaml
+  method: auto
+  yaw_mode: constant
+  sample_dt_s: 0.01
+  fail_on_infeasible: false
+
+sim:
+  dt_s: 0.01
+  method: rk45
+  rtol: 1.0e-5
+  atol: 1.0e-7
+  attitude: quat
+
+metrics:
+  # Tighter path + elevation → looser success band than gentle figure-eight
+  position_bound_m: 1.0

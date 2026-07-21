@@ -338,7 +338,7 @@ Documented as roadmap, not core-complete *implementation* commitments. **Archite
 
 **Other GNC / product**
 
-- Sensor models and EKF / state estimation (core SIL may use full state or an ideal measurement bus)
+- ~~Sensor models and EKF / state estimation~~ → **Promoted to Phase 5d (ROADMAP)** — ideal full-state bus remains default; observer-in-the-loop is in-scope SIL before HIL  
 - Motor dynamics, propeller maps, allocation (+/X configs) beyond torque/thrust interface
 - Environment: wind, drag, ground effect, rotor interaction
 - Multi-vehicle / formation

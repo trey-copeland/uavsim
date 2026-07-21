@@ -36,10 +36,24 @@ Guide: [vehicles.md](vehicles.md) · [airframes.md](airframes.md)
 | C-6 | Export / load for LQR + PID | **Done** | |
 | C-7 | Export for arbitrary new laws | **Partial** | Must extend export module |
 | C-8 | Geometric / SE(3) controller | **TODO** | |
-| C-9 | Partial-state / noisy measurements | **TODO** | Bus is ideal full state |
+| C-9 | Partial-state / noisy measurements | **TODO** | **Phase 5d** — bus is ideal full state today |
 | C-10 | Entry-point plugins for third-party laws | **TODO** | |
+| C-11 | Control from state estimate (not only x_true) | **TODO** | **Phase 5d** — closed-loop: plant → observer → controller |
 
 Guide: [control.md](control.md)
+
+---
+
+## Estimation / observers (Phase 5d — in scope)
+
+| ID | Item | Status | Notes |
+|----|------|--------|-------|
+| EST-1 | Configurable measurement models (noise, partial outputs) | **TODO** | IMU-like rates, position, etc. on `MeasurementBus` |
+| EST-2 | `StateObserver` protocol (predict / update) | **TODO** | Pluggable in `simulate_closed_loop` |
+| EST-3 | Reference filter implementation | **TODO** | Linear KF and/or error-state EKF (MEKF-class) |
+| EST-4 | Study config `sim.observer` | **TODO** | Default `none` = full-state SIL (preserves goldens) |
+
+**Not** optional for HIL honesty: hardware will not feed full x. SIL must exercise the estimate path before Phase 7.
 
 ---
 
@@ -67,14 +81,14 @@ Guide: [guidance.md](guidance.md)
 |----|------|--------|-------|
 | D-1 | Nonlinear 6DOF body-wrench plant | **Done** | Euler kinematics today; no drag |
 | D-2 | Hover analytic linearization for LQR | **Done** | Small-angle; revisit with D-10 |
-| D-3 | `DynamicsModel` protocol + plant injection | **TODO** | **High priority** with D-10; motors/flex/airframes |
+| D-3 | `DynamicsModel` protocol + plant injection | **Done** | `dynamics/model.py`; `SimPlant(dynamics=…)` / `get_dynamics_model` |
 | D-4 | Vehicle aero params (drag, damping) | **TODO** | Plan D1 |
 | D-5 | Drag / damping in \(f(x,u,p)\) | **TODO** | Plan D3 |
 | D-6 | Numeric linearization utility | **TODO** | |
 | D-7 | Motor/prop first-order states | **TODO** | After D-3; changes state dim |
 | D-8 | Control allocation / mixer | **TODO** | After / with D-7 |
 | D-9 | Wind / process disturbance API | **TODO** | |
-| D-10 | Quaternion (SO(3)) attitude + error-state control path | **Partial** | **5c.1–5c.3:** quat plant + SO(3) LQR/PID/metrics; optional `sim.attitude: quat`. Native 13-state export + aggressive demo still open |
+| D-10 | Quaternion (SO(3)) attitude + error-state control path | **Partial** | Plant + SO(3) control/metrics + aggressive demo. Native 13-state export optional |
 | D-11 | HIL validation seams + companion project | **TODO** | Fixed-step, I/O; parallel with rig build (do not block 5c) |
 | D-12 | Multi-airframe dynamics extensions | **TODO** | Tilt mechanisms, mode transitions, hybrid aero (after mixer) |
 | D-13 | Flexible / elastic body (lumped modes) | **TODO** | After D-3 (+ ideally D-10); extends V-7 into plant states |
@@ -111,10 +125,10 @@ Hardware and transport live primarily in a **HIL companion** project; this backl
 
 **SIL (Track A — do now while HIL rig is ordered/built):**
 
-1. **D-10** — quaternion / SO(3) plant + attitude error for control/metrics (Phase 5c). Unlocks mission profiles beyond small-angle Euler.  
-2. **D-3** — `DynamicsModel` protocol + plant injection (can land with or right after D-10).  
+1. **Finish D-10 / 5c** — aggressive mission demo + **D-3** `DynamicsModel`.  
+2. **Phase 5d observers** — EST-1…4 + C-9/C-11 (KF/EKF in the loop; default full-state unchanged).  
 3. **D-7 + D-8** — motor dynamics + mixer.  
-4. **D-13 / V-7** — flexible / elastic lumped states (richer HIL *later*; model in SIL first).  
+4. **D-13 / V-7** — flexible / elastic lumped states.  
 5. **D-4/D-5** — drag/aero as needed.  
 6. **G-5 / C-5** — registries when plugin ergonomics block experiments.  
 7. **V-8 / D-12 / S-7** — multi-airframe families after mixer + protocol.
@@ -122,11 +136,11 @@ Hardware and transport live primarily in a **HIL companion** project; this backl
 **HIL rig (Track B — parallel, long lead; software when hardware exists):**
 
 1. Order/build frame, myDAQ, high-rate sensors, ESCs (INSTR-1).  
-2. Thin **D-11** fixed-step / I/O seams in this repo (does not wait for full D-10 if needed earlier).  
+2. Thin **D-11** fixed-step / I/O seams in this repo.  
 3. Companion: NATS/MQTT + dashboard (COMM-1); DDS/CAN later (COMM-2).  
-4. Phase 7 transport + SIL↔HIL compare.
+4. Phase 7 transport + SIL↔HIL compare (**uses 5d observer path**).
 
-Do **not** block D-10 on the rig. Do **not** start multi-airframe cosmetics ahead of D-10/D-3.
+Do **not** block 5c on the rig. Do **not** skip 5d before claiming HIL-ready control.
 
 ---
 

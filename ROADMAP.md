@@ -56,7 +56,8 @@ Ship when SPEC §17 holds, especially:
 | Phase 5 Workflow polish (export / compare / 2nd controller) | **Done** |
 | Phase 5b Visualization pack (S5 / §11A V1–V8) | **Done** |
 | Portfolio advertise (Pages + LinkedIn) | **Done** |
-| Phase 5c Attitude / plant fidelity (quaternions → richer missions) | **Next** ← SIL advance while HIL rig is built |
+| Phase 5c Attitude / plant fidelity (quaternions → richer missions) | **Essentially complete** (optional 13-state export left) |
+| Phase 5d Observer-in-the-loop (KF/EKF) | **Scoped next** |
 | HIL test rig (hardware order/build) | **In progress (parallel, long lead)** |
 | Phase 6 nav / Phase 7 HIL software | **Not started** (after or interleaved with 5c) |
 
@@ -75,7 +76,8 @@ Phases are **capability gates**, not calendar dates. Prefer finishing a gate’s
 | **4** | Systems | F | Docker study + sharded MC assemble | Done |
 | **5** | Workflow polish | D, E-SIL | **Export** + **`compare`** two SIL runs; second controller if not done | Done |
 | **5b** | Visualization | S5 | Interactive 3D + MC pack + showcase | Done |
-| **5c** | Attitude & plant fidelity | A+ | Quaternion kinematics + error-state control path; unlock large-attitude missions; dynamics protocol ready for flex | **Now** |
+| **5c** | Attitude & plant fidelity | A+ | Quaternion kinematics + error-state control; large-attitude demo; `DynamicsModel` for flex/motors | **Now** |
+| **5d** | Observer-in-the-loop | C+, E | Noisy measurements + filter (e.g. EKF/KF) feeding control; ideal full-state remains default | After 5c core; before heavy HIL |
 | **6** | Nav expansion | B+ | First non-waypoint guidance | After 5c (or light parallel) |
 | **7** | HIL / PIL | E | Fixed-step + transport + SIL↔HIL via export/compare | Parallel with rig build; software when rig ready |
 
@@ -95,14 +97,15 @@ Detail and MoSCoW: SPEC §6, §19. Module map: ARCH §3, §16. Backlog IDs: [`do
 Do **not** stall Track A on Track B. Keep HIL **seams** (fixed-step, I/O schemas) thin until the rig exists.
 
 ### Now (Track A — SIL)
-1. **Phase 5c** — quaternion attitude + control/metrics error path (D-10); unlocks aggressive / large-tilt mission profiles.  
-2. **D-3** — `DynamicsModel` protocol so plant variants (motors, flex) plug in without forking the sim loop.  
-3. Keep showcase / figure-eight as regression baseline (Euler-era metrics soft bands until rebaselined).
+1. **Finish Phase 5c** — aggressive/high-tilt mission demo; `DynamicsModel` (D-3); optional native 13-state logging.  
+2. Keep showcase / gentle figure-eight as regression baseline.  
+3. **Phase 5d (scoped)** — observer-in-the-loop (Kalman/EKF class): not optional forever; required for honest HIL and partial-state control (see §5.3).
 
 ### Next (Track A, still SIL)
-1. Motor dynamics + mixer (D-7, D-8).  
-2. Flexible / elastic plant spike (V-7 → lumped modes), still software-only.  
-3. Phase 6 non-waypoint guidance if mission design needs it more than plant fidelity.
+1. **Phase 5d** — measurement noise models + KF/EKF in the control loop (C-9 / EST-*).  
+2. Motor dynamics + mixer (D-7, D-8).  
+3. Flexible / elastic plant spike (V-7 → lumped modes).  
+4. Phase 6 non-waypoint guidance if mission design needs it more than plant fidelity.
 
 ### Later / when rig is ready (Track B + Phase 7)
 1. Companion project: NATS/MQTT, high-rate accels, ESC RPM (COMM-*, INSTR-1).  
@@ -113,16 +116,30 @@ Do **not** stall Track A on Track B. Keep HIL **seams** (fixed-step, I/O schemas
 
 **Goal:** Stop treating ZYX Euler + small-angle LQR as the ceiling for *which missions we can model*. Quaternions (or equivalent SO(3) kinematics + error-state control) come **before** waiting on the HIL bench.
 
+| Slice | Exit signals | Backlog | Status |
+|-------|--------------|---------|--------|
+| **5c.1** Plant kinematics | Unit-quat + renorm; open-loop Euler parity | D-10 | **Done** |
+| **5c.2** Control / metrics | SO(3) error in LQR/PID/metrics | D-10 | **Done** |
+| **5c.3** Optional quat plant + mission stress | `sim.attitude: quat`; aggressive elevated F8 demo | D-10, configs | **Done** |
+| **5c.4** Extensibility | `DynamicsModel` injection (D-3) | D-3 | **Done** |
+
+**Then (still Track A):** **5d observer** → motors/mixer → flexible body; **not** blocked on Phase 7 hardware.
+
+**Why not HIL-first:** Rig procurement/build is multi-week; SIL can ship mission envelope + model fidelity + estimation seams in that window.
+
+### 5.3 Phase 5d — observer-in-the-loop (scoped; was deferred)
+
+**Previously:** SPEC listed “sensor models and EKF” as deferred; only C-9 (partial-state bus) existed as a thin TODO.  
+**Now in product scope** for SIL-before-HIL: control must be able to run on **estimates**, not only ideal full state.
+
 | Slice | Exit signals | Backlog |
 |-------|--------------|---------|
-| **5c.1** Plant kinematics | Unit-quat integration + renorm; parity tests vs Euler on gentle missions | D-10 |
-| **5c.2** Control / metrics | Attitude error not component-wise Euler; LQR error-state or documented hybrid; PID/ref updated | D-10, metrics |
-| **5c.3** Missions | At least one large-attitude or high-tilt demo study that would stress Euler | configs + soft goldens |
-| **5c.4** Extensibility | `DynamicsModel` injection (D-3) so flex/motor states are additive | D-3 |
+| **5d.1** Measurement models | Configurable noise / partial outputs on `MeasurementBus` (pos, IMU-like rates, etc.) | C-9, EST-1 |
+| **5d.2** Filter protocol | `StateObserver` (predict/update) pluggable in closed-loop between plant and controller | EST-2 |
+| **5d.3** Reference KF/EKF | At least one working filter (e.g. linear KF on pos/vel **or** simple MEKF/error-state EKF on attitude) | EST-3 |
+| **5d.4** Study switch | `sim.observer: none \| …` — default `none` (full-state) preserves all goldens | pipeline |
 
-**Then (still Track A):** motors/mixer → flexible body → richer MC; **not** blocked on Phase 7 hardware.
-
-**Why not HIL-first:** Rig procurement/build is multi-week; SIL can ship meaningful capability (mission envelope + model fidelity) in that window. Flexible HIL later benefits from quat + extra states already landing in SIL.
+**Dependency:** Prefer finishing 5c.4 (`DynamicsModel`) so plant and process-noise models share one f(x,u). Observer work can start as soon as MeasurementBus stays the control input (already true).
 
 ### 5.2 Multi-airframe & lab research (after 5c foundation)
 
@@ -189,12 +206,18 @@ Use as a living board (check off in PRs or edit this file).
 - [x] V8 3D still PNG export  
 
 ### M5c — Quaternion attitude & plant fidelity (**in progress**)
-- [x] **5c.1** Quaternion plant kinematics + renorm; Euler gentle open-loop parity (`state_derivative_quat`, unit tests)  
-- [x] **5c.2** Error-state / geodesic attitude error in control + metrics (`tracking_error_state`, SO(3) metrics)  
-- [x] **5c.3** LQR + PID use SO(3) attitude error; optional `sim.attitude: quat` closed-loop plant  
-- [ ] Export / timeseries schema documented for native 13-state logging (artifacts still Euler 12)  
-- [ ] At least one mission profile that exceeds comfortable Euler/small-angle use  
-- [ ] `DynamicsModel` protocol + plant injection (enables motors/flex next)  
+- [x] **5c.1** Quaternion plant kinematics + renorm; Euler gentle open-loop parity  
+- [x] **5c.2** Error-state / geodesic attitude error in control + metrics  
+- [x] **5c.3a** LQR + PID SO(3) error; optional `sim.attitude: quat` plant  
+- [x] **5c.3b** Aggressive elevated figure-eight demo (`figure_eight_aggressive`, soft goldens)  
+- [x] **5c.4** `DynamicsModel` protocol + plant injection  
+- [ ] Export / timeseries schema for native 13-state logging (optional; not required for 5c exit)
+
+### M5d — Observer-in-the-loop (**scoped next after 5c**)
+- [ ] Measurement noise / partial sensors filling `MeasurementBus`  
+- [ ] `StateObserver` protocol wired in closed-loop (plant → observer → controller)  
+- [ ] At least one KF/EKF implementation + study config switch (`observer: none` default)  
+- [ ] Soft regression: full-state path unchanged; observer path tracks with degraded-but-finite metrics  
 
 ### M6 — Nav beyond waypoints
 - [ ] First non-waypoint guidance backend + example study  
@@ -275,3 +298,4 @@ Per `GROK.md` GSD: non-trivial work gets a SPEC note before a large implementati
 | 2026-07-19 | Phase 5b / M5b: viz pack V1–V8 (interactive 3D, MC plots, feasibility, stills) |
 | 2026-07-20 | Document multi-airframe / HIL-rig research track (§5.1); developer airframes guide |
 | 2026-07-20 | Promote Phase **5c** (quaternions + plant fidelity) to **Now**; HIL rig parallel Track B; flex/motors after 5c |
+| 2026-07-21 | Promote **observer-in-the-loop (5d)** from deferred to scoped SIL (KF/EKF); order after 5c plant seams |
