@@ -43,7 +43,7 @@ Tabs: overview · 3D flight scrubber · metrics · MC distribution/sensitivity g
 
 ## Heritage
 
-Domain reference: ME590 MATLAB research (private). This repo is a **redesign**, not a line-for-line port. Runtime does **not** depend on MATLAB or private Drive assets.
+Domain reference and prior implementation: **[quad_uav](https://github.com/trey-copeland/quad_uav)** (ME590 quadrotor GNC research, MATLAB). This repo (`uavsim`) is a **redesign** in open Python — not a line-for-line port. Runtime does **not** depend on MATLAB or on that codebase.
 
 ## License
 
