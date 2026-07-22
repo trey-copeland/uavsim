@@ -30,10 +30,11 @@ class Observation:
 @dataclass
 class MeasurementModel:
     """
-    Additive Gaussian noise on selected Euler 12-state channels.
+    Additive Gaussian noise on selected measurement channels.
 
-    ``channels`` defaults to full state. Use e.g. ``[\"pos\", \"omega\"]`` for
-    GPS-like position + gyro-only partial sensing.
+    Channels may be Euler slices (``pos``, ``att``, ``vel``, ``omega``),
+    altitude (``alt``), horizontal velocity (``vel_xy``), or body-frame
+    velocity / optical-flow proxy (``body_vel`` / ``flow``).
     """
 
     seed: int = 0
@@ -41,6 +42,8 @@ class MeasurementModel:
     vel_sigma_m_s: float = 0.0
     att_sigma_rad: float = 0.0
     omega_sigma_rad_s: float = 0.0
+    alt_sigma_m: float | None = None
+    body_vel_sigma_m_s: float | None = None
     channels: list[str] = field(default_factory=lambda: list(DEFAULT_CHANNELS))
 
     def __post_init__(self) -> None:
@@ -54,13 +57,25 @@ class MeasurementModel:
             vel_sigma_m_s=self.vel_sigma_m_s,
             att_sigma_rad=self.att_sigma_rad,
             omega_sigma_rad_s=self.omega_sigma_rad_s,
+            alt_sigma_m=self.alt_sigma_m,
+            body_vel_sigma_m_s=self.body_vel_sigma_m_s,
         )
 
     def measure(self, x_true_euler: np.ndarray) -> np.ndarray:
-        """Return noisy **full** 12-state (unmeasured channels = true, no noise)."""
+        """
+        Return noisy **full** 12-state for legacy paths.
+
+        Unmeasured channels keep truth. ``body_vel`` is packed into NED vel
+        slots (hover-linear / partial_raw bus convention).
+        """
         x = np.asarray(x_true_euler, dtype=float).reshape(STATE_DIM).copy()
         y_part = self.measure_vector(x)
-        x[self._idx] = y_part
+        # Place via H columns (works for selection and body_vel hover H)
+        h = self._h
+        for i in range(h.shape[0]):
+            js = np.flatnonzero(np.abs(h[i]) > 0.5)
+            if js.size == 1:
+                x[int(js[0])] = y_part[i]
         return x
 
     def measure_vector(self, x_true_euler: np.ndarray) -> np.ndarray:

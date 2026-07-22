@@ -71,7 +71,79 @@ select, input[type="range"] {
   background: var(--bg); color: var(--text); border: 1px solid var(--border);
   border-radius: 6px; padding: 0.35rem 0.5rem;
 }
-.plot { width: 100%; min-height: 360px; background: #0c1018; border-radius: 8px; }
+.compare-controls {
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.compare-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: min(100%, 16rem);
+  flex: 1 1 14rem;
+}
+.compare-pick-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.compare-pick select {
+  width: 100%;
+  max-width: 28rem;
+  font-size: 0.88rem;
+}
+.btn-swap {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  margin-bottom: 0.05rem;
+}
+.btn-swap:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+/* Plotly: captions live outside the SVG so the modebar never covers titles */
+.plot-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.plot-caption {
+  margin: 0;
+  padding: 0 0.15rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+  /* Reserve the right edge so hover modebar doesn't sit on long titles */
+  padding-right: 5.5rem;
+}
+.plot {
+  width: 100%;
+  min-height: 240px;
+  background: #0c1018;
+  border-radius: 8px;
+  position: relative;
+}
+/* Modebar only on hover (config) — keep it compact when visible */
+.plot .modebar-container,
+.plot .modebar {
+  top: 4px !important;
+  right: 4px !important;
+}
+.plot .modebar-btn path {
+  fill: #9aa0a6 !important;
+}
 .footer {
   padding: 1rem 1.5rem 2rem; color: var(--muted); font-size: 0.8rem;
   border-top: 1px solid var(--border);
@@ -90,15 +162,27 @@ select, input[type="range"] {
 .badge.mc { background: #1e3a2f; color: #7dffb3; }
 .badge-row { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; vertical-align: middle; }
 
-/* Controller × sensor overview matrix */
+/* Controller × sensor overview matrix — equal column gaps & card sizes */
 .matrix-wrap { overflow: hidden; }
-.matrix-scroll { overflow-x: auto; }
+.matrix-scroll {
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
 table.controller-matrix {
   width: 100%;
+  table-layout: fixed;
   border-collapse: separate;
-  border-spacing: 0.5rem;
+  border-spacing: 0.65rem;
   font-size: 0.85rem;
-  min-width: 720px;
+  /* Prefer horizontal scroll over squeezing uneven columns */
+  min-width: 1120px;
+}
+table.controller-matrix col.row-head {
+  width: 6.75rem;
+}
+table.controller-matrix col.sensor {
+  /* Equal share of remaining width (6 sensor columns) */
+  width: calc((100% - 6.75rem) / 6);
 }
 table.controller-matrix th.corner,
 table.controller-matrix th.row-label {
@@ -106,58 +190,104 @@ table.controller-matrix th.row-label {
   color: var(--muted);
   font-weight: 600;
   vertical-align: middle;
-  min-width: 7rem;
+  padding: 0 0.15rem;
+  box-sizing: border-box;
 }
 table.controller-matrix thead th {
   text-align: center;
   color: var(--text);
   font-weight: 600;
-  padding: 0.25rem 0.35rem 0.5rem;
+  padding: 0.15rem 0.25rem 0.45rem;
   vertical-align: bottom;
+  box-sizing: border-box;
+}
+table.controller-matrix thead th .col-label {
+  line-height: 1.25;
+  min-height: 2.4em; /* two lines of title → uniform header band */
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  text-align: center;
 }
 table.controller-matrix thead th .col-sub {
   font-weight: 400;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--muted);
-  margin-top: 0.2rem;
+  margin-top: 0.25rem;
+  line-height: 1.2;
+  min-height: 1.2em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 table.controller-matrix td {
-  vertical-align: stretch;
+  vertical-align: top;
   padding: 0;
-  width: 18%;
+  height: 1px; /* lets .matrix-cell height:100% fill the row */
+}
+table.controller-matrix tbody th.row-label {
+  vertical-align: middle;
 }
 .matrix-cell {
   margin: 0;
-  min-height: 7.5rem;
+  height: 100%;
+  min-height: 8.75rem;
+  box-sizing: border-box;
+  padding: 0.7rem 0.75rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  gap: 0.45rem;
   transition: border-color 0.12s ease;
 }
 .matrix-cell:hover { border-color: var(--accent); }
 .matrix-cell.cell-fail { border-color: #6a3030; }
 .matrix-cell.empty {
   opacity: 0.35;
-  min-height: 4rem;
+  min-height: 8.75rem;
   align-items: center;
   justify-content: center;
 }
 .matrix-cell-head {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 0.35rem;
+  min-height: 2.1rem; /* one line method + badges without shifting RMSE */
 }
 .matrix-method {
+  font-size: 0.7rem;
+  color: var(--muted);
+  line-height: 1.3;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.matrix-cell-head .badge-row {
+  flex: 0 0 auto;
+  max-width: 48%;
+  justify-content: flex-end;
+}
+.matrix-rmse {
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.matrix-rmse span {
+  margin-top: 0.15rem;
+}
+.matrix-meta {
+  margin: 0;
   font-size: 0.72rem;
   color: var(--muted);
-  line-height: 1.25;
-}
-.matrix-rmse { font-size: 1.25rem; }
-.matrix-meta {
-  margin: 0.35rem 0 0;
-  font-size: 0.75rem;
-  color: var(--muted);
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

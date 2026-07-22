@@ -19,7 +19,8 @@
 - Nonlinear **6-DoF** rigid-body dynamics (NED, body wrench)
 - **Euler** (default) or **unit-quaternion** plant (`sim.attitude: quat`) via pluggable [`DynamicsModel`](docs/developer/dynamics.md)
 - Optional **mixer + first-order motors** (`sim.plant: motors`) — control allocation uses arm length / \(c_T,c_Q\)
-- YAML vehicles: mass, inertia, arm length, limits, propulsion — [vehicles guide](docs/developer/vehicles.md)
+- Optional **aero**: body drag, prop H-force, ground effect (`vehicle.aero`, off by default)
+- YAML vehicles: mass, inertia, arm length, limits, propulsion, aero — [vehicles guide](docs/developer/vehicles.md)
 
 ### Guidance
 - **Hold** and **waypoint** missions (interp / min-snap / auto)
@@ -38,7 +39,8 @@
 - Observer-in-the-loop: plant → noisy measurements → filter → controller
 - **`partial_raw`**: naive pack of measured channels (zeros elsewhere) — teaching baseline
 - **`linear_kf`** (hover \(A,B\)) and **`mekf`** (error-state / multiplicative attitude)
-- Sensor stories: GPS+IMU (`pos`+`omega`), AHRS-like (`att`+`omega`), IMU-only (`omega`)
+- Channels: `pos` / `att` / `vel` / `omega`, plus GPS-denied **`body_vel` (optical-flow proxy)**, **`alt`**, `vel_xy`
+- Sensor stories: GPS+IMU, AHRS, **flow+altitude**, IMU-only — same matrix for LQR/LQG and PID
 - Estimates logged as `x_hat` — [estimation guide](docs/developer/estimation.md)
 
 ### Studies, robustness & systems

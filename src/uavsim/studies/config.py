@@ -79,7 +79,10 @@ class ObserverConfig(BaseModel):
     att_sigma_rad: float = Field(default=0.02, ge=0)
     omega_sigma_rad_s: float = Field(default=0.05, ge=0)
     process_sigma: float = Field(default=0.02, ge=0)
-    # Partial-state channels, e.g. ["pos", "omega"] or full default
+    # Optional overrides (default: reuse pos/vel sigmas)
+    alt_sigma_m: float | None = Field(default=None, ge=0)
+    body_vel_sigma_m_s: float | None = Field(default=None, ge=0)
+    # Partial channels, e.g. ["pos", "omega"] or GPS-denied ["body_vel", "alt", "omega"]
     channels: list[str] | None = None
 
 

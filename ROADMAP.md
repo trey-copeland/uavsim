@@ -61,6 +61,7 @@ Ship when SPEC §17 holds, especially:
 | HIL test rig (hardware order/build) | **In progress (parallel, long lead)** |
 | Motors / mixer (D-7, D-8) | **Done** (`sim.plant: motors`, figure_eight_motors) |
 | Drag / aero / ground effect (D-4, D-5) | **Done** (`AeroParams`, figure_eight_aero, hover_ground_effect) |
+| GPS-denied flow + altitude sensing (EST-6) | **Done** (`body_vel`/`alt`, flow_alt showcase column) |
 | Next SIL: flex (D-13 / V-7) | **Now** (Track A) |
 | Phase 6 nav / Phase 7 HIL software | **Not started** (nav after plant fidelity as needed; HIL when rig ready) |
 
@@ -104,12 +105,13 @@ Do **not** stall Track A on Track B. Keep HIL **seams** (fixed-step, I/O schemas
 1. Keep showcase / gentle figure-eight as regression baseline.  
 2. ~~**Motor dynamics + mixer** (D-7, D-8)~~ — **Done** (`sim.plant: motors`).  
 3. ~~**Drag / aero / ground effect** (D-4, D-5)~~ — **Done** (`dynamics/aero.py`).  
-4. **Flexible / elastic plant** (V-7 / D-13) — next fidelity.  
-5. Optional: native 13-state export polish (not blocking).
+4. ~~**GPS-denied flow + altitude** (EST-6)~~ — **Done** (`body_vel`/`alt` channels + showcase).  
+5. **Flexible / elastic plant** (V-7 / D-13) — next fidelity.  
+6. Optional: native 13-state export polish (not blocking).
 
 ### Next (Track A, still SIL)
 1. Phase 6 non-waypoint guidance if mission design needs it more than plant fidelity.  
-2. Deeper estimation (real IMU models, sensor fusion polish) as HIL approaches.
+2. Deeper estimation (EST-7/8: state-dep. flow \(H\), accel-aided MEKF) as HIL approaches.
 
 ### Later / when rig is ready (Track B + Phase 7)
 1. Companion project: NATS/MQTT, high-rate accels, ESC RPM (COMM-*, INSTR-1).  

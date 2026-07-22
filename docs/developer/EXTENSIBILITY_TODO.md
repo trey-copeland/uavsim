@@ -36,7 +36,7 @@ Guide: [vehicles.md](vehicles.md) · [airframes.md](airframes.md)
 | C-6 | Export / load for LQR + PID | **Done** | |
 | C-7 | Export for arbitrary new laws | **Partial** | Must extend export module |
 | C-8 | Geometric / SE(3) controller | **TODO** | |
-| C-9 | Partial-state / noisy measurements | **Done** | Noise + `channels` selection / \(H\); richer IMU physics still open |
+| C-9 | Partial-state / noisy measurements | **Done** | Noise + channels / \(H\); `body_vel`+`alt` GPS-denied; richer IMU physics still open |
 | C-10 | Entry-point plugins for third-party laws | **TODO** | |
 | C-11 | Control from state estimate (not only x_true) | **Done** | Closed-loop: plant → measure → observer → controller |
 
@@ -51,10 +51,13 @@ Guide: [control.md](control.md)
 | EST-1 | Configurable measurement models (noise) | **Done** | Full or partial channels; `Observation` + H |
 | EST-2 | `StateObserver` protocol (predict / update) | **Done** | Wired in closed-loop |
 | EST-3 | Reference filter implementation | **Done** | `linear_kf` (hover A,B) + `mekf` (error-state / multiplicative att) |
-| EST-4 | Study config `sim.observer` | **Done** | `none` \| `linear_kf` \| `mekf`; `channels` list |
+| EST-4 | Study config `sim.observer` | **Done** | `none` \| `linear_kf` \| `mekf` \| `partial_raw`; `channels` list |
 | EST-5 | Log `x_hat` in run artifacts | **Done** | `nominal/timeseries.npz` key `x_hat` |
+| EST-6 | GPS-denied flow + altitude channels | **Done** | `body_vel` / `alt` / `vel_xy`; demos `figure_eight_flow_alt_*` |
+| EST-7 | Body-frame \(H(x)\) / EKF Jacobian for flow | **TODO** | Hover-linear \(H\) today; optional state-dep. \(R^\top\) |
+| EST-8 | Accel-aided MEKF / true IMU physics | **TODO** | As HIL approaches |
 
-Demos: `figure_eight_observer.yaml`, `figure_eight_mekf.yaml` (partial `pos`+`omega`).
+Demos: GPS+IMU / AHRS / **flow+alt** / IMU-only matrix; `figure_eight_mekf.yaml`.
 
 ---
 

@@ -10,11 +10,13 @@ Single-page React app for the portfolio base case: a **controller × sensor** ma
 | GPS+IMU naive → LQR | `figure_eight_gps_imu_naive.yaml` | `pos`+`omega`, zeros elsewhere → LQR |
 | GPS+IMU LQG | `figure_eight_gps_imu_lqg.yaml` | Same sensors → linear KF → LQR |
 | AHRS LQG | `figure_eight_ahrs_lqg.yaml` | GPS-denied: `att`+`omega` |
+| **Flow+alt LQG** | **`figure_eight_flow_alt_lqg.yaml`** | **`body_vel`+`alt`+`omega` → KF → LQR** |
 | IMU-only LQG | `figure_eight_imu_only_lqg.yaml` | Rates only — position not observable |
 | Ideal PID | `figure_eight_pid.yaml` | Full-state cascade |
 | GPS+IMU naive → PID | `figure_eight_gps_imu_naive_pid.yaml` | Same incomplete bus as LQR naive |
 | GPS+IMU KF → PID | `figure_eight_gps_imu_kf_pid.yaml` | linear KF → PID (not classical LQG) |
 | AHRS KF → PID | `figure_eight_ahrs_kf_pid.yaml` | `att`+`omega` → KF → PID |
+| **Flow+alt KF → PID** | **`figure_eight_flow_alt_kf_pid.yaml`** | **Same flow+alt stack → PID** |
 | IMU-only KF → PID | `figure_eight_imu_only_kf_pid.yaml` | Rates only → KF → PID |
 | MC | `figure_eight_gps_imu_lqg_mc.yaml` | Mass/inertia/arm under GPS+IMU LQG |
 | **Overview** tab | matrix grid | Law × sensors RMSE cards |
@@ -22,7 +24,8 @@ Single-page React app for the portfolio base case: a **controller × sensor** ma
 
 Mission: [`configs/missions/figure_eight.yaml`](../../configs/missions/figure_eight.yaml) — constant yaw, ≥4 s segments, altitude undulation.
 
-**Naming:** LQG = linear KF + hover LQR. PID+KF is the cascade on \(\hat x\), not classical LQG.
+**Naming:** LQG = linear KF + hover LQR. PID+KF is the cascade on \(\hat x\), not classical LQG.  
+**Flow+alt:** body-frame velocity (optical-flow *proxy*) + NED \(z\) altitude + gyro — practical GPS-denied teaching column.
 
 Data lives in `data/showcase.json` (browser-safe, downsampled). No build step: React + Plotly load from CDN.
 
@@ -61,4 +64,6 @@ If the live site looks stale after a green **Pages showcase** run:
 - **Overview** — controller × sensor RMSE grid + MC card  
 - **Estimation** — grouped RMSE bars (LQR/LQG vs PID) + scenario table  
 - **Flight 3D** — rotate/zoom path, scrub time, velocity vector, strip charts  
-- **Metrics / Monte Carlo / Compare / Envelope** — as before  
+- **Metrics / Monte Carlo / Envelope** — as before  
+- **Compare** — pick any two runs (A/B) for metric deltas + path overlay  
+

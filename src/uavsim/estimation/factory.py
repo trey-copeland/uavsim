@@ -26,6 +26,8 @@ def _params_from_cfg(observer_cfg: Any) -> tuple[str, dict[str, Any]]:
             "att_sigma_rad": getattr(observer_cfg, "att_sigma_rad", 0.02),
             "omega_sigma_rad_s": getattr(observer_cfg, "omega_sigma_rad_s", 0.05),
             "process_sigma": getattr(observer_cfg, "process_sigma", 0.02),
+            "alt_sigma_m": getattr(observer_cfg, "alt_sigma_m", None),
+            "body_vel_sigma_m_s": getattr(observer_cfg, "body_vel_sigma_m_s", None),
             "channels": getattr(observer_cfg, "channels", None),
         }
     if isinstance(observer_cfg, dict):
@@ -59,12 +61,16 @@ def build_observer(
 
     ch_list = list(channels) if channels else list(DEFAULT_CHANNELS)
     common["channels"] = ch_list
+    alt_sigma = params.get("alt_sigma_m")
+    body_vel_sigma = params.get("body_vel_sigma_m_s")
     meas = MeasurementModel(
         seed=int(params.get("seed", 0)),
         pos_sigma_m=common["pos_sigma_m"],
         vel_sigma_m_s=common["vel_sigma_m_s"],
         att_sigma_rad=common["att_sigma_rad"],
         omega_sigma_rad_s=common["omega_sigma_rad_s"],
+        alt_sigma_m=None if alt_sigma is None else float(alt_sigma),
+        body_vel_sigma_m_s=None if body_vel_sigma is None else float(body_vel_sigma),
         channels=ch_list,
     )
 

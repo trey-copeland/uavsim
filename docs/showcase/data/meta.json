@@ -1,17 +1,19 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-22T01:53:50.939326+00:00",
+  "generated_at": "2026-07-22T02:14:00.953246+00:00",
   "uavsim_version": "0.1.0",
   "runs": [
     "figure_eight_lqr",
     "gps_imu_naive",
     "gps_imu_lqg",
     "ahrs_lqg",
+    "flow_alt_lqg",
     "imu_only_lqg",
     "figure_eight_pid",
     "gps_imu_naive_pid",
     "gps_imu_kf_pid",
     "ahrs_kf_pid",
+    "flow_alt_kf_pid",
     "imu_only_kf_pid",
     "gps_imu_lqg_mc"
   ],

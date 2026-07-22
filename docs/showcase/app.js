@@ -12,6 +12,8 @@
       parts.push(e("span", { key: "n", className: "badge naive" }, "naive"));
     else if (role.includes("imu_only"))
       parts.push(e("span", { key: "i", className: "badge weak" }, "IMU-only"));
+    else if (role.includes("flow"))
+      parts.push(e("span", { key: "f", className: "badge ahrs" }, "flow+alt"));
     else if (role.includes("ahrs"))
       parts.push(e("span", { key: "a", className: "badge ahrs" }, "AHRS"));
     else if (role.includes("lqg"))
@@ -136,23 +138,68 @@
     };
   }
 
+  /** Plotly config: modebar on hover so tools never permanently cover titles. */
+  const DEFAULT_PLOT_CONFIG = {
+    responsive: true,
+    displayModeBar: "hover",
+    displaylogo: false,
+    modeBarButtonsToRemove: ["lasso2d", "select2d", "autoScale2d"],
+  };
+
+  function extractPlotCaption(layout) {
+    if (!layout || layout.title == null) return { caption: null, layout: layout || {} };
+    const t = layout.title;
+    let caption = null;
+    if (typeof t === "string") caption = t;
+    else if (t && typeof t.text === "string") caption = t.text;
+    const next = Object.assign({}, layout);
+    delete next.title;
+    return { caption: caption, layout: next };
+  }
+
+  function withPlotMargins(layout) {
+    const base = { t: 28, r: 18, b: 44, l: 54 };
+    const m = Object.assign({}, base, (layout && layout.margin) || {});
+    // Never let callers clip the top under residual modebar chrome
+    if (m.t < 20) m.t = 20;
+    return Object.assign({}, layout, { margin: m });
+  }
+
   function PlotDiv({ id, data, layout, config }) {
     const ref = useRef(null);
+    const extracted = extractPlotCaption(layout);
+    const caption = extracted.caption;
+    let finalLayout = withPlotMargins(extracted.layout);
+    // Title moved to HTML caption — reclaim Plotly top margin reserved for gtitle
+    if (caption && finalLayout.margin && finalLayout.margin.t > 28) {
+      finalLayout = Object.assign({}, finalLayout, {
+        margin: Object.assign({}, finalLayout.margin, { t: 24 }),
+      });
+    }
+    const finalConfig = Object.assign({}, DEFAULT_PLOT_CONFIG, config || {});
+
     useEffect(() => {
       if (!ref.current || !window.Plotly) return;
-      Plotly.react(
-        ref.current,
-        data,
-        layout,
-        config || { responsive: true, displayModeBar: true }
-      );
-    }, [id, data, layout]);
+      Plotly.react(ref.current, data, finalLayout, finalConfig);
+    }, [id, data, layout, config]);
     useEffect(() => {
       return () => {
         if (ref.current && window.Plotly) Plotly.purge(ref.current);
       };
     }, [id]);
-    return e("div", { className: "plot", ref, id });
+
+    return e(
+      "div",
+      { className: "plot-wrap" },
+      caption
+        ? e("h3", { className: "plot-caption" }, caption)
+        : null,
+      e("div", {
+        className: "plot" + (caption ? " plot-has-caption" : ""),
+        ref: ref,
+        id: id,
+      })
+    );
   }
 
   /**
@@ -326,7 +373,8 @@
 
       Plotly.newPlot(ref.current, traces, layout, {
         responsive: true,
-        displayModeBar: true,
+        displayModeBar: "hover",
+        displaylogo: false,
       }).then(function () {
         ready.current = true;
         applyFrame(0);
@@ -359,6 +407,22 @@
     const rowDefs = (matrix && matrix.rows) || null;
     const scenarios = (matrix && matrix.scenarios) || [];
 
+    function fmtRmse(v) {
+      if (v === null || v === undefined || !Number.isFinite(+v)) return "—";
+      const x = +v;
+      // Keep digit bands similar width across the grid
+      if (x >= 100) return x.toFixed(0);
+      if (x >= 10) return x.toFixed(1);
+      return x.toFixed(3);
+    }
+    function fmtMaxE(v) {
+      if (v === null || v === undefined || !Number.isFinite(+v)) return "—";
+      const x = +v;
+      if (x >= 100) return x.toFixed(0);
+      if (x >= 10) return x.toFixed(1);
+      return x.toFixed(2);
+    }
+
     function cellCard(sc) {
       if (!sc) {
         return e("div", { className: "matrix-cell empty", key: "empty" }, "—");
@@ -386,14 +450,14 @@
         e(
           "div",
           { className: "stat matrix-rmse" },
-          fmt(m.rmse_position_m, 3),
+          fmtRmse(m.rmse_position_m),
           e("span", null, "RMSE [m]")
         ),
         e(
           "p",
           { className: "matrix-meta" },
           "max |e| ",
-          fmt(m.max_position_error_m, 2),
+          fmtMaxE(m.max_position_error_m),
           " · ",
           e("span", { className: ok ? "ok" : "fail" }, ok === true ? "ok" : ok === false ? "fail" : "—")
         )
@@ -428,6 +492,14 @@
                 "table",
                 { className: "controller-matrix" },
                 e(
+                  "colgroup",
+                  null,
+                  e("col", { className: "row-head" }),
+                  columns.map(function (c) {
+                    return e("col", { key: c.id, className: "sensor" });
+                  })
+                ),
+                e(
                   "thead",
                   null,
                   e(
@@ -438,10 +510,10 @@
                       return e(
                         "th",
                         { key: c.id },
-                        e("div", null, c.label),
+                        e("div", { className: "col-label" }, c.label),
                         e(
                           "div",
-                          { className: "col-sub" },
+                          { className: "col-sub", title: c.sensors || "" },
                           c.sensors || ""
                         )
                       );
@@ -1096,17 +1168,196 @@
     );
   }
 
+  const COMPARE_METRIC_KEYS = [
+    "rmse_position_m",
+    "max_position_error_m",
+    "final_position_error_m",
+    "time_in_bounds_frac",
+    "rmse_attitude_rad",
+    "max_attitude_error_rad",
+    "rmse_velocity_m_s",
+    "control_effort_proxy",
+    "peak_thrust_n",
+    "peak_torque_nm",
+    "success",
+    "sim_success",
+    "observer_id",
+  ];
+
+  function computeClientDeltas(metricsA, metricsB) {
+    const ma = metricsA || {};
+    const mb = metricsB || {};
+    const rows = [];
+    COMPARE_METRIC_KEYS.forEach(function (key) {
+      if (!(key in ma) && !(key in mb)) return;
+      const va = ma[key];
+      const vb = mb[key];
+      if (typeof va === "boolean" || typeof vb === "boolean") {
+        rows.push({ metric: key, a: va, b: vb, delta: null });
+        return;
+      }
+      if (typeof va === "string" || typeof vb === "string") {
+        rows.push({ metric: key, a: va, b: vb, delta: null });
+        return;
+      }
+      const fa = Number(va);
+      const fb = Number(vb);
+      if (Number.isFinite(fa) && Number.isFinite(fb)) {
+        rows.push({ metric: key, a: fa, b: fb, delta: fb - fa });
+      } else {
+        rows.push({ metric: key, a: va, b: vb, delta: null });
+      }
+    });
+    return rows;
+  }
+
   function CompareTab({ doc }) {
-    const cmp = doc.compare;
-    if (!cmp) return e("div", { className: "card" }, "No compare pair in this gallery.");
-    const a = (doc.runs || []).find((r) => r.id === cmp.a);
-    const b = (doc.runs || []).find((r) => r.id === cmp.b);
-    if (!a || !b || !a.timeseries || !b.timeseries) {
-      return e("div", { className: "card" }, "Compare runs missing timeseries.");
+    const runs = doc.runs || [];
+    // Prefer runs with metrics; timeseries optional for path overlay
+    const candidates = runs.filter(function (r) {
+      return r && r.metrics;
+    });
+    const defaults = doc.compare || {};
+    const defaultA =
+      (defaults.a && candidates.some(function (r) {
+        return r.id === defaults.a;
+      })
+        ? defaults.a
+        : null) ||
+      (candidates[0] && candidates[0].id) ||
+      "";
+    const defaultB =
+      (defaults.b && candidates.some(function (r) {
+        return r.id === defaults.b;
+      })
+        ? defaults.b
+        : null) ||
+      (candidates[1] && candidates[1].id) ||
+      (candidates[0] && candidates[0].id) ||
+      "";
+
+    const [idA, setIdA] = useState(defaultA);
+    const [idB, setIdB] = useState(defaultB);
+
+    // If gallery data reloads with new defaults and state is empty
+    useEffect(
+      function () {
+        if (!idA && defaultA) setIdA(defaultA);
+        if (!idB && defaultB) setIdB(defaultB);
+      },
+      [defaultA, defaultB]
+    );
+
+    if (!candidates.length) {
+      return e("div", { className: "card" }, "No runs with metrics to compare.");
     }
-    const pa = a.timeseries.pos_plot;
-    const pb = b.timeseries.pos_plot;
-    const rows = (cmp.deltas && cmp.deltas.rows) || [];
+
+    const a = candidates.find(function (r) {
+      return r.id === idA;
+    }) || candidates[0];
+    const b = candidates.find(function (r) {
+      return r.id === idB;
+    }) || candidates[Math.min(1, candidates.length - 1)];
+
+    const labelA = a.label || a.id;
+    const labelB = b.label || b.id;
+    const rows = computeClientDeltas(a.metrics, b.metrics);
+    const highlight = [
+      "rmse_position_m",
+      "max_position_error_m",
+      "success",
+      "control_effort_proxy",
+      "rmse_attitude_rad",
+      "observer_id",
+    ];
+    const primaryRows = rows.filter(function (r) {
+      return highlight.indexOf(r.metric) >= 0;
+    });
+    const otherRows = rows.filter(function (r) {
+      return highlight.indexOf(r.metric) < 0;
+    });
+
+    const hasPath =
+      a.timeseries &&
+      a.timeseries.pos_plot &&
+      b.timeseries &&
+      b.timeseries.pos_plot;
+
+    function runSelect(which, value, onChange) {
+      return e(
+        "label",
+        { className: "compare-pick" },
+        e("span", { className: "compare-pick-label" }, which),
+        e(
+          "select",
+          {
+            value: value,
+            onChange: function (ev) {
+              onChange(ev.target.value);
+            },
+            "aria-label": "Compare " + which,
+          },
+          candidates.map(function (r) {
+            return e(
+              "option",
+              { key: r.id, value: r.id },
+              r.label || r.id
+            );
+          })
+        )
+      );
+    }
+
+    function swapAB() {
+      const prevA = idA;
+      setIdA(idB);
+      setIdB(prevA);
+    }
+
+    function metricTable(tableRows, caption) {
+      if (!tableRows.length) return null;
+      return e(
+        "div",
+        { className: "table-wrap", style: { marginTop: caption ? "0.75rem" : 0 } },
+        caption
+          ? e(
+              "h3",
+              { style: { margin: "0 0 0.5rem", fontSize: "0.9rem", color: "var(--muted)" } },
+              caption
+            )
+          : null,
+        e(
+          "table",
+          { className: "metrics" },
+          e(
+            "thead",
+            null,
+            e(
+              "tr",
+              null,
+              e("th", null, "metric"),
+              e("th", null, "A · " + labelA),
+              e("th", null, "B · " + labelB),
+              e("th", null, "Δ (B−A)")
+            )
+          ),
+          e(
+            "tbody",
+            null,
+            tableRows.map(function (r) {
+              return e(
+                "tr",
+                { key: r.metric },
+                e("td", null, r.metric),
+                e("td", null, fmt(r.a, 5)),
+                e("td", null, fmt(r.b, 5)),
+                e("td", null, r.delta == null ? "—" : fmt(r.delta, 5))
+              );
+            })
+          )
+        )
+      );
+    }
 
     return e(
       "div",
@@ -1114,94 +1365,134 @@
       e(
         "div",
         { className: "card", style: { gridColumn: "1 / -1" } },
-        e("h2", null, "Controller compare: ", cmp.label_a, " vs ", cmp.label_b),
+        e("h2", null, "Compare runs"),
         e(
-          "table",
-          { className: "metrics" },
+          "p",
+          { style: { color: "var(--muted)", fontSize: "0.9rem", marginTop: 0 } },
+          "Pick any two gallery runs. Metrics are B − A. Path overlay needs timeseries on both."
+        ),
+        e(
+          "div",
+          { className: "row compare-controls" },
+          runSelect("A", a.id, setIdA),
           e(
-            "thead",
-            null,
-            e("tr", null, e("th", null, "metric"), e("th", null, "A"), e("th", null, "B"), e("th", null, "Δ (B−A)"))
+            "button",
+            {
+              type: "button",
+              className: "btn-swap",
+              onClick: swapAB,
+              title: "Swap A and B",
+            },
+            "⇄ Swap"
           ),
-          e(
-            "tbody",
-            null,
-            rows
-              .filter((r) => ["rmse_position_m", "max_position_error_m", "success", "control_effort_proxy"].includes(r.metric))
-              .map((r) =>
-                e(
-                  "tr",
-                  { key: r.metric },
-                  e("td", null, r.metric),
-                  e("td", null, fmt(r.a, 5)),
-                  e("td", null, fmt(r.b, 5)),
-                  e("td", null, fmt(r.delta, 5))
-                )
-              )
-          )
-        )
+          runSelect("B", b.id, setIdB)
+        ),
+        a.id === b.id
+          ? e(
+              "p",
+              { style: { color: "var(--warn)", fontSize: "0.85rem" } },
+              "A and B are the same run — choose a different pair to see deltas."
+            )
+          : null,
+        metricTable(primaryRows, null),
+        metricTable(otherRows, "More metrics")
       ),
-      e("div", { className: "card", style: { gridColumn: "1 / -1" } }, e(PlotDiv, {
-        id: "cmp3d",
-        data: (function () {
-          const b = fitSceneBounds([pa, pb]);
-          return [
-            cornerTrace(b),
-            {
-              type: "scatter3d",
-              mode: "lines",
-              x: pa.map(function (p) {
-                return p[0];
-              }),
-              y: pa.map(function (p) {
-                return p[1];
-              }),
-              z: pa.map(function (p) {
-                return p[2];
-              }),
-              line: { color: "#3d9cf0", width: 5 },
-              name: cmp.label_a,
-            },
-            {
-              type: "scatter3d",
-              mode: "lines",
-              x: pb.map(function (p) {
-                return p[0];
-              }),
-              y: pb.map(function (p) {
-                return p[1];
-              }),
-              z: pb.map(function (p) {
-                return p[2];
-              }),
-              line: { color: "#e6b450", width: 4, dash: "dash" },
-              name: cmp.label_b,
-            },
-          ];
-        })(),
-        layout: (function () {
-          const b = fitSceneBounds([pa, pb]);
-          return {
-            title: "Path overlay (N, E, up=−D)",
-            paper_bgcolor: "#0c1018",
-            plot_bgcolor: "#0c1018",
-            font: { color: "#e7ecf3", size: 11 },
-            height: 480,
-            margin: { t: 40, r: 0, b: 0, l: 0 },
-            uirevision: "compare-paths",
-            scene: {
-              xaxis: { title: "N", gridcolor: "#2d3a4d", range: b.x, autorange: false },
-              yaxis: { title: "E", gridcolor: "#2d3a4d", range: b.y, autorange: false },
-              zaxis: { title: "up", gridcolor: "#2d3a4d", range: b.z, autorange: false },
-              aspectmode: "manual",
-              aspectratio: b.ar,
-              bgcolor: "#0c1018",
-              camera: { eye: { x: 2.4, y: 2.4, z: 1.55 } },
-            },
-            legend: { orientation: "h" },
-          };
-        })(),
-      }))
+      hasPath
+        ? e(
+            "div",
+            { className: "card", style: { gridColumn: "1 / -1" } },
+            e(PlotDiv, {
+              id: "cmp3d-" + a.id + "-" + b.id,
+              data: (function () {
+                const pa = a.timeseries.pos_plot;
+                const pb = b.timeseries.pos_plot;
+                const bounds = fitSceneBounds([pa, pb]);
+                return [
+                  cornerTrace(bounds),
+                  {
+                    type: "scatter3d",
+                    mode: "lines",
+                    x: pa.map(function (p) {
+                      return p[0];
+                    }),
+                    y: pa.map(function (p) {
+                      return p[1];
+                    }),
+                    z: pa.map(function (p) {
+                      return p[2];
+                    }),
+                    line: { color: "#3d9cf0", width: 5 },
+                    name: labelA,
+                  },
+                  {
+                    type: "scatter3d",
+                    mode: "lines",
+                    x: pb.map(function (p) {
+                      return p[0];
+                    }),
+                    y: pb.map(function (p) {
+                      return p[1];
+                    }),
+                    z: pb.map(function (p) {
+                      return p[2];
+                    }),
+                    line: { color: "#e6b450", width: 4, dash: "dash" },
+                    name: labelB,
+                  },
+                ];
+              })(),
+              layout: (function () {
+                const pa = a.timeseries.pos_plot;
+                const pb = b.timeseries.pos_plot;
+                const bounds = fitSceneBounds([pa, pb]);
+                return {
+                  title: "Path overlay (N, E, up=−D)",
+                  paper_bgcolor: "#0c1018",
+                  plot_bgcolor: "#0c1018",
+                  font: { color: "#e7ecf3", size: 11 },
+                  height: 480,
+                  margin: { t: 40, r: 0, b: 0, l: 0 },
+                  uirevision: "compare-paths-" + a.id + "-" + b.id,
+                  scene: {
+                    xaxis: {
+                      title: "N",
+                      gridcolor: "#2d3a4d",
+                      range: bounds.x,
+                      autorange: false,
+                    },
+                    yaxis: {
+                      title: "E",
+                      gridcolor: "#2d3a4d",
+                      range: bounds.y,
+                      autorange: false,
+                    },
+                    zaxis: {
+                      title: "up",
+                      gridcolor: "#2d3a4d",
+                      range: bounds.z,
+                      autorange: false,
+                    },
+                    aspectmode: "manual",
+                    aspectratio: bounds.ar,
+                    bgcolor: "#0c1018",
+                    camera: { eye: { x: 2.4, y: 2.4, z: 1.55 } },
+                  },
+                  legend: { orientation: "h" },
+                };
+              })(),
+            })
+          )
+        : e(
+            "div",
+            { className: "card", style: { gridColumn: "1 / -1" } },
+            e("h3", null, "Path overlay"),
+            e(
+              "p",
+              { style: { color: "var(--muted)", margin: 0 } },
+              "One or both selected runs have no timeseries in the gallery payload ",
+              "(e.g. Monte Carlo-only cards). Metrics above still compare."
+            )
+          )
     );
   }
 
@@ -1388,7 +1679,8 @@
             "li",
             null,
             e("strong", null, "GPS-denied: "),
-            "AHRS (att+ω) stays finite; IMU-only (ω) cannot observe position for either controller."
+            "Flow+alt (body velocity + height + gyro) is the practical win; ",
+            "AHRS (att+ω) stays finite but weaker; IMU-only (ω) cannot observe position."
           ),
           e(
             "li",

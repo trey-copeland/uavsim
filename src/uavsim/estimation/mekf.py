@@ -16,6 +16,7 @@ from uavsim.dynamics.rotations import (
     rotation_body_to_inertial_quat,
 )
 from uavsim.estimation.channels import (
+    channel_dim,
     measurement_noise_diag,
     normalize_channels,
     pack_measurement,
@@ -168,7 +169,8 @@ class ErrorStateMekf:
         # Multiplicative attitude residual for att block in channel order
         offset = 0
         for ch in obs.channels:
-            if ch == "att":
+            d = channel_dim(ch)
+            if ch == "att" and d == 3:
                 eul_meas = y[offset : offset + 3]
                 q_meas = euler_to_quat(float(eul_meas[0]), float(eul_meas[1]), float(eul_meas[2]))
                 q_err = quat_multiply(quat_conjugate(self._q), q_meas)
@@ -176,10 +178,7 @@ class ErrorStateMekf:
                     q_err = -q_err
                 dth = 2.0 * q_err[1:4]
                 innov[offset : offset + 3] = dth
-            if ch == "omega":
-                # Direct rate blend handled after KF step
-                pass
-            offset += 3
+            offset += d
 
         if np.linalg.norm(h_e) > 1e-15:
             s = h_e @ self._p_cov @ h_e.T + r + np.eye(m_rows) * 1e-12
@@ -195,8 +194,9 @@ class ErrorStateMekf:
         if "omega" in obs.channels:
             offset = 0
             for ch in obs.channels:
+                d = channel_dim(ch)
                 if ch == "omega":
-                    y_w = y[offset : offset + 3]
+                    y_w = y[offset : offset + d]
                     self._omega = 0.5 * self._omega + 0.5 * y_w
-                offset += 3
+                offset += d
         return self.x_hat

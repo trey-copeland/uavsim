@@ -37,6 +37,11 @@ BASE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
         "est_ahrs_lqg",
     ),
     (
+        "configs/studies/figure_eight_flow_alt_lqg.yaml",
+        "flow_alt_lqg",
+        "est_flow_alt_lqg",
+    ),
+    (
         "configs/studies/figure_eight_imu_only_lqg.yaml",
         "imu_only_lqg",
         "est_imu_only_lqg",
@@ -57,6 +62,11 @@ BASE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
         "configs/studies/figure_eight_ahrs_kf_pid.yaml",
         "ahrs_kf_pid",
         "est_ahrs_kf_pid",
+    ),
+    (
+        "configs/studies/figure_eight_flow_alt_kf_pid.yaml",
+        "flow_alt_kf_pid",
+        "est_flow_alt_kf_pid",
     ),
     (
         "configs/studies/figure_eight_imu_only_kf_pid.yaml",
@@ -92,6 +102,11 @@ _EST_COLUMNS: list[dict[str, str]] = [
         "sensors": "att + omega (noisy)",
     },
     {
+        "id": "flow_alt",
+        "label": "GPS-denied flow+alt",
+        "sensors": "body_vel + alt + omega",
+    },
+    {
         "id": "imu_only",
         "label": "GPS-denied IMU-only",
         "sensors": "omega only (noisy)",
@@ -104,10 +119,11 @@ ESTIMATION_MATRIX: dict[str, Any] = {
     "description": (
         "Same elevated figure-eight for every cell. "
         "Rows: hover LQR (with KF = classic LQG) vs PID cascade. "
-        "Columns: full-state ideal, GPS+IMU naive (partial zeros on the bus), "
-        "GPS+IMU with linear KF, AHRS-like (att+ω), IMU-only (ω). "
-        "KF uses the hover linear model; it does not invent GPS when position "
-        "is unmeasured. Compare laws across a column — not only LQR vs PID ideal."
+        "Columns: full-state ideal, GPS+IMU naive, GPS+IMU + KF, AHRS-like (att+ω), "
+        "optical-flow proxy + altitude + gyro (body_vel+alt+ω), IMU-only (ω). "
+        "KF uses the hover linear model; it does not invent GPS. "
+        "Flow+alt is the practical GPS-denied win over AHRS/IMU-only. "
+        "Compare laws down a column — not only ideal LQR vs PID."
     ),
     "columns": _EST_COLUMNS,
     "rows": [
@@ -157,6 +173,19 @@ ESTIMATION_MATRIX: dict[str, Any] = {
             "lesson": (
                 "No GPS: attitude+rates still let the KF help; "
                 "position tracking degrades but stays finite vs naive blow-up."
+            ),
+        },
+        {
+            "id": "flow_alt_lqg",
+            "column": "flow_alt",
+            "controller": "lqr",
+            "label": "Flow+alt LQG",
+            "sensors": "body_vel + alt + omega",
+            "method": "linear_kf → LQR",
+            "run_id": "flow_alt_lqg",
+            "lesson": (
+                "Practical GPS-denied stack: body velocity (optical-flow proxy) "
+                "+ altitude + gyro. Better path hold than AHRS; still no global XY GPS."
             ),
         },
         {
@@ -212,6 +241,16 @@ ESTIMATION_MATRIX: dict[str, Any] = {
             "method": "linear_kf → PID",
             "run_id": "ahrs_kf_pid",
             "lesson": "GPS-denied with attitude reference; compare RMSE to AHRS LQG.",
+        },
+        {
+            "id": "flow_alt_kf_pid",
+            "column": "flow_alt",
+            "controller": "pid",
+            "label": "Flow+alt KF → PID",
+            "sensors": "body_vel + alt + omega",
+            "method": "linear_kf → PID",
+            "run_id": "flow_alt_kf_pid",
+            "lesson": "Same flow+alt sensors as LQG column; cascade on x_hat.",
         },
         {
             "id": "imu_only_kf_pid",
@@ -471,11 +510,13 @@ def generate_base_case_gallery(
         "gps_imu_naive": "GPS+IMU naive → LQR",
         "gps_imu_lqg": "GPS+IMU LQG",
         "ahrs_lqg": "AHRS LQG",
+        "flow_alt_lqg": "Flow+alt LQG",
         "imu_only_lqg": "IMU-only LQG",
         "figure_eight_pid": "Ideal PID (full state)",
         "gps_imu_naive_pid": "GPS+IMU naive → PID",
         "gps_imu_kf_pid": "GPS+IMU KF → PID",
         "ahrs_kf_pid": "AHRS KF → PID",
+        "flow_alt_kf_pid": "Flow+alt KF → PID",
         "imu_only_kf_pid": "IMU-only KF → PID",
         "gps_imu_lqg_mc": "GPS+IMU LQG Monte Carlo",
     }
@@ -527,9 +568,9 @@ def generate_base_case_gallery(
         title="uavsim · flight results",
         description=(
             "Figure-eight SIL: controller × sensor matrix (LQR/LQG and PID × "
-            "ideal, GPS+IMU naive, GPS+IMU KF, AHRS, IMU-only), Monte Carlo on "
-            "GPS+IMU LQG, and a time-scale envelope for hover-linearization "
-            "limits. Simulation only."
+            "ideal, GPS+IMU naive/KF, AHRS, optical-flow+altitude, IMU-only), "
+            "Monte Carlo on GPS+IMU LQG, and a time-scale envelope for "
+            "hover-linearization limits. Simulation only."
         ),
         # Primary compare: naive vs LQG on same sensors (teaching win)
         compare_ids=("gps_imu_naive", "gps_imu_lqg"),
