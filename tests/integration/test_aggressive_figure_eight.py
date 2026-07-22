@@ -13,7 +13,8 @@ STUDY = ROOT / "configs" / "studies" / "figure_eight_aggressive.yaml"
 def test_aggressive_figure_eight_quat_tracks(tmp_path: Path) -> None:
     """
     Faster path + altitude undulation under LQR + quat plant.
-    Soft band: must remain bounded/successful; RMSE higher than gentle F8.
+    Soft upper band catches divergence; with correct attitude feedforward,
+    RMSE can be low even on the stress path (ideal full-state).
     """
     result = run_nominal_study(STUDY, output_root=tmp_path / "runs", run_mc=False)
     m = result.metrics
@@ -21,6 +22,6 @@ def test_aggressive_figure_eight_quat_tracks(tmp_path: Path) -> None:
     assert result.success is True
     rmse = float(m["rmse_position_m"])
     assert rmse < 0.5, f"RMSE {rmse} m out of soft band"
-    # Stress case should not look like pure hover
-    assert rmse > 0.02
+    # Stress case should not look like pure hover (envelope, not RMSE floor)
+    assert float(m["peak_speed_m_s"]) > 0.5
     assert m.get("attitude_error_model") == "so3_geodesic"

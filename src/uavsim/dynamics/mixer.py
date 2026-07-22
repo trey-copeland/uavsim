@@ -42,16 +42,25 @@ def allocation_matrix(vehicle: VehicleParams) -> np.ndarray:
     B (4×4) such that ``u = B @ f`` with motor forces ``f ≥ 0``.
 
     Rows: total thrust, roll torque, pitch torque, yaw torque.
+
+    Moment rows match FRD geometry with thrust along **−body-z**:
+    ``τ = r × [0, 0, -f]`` ⇒ ``τ_x = -y f``, ``τ_y = x f`` for motor at ``(x, y)``.
+    With X-layout positions ``(±ℓ, ±ℓ)`` (motor 1 FR … 4 FL)::
+
+        roll:  [-ℓ, -ℓ, +ℓ, +ℓ]
+        pitch: [+ℓ, -ℓ, -ℓ, +ℓ]
+
+    Yaw row is reaction torque (``± cq/ct``); motors 1&3 same sign, 2&4 opposite.
     """
     prop = vehicle.propulsion
     ell = lever_arm_m(vehicle)
     k = yaw_force_coeff(prop)
-    # Columns = motors 1..4
+    # Columns = motors 1..4 (FR, RR, RL, FL)
     return np.array(
         [
             [1.0, 1.0, 1.0, 1.0],
+            [-ell, -ell, ell, ell],
             [ell, -ell, -ell, ell],
-            [ell, ell, -ell, -ell],
             [k, -k, k, -k],
         ],
         dtype=float,

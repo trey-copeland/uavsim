@@ -33,3 +33,21 @@ def test_pid_pushes_toward_reference() -> None:
     assert np.isfinite(u).all()
     # Positive pitch torque initially toward +theta demand
     assert u[2] > 0.0
+
+
+def test_pid_altitude_and_east_signs() -> None:
+    vehicle = default_vehicle()
+    ctrl = design_pid_cascade(vehicle)
+    ref = ReferenceSample(t=0.0, x_ref=np.zeros(12))
+
+    # Too deep (NED +z): increase thrust to climb
+    x_z = np.zeros(12)
+    x_z[2] = 1.0
+    u_z = ctrl.compute(0.0, MeasurementBus(t=0.0, x=x_z), ref).u
+    assert u_z[0] > vehicle.hover_thrust_n()
+
+    # East of target → −roll torque (need −φ for −ÿ)
+    x_e = np.zeros(12)
+    x_e[1] = 1.0
+    u_e = ctrl.compute(0.0, MeasurementBus(t=0.0, x=x_e), ref).u
+    assert u_e[1] < 0.0
