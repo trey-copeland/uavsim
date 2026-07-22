@@ -18,10 +18,12 @@ YAML fields map 1:1 to the Pydantic model `VehicleParams`:
 | `vehicle_id` | Short name for manifests / exports | string |
 | `mass_kg` | Mass | kg |
 | `gravity_m_s2` | Gravity magnitude (NED down-positive dynamics use \(+mg\) on \(z\)) | m/s² |
-| `arm_length_m` | Arm length (stored; **mixer not used in core plant yet**) | m |
+| `arm_length_m` | Arm length (mixer D-8) | m |
 | `inertia.ixx_kg_m2` … `izz_kg_m2` | Principal inertia (diagonal only) | kg·m² |
 | `limits.thrust_min_n` / `thrust_max_n` | Total thrust bounds | N |
 | `limits.torque_max_nm` | Symmetric body torque limit on each axis | N·m |
+| `propulsion.*` | Mixer / motors (`ct`, `cq`, τ_m, ω limits) | see default YAML |
+| `aero.*` | Optional drag / prop H / ground effect (**off** by default) | see [dynamics.md](dynamics.md) |
 
 Helpers on the loaded model:
 

@@ -28,3 +28,17 @@ propulsion:
   motor_time_const_s: 0.05
   omega_min_rad_s: 0.0
   omega_max_rad_s: 1200.0
+
+# Aero / environment (D-4/D-5 + ground effect). Defaults off → vacuum plant.
+# Enable on a dedicated vehicle YAML for demos (see default_quadrotor_aero.yaml).
+aero:
+  drag_lin_ns_m: 0.0
+  drag_quad_ns2_m2: 0.0
+  rate_damp_nm_s: 0.0
+  prop_h_s_per_m: 0.0
+  ground_effect: none
+  rotor_radius_m: 0.1
+  ground_z_ned_m: 0.0
+  ge_exp_a: 0.5
+  ge_exp_b: 2.0
+  ge_kappa_max: 3.0

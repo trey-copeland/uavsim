@@ -55,6 +55,33 @@ class PropulsionParams(BaseModel):
     omega_max_rad_s: float = Field(default=1200.0, gt=0)
 
 
+class AeroParams(BaseModel):
+    """
+    Optional aero / environment forces (D-4 / D-5 + ground effect).
+
+    All coefficients default to **off** (zero / ``none``) so existing studies
+    bit-match the vacuum rigid-body plant.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Translational drag in NED: F = -b_lin v - b_quad ||v|| v
+    drag_lin_ns_m: float = Field(default=0.0, ge=0)  # N·s/m
+    drag_quad_ns2_m2: float = Field(default=0.0, ge=0)  # N·s²/m²
+    # Body rate damping τ = -c ω
+    rate_damp_nm_s: float = Field(default=0.0, ge=0)  # N·m·s
+    # Lumped prop H-force in body xy: f_xy = -k_h * T * v_xy  (k_h in s/m)
+    prop_h_s_per_m: float = Field(default=0.0, ge=0)
+    # Ground effect on thrust (κ ≥ 1 near ground)
+    ground_effect: Literal["none", "cheeseman", "exp"] = "none"
+    rotor_radius_m: float = Field(default=0.1, gt=0)
+    # Flat ground plane NED z (z+ down). AGL = ground_z_ned_m - z.
+    ground_z_ned_m: float = 0.0
+    ge_exp_a: float = Field(default=0.5, ge=0)  # exp model: 1 + a e^{-b h/R}
+    ge_exp_b: float = Field(default=2.0, ge=0)
+    ge_kappa_max: float = Field(default=3.0, gt=1.0)
+
+
 class VehicleParams(BaseModel):
     """Physical params + limits. Does not own equations of motion."""
 
@@ -68,6 +95,7 @@ class VehicleParams(BaseModel):
     inertia: InertiaParams
     limits: ActuatorLimits
     propulsion: PropulsionParams = Field(default_factory=PropulsionParams)
+    aero: AeroParams = Field(default_factory=AeroParams)
 
     @property
     def m(self) -> float:
@@ -114,4 +142,5 @@ def default_vehicle() -> VehicleParams:
             torque_max_nm=1.0,
         ),
         propulsion=PropulsionParams(),
+        aero=AeroParams(),
     )

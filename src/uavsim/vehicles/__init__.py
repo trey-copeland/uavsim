@@ -1,6 +1,7 @@
 """Vehicle params, actuator limits, and config factories."""
 
 from uavsim.vehicles.params import (
+    AeroParams,
     PropulsionParams,
     VehicleParams,
     default_vehicle,
@@ -8,6 +9,7 @@ from uavsim.vehicles.params import (
 )
 
 __all__ = [
+    "AeroParams",
     "PropulsionParams",
     "VehicleParams",
     "default_vehicle",

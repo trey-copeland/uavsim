@@ -1,5 +1,13 @@
 """Plant dynamics: f(x, u, p), linearization, trim helpers."""
 
+from uavsim.dynamics.aero import (
+    apply_aero,
+    body_drag_force_ned,
+    ground_effect_kappa,
+    height_agl_m,
+    prop_h_force_body,
+    rate_damping_torque,
+)
 from uavsim.dynamics.attitude_error import (
     geodesic_attitude_error_rad,
     rotation_error_vector_from_euler,
@@ -60,17 +68,23 @@ __all__ = [
     "STATE_DIM_QUAT",
     "STATE_DIM_QUAT_MOTORS",
     "allocation_matrix",
+    "apply_aero",
+    "body_drag_force_ned",
     "euler_state_to_quat_state",
     "euler_to_quat",
     "geodesic_attitude_error_rad",
     "get_dynamics_model",
+    "ground_effect_kappa",
+    "height_agl_m",
     "hover_linearization",
     "hover_omega",
     "integrate_fixed_step",
     "motor_forces_to_wrench",
+    "prop_h_force_body",
     "quat_normalize",
     "quat_state_to_euler_state",
     "quat_to_euler",
+    "rate_damping_torque",
     "renormalize_quat_state",
     "rotation_body_to_inertial",
     "rotation_body_to_inertial_quat",

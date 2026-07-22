@@ -10,7 +10,7 @@
 
 ## Model today (what is implemented)
 
-Rigid-body 6DOF quadrotor, **no aerodynamic drag**, **no propeller lag**, **body wrench control**. Attitude: **ZYX Euler** plant by default, or **unit-quaternion** plant via study config.
+Rigid-body 6DOF quadrotor, **body wrench control** (default). Attitude: **ZYX Euler** plant by default, or **unit-quaternion** plant via study config. Optional **motors** plant (first-order ω). Optional **aero** (drag / prop H / ground effect) via `vehicle.aero` — **off by default**.
 
 ### State and control
 
@@ -66,10 +66,25 @@ Demo: `configs/studies/figure_eight_motors.yaml`.
 |----|--------|
 | **D-8** mixer / allocation | **Done** — `dynamics/mixer.py` |
 | **D-7** first-order motor states | **Done** — `dynamics/motors.py` (`euler_motors` / `quat_motors`) |
+| **D-4 / D-5** drag / aero / GE | **Done** — `dynamics/aero.py`; `AeroParams` (defaults off) |
 | **D-13 / V-7** flexible body | **TODO** |
-| **D-4 / D-5** drag / aero | **TODO** |
 
-Gentle figure-eight / square demos remain the Euler **wrench** regression baseline.
+Gentle figure-eight / square demos remain the Euler **wrench** regression baseline (aero off).
+
+### Aero / environment (D-4 / D-5 + ground effect)
+
+Applied inside `state_derivative` / `state_derivative_quat` (so motors plant inherits them):
+
+| Effect | Model | Params |
+|--------|--------|--------|
+| Body drag | \(F_d = -b_\ell v - b_q \|v\| v\) (NED) | `drag_lin_ns_m`, `drag_quad_ns2_m2` |
+| Rate damping | \(\tau_d = -c\,\omega\) | `rate_damp_nm_s` |
+| Prop H-force | \(f_{xy}^\text{body} = -k_h\,T\,v_{xy}\) | `prop_h_s_per_m` |
+| Ground effect | Thrust \(\times\kappa(h)\); Cheeseman–Bennett or exp | `ground_effect`, `rotor_radius_m`, `ground_z_ned_m`, … |
+
+Height AGL (NED \(z+\) down): \(h = z_\text{ground} - z\).  
+Demos: `configs/vehicles/default_quadrotor_aero.yaml` + `figure_eight_aero.yaml`;  
+`default_quadrotor_ge.yaml` + `hover_ground_effect.yaml`.
 
 ### Where it is used
 
@@ -153,30 +168,15 @@ DynamicsModel
 
 Shipped: `EulerRigidBodyDynamics`, `QuatRigidBodyDynamics`; `SimPlant` injects via `sim.attitude` (or custom `dynamics=`). Study-selected named backends beyond euler/quat (S-4 full) still open.
 
-### Next — Vehicle aero / param bag (D-4)
+### Done — Vehicle aero / drag / GE (D-4 / D-5)
 
-- Extend `VehicleParams` (or nested `aero:`) with optional fields, e.g.  
-  `drag_lin_ns_m`, `drag_quad_ns2_m2`, `c_mq` (pitch damping), etc.
-- Keep defaults **zero** so existing studies bit-match.
-- Document units in vehicle guide.
+- `AeroParams` nested on vehicle; defaults off.
+- Body lin/quad drag, rate damping, lumped prop H-force, ground-effect κ on thrust.
+- Hover linearization includes **linear** drag and rate damp only.
 
-### Next — Drag / damping models (D-5)
+### Done — Propeller / motor dynamics (D-7) + mixer (D-8)
 
-- Implement `f` terms: linear/quadratic translational drag in NED or body;  
-  optional rotor-induced or rate damping on \(\omega\).
-- Update or replace hover linearization (numerical finite-difference fallback is OK).
-- Add unit tests: energy dissipation, hover trim still holds when \(v=0\).
-
-### Next — Propeller / motor dynamics (D-7)
-
-- First-order lag on thrust or motor RPM states → **state dimension change**.
-- Requires careful state layout docs + controller awareness (or outer wrench still commanded).
-- Export / metrics state maps must version.
-
-### Next — Control allocation (D-8)
-
-- Optional mixer: motors → \(u\) body wrench using `arm_length_m` and CT/CQ.
-- Controllers may still output wrench; plant applies mixer + motor limits.
+- First-order motor ω states + X-quad allocation (`sim.plant: motors`).
 
 ---
 

@@ -60,7 +60,8 @@ Ship when SPEC §17 holds, especially:
 | Phase 5d Observer-in-the-loop (KF/EKF) | **Done** (`linear_kf`, `mekf`, partial channels, `x_hat` log) |
 | HIL test rig (hardware order/build) | **In progress (parallel, long lead)** |
 | Motors / mixer (D-7, D-8) | **Done** (`sim.plant: motors`, figure_eight_motors) |
-| Next SIL: flex / drag | **Now** (Track A) |
+| Drag / aero / ground effect (D-4, D-5) | **Done** (`AeroParams`, figure_eight_aero, hover_ground_effect) |
+| Next SIL: flex (D-13 / V-7) | **Now** (Track A) |
 | Phase 6 nav / Phase 7 HIL software | **Not started** (nav after plant fidelity as needed; HIL when rig ready) |
 
 ---
@@ -80,7 +81,7 @@ Phases are **capability gates**, not calendar dates. Prefer finishing a gate’s
 | **5b** | Visualization | S5 | Interactive 3D + MC pack + showcase | Done |
 | **5c** | Attitude & plant fidelity | A+ | Quaternion kinematics + error-state control; large-attitude demo; `DynamicsModel` for flex/motors | **Done** |
 | **5d** | Observer-in-the-loop | C+, E | Noisy measurements + filter (KF/MEKF) feeding control; ideal full-state remains default | **Done** |
-| **—** | Plant fidelity (motors) | A+ | Motor dynamics + mixer (D-7, D-8) | **Now** |
+| **—** | Plant fidelity (motors + aero) | A+ | Motors/mixer (D-7/D-8) + drag/GE (D-4/D-5) | **Done** |
 | **6** | Nav expansion | B+ | First non-waypoint guidance | After motors/flex or when mission design needs it |
 | **7** | HIL / PIL | E | Fixed-step + transport + SIL↔HIL via export/compare | Parallel with rig build; software when rig ready |
 
@@ -102,8 +103,9 @@ Do **not** stall Track A on Track B. Keep HIL **seams** (fixed-step, I/O schemas
 ### Now (Track A — SIL)
 1. Keep showcase / gentle figure-eight as regression baseline.  
 2. ~~**Motor dynamics + mixer** (D-7, D-8)~~ — **Done** (`sim.plant: motors`).  
-3. **Flexible / elastic plant** (V-7 / D-13) or drag (D-4/D-5) — next fidelity.  
-4. Optional: native 13-state export polish (not blocking).
+3. ~~**Drag / aero / ground effect** (D-4, D-5)~~ — **Done** (`dynamics/aero.py`).  
+4. **Flexible / elastic plant** (V-7 / D-13) — next fidelity.  
+5. Optional: native 13-state export polish (not blocking).
 
 ### Next (Track A, still SIL)
 1. Phase 6 non-waypoint guidance if mission design needs it more than plant fidelity.  

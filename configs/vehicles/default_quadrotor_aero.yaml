@@ -1,0 +1,40 @@
+# Default 500 g class with body drag + lumped prop H-force enabled (no GE).
+# Same mass/I/limits as default_quadrotor; aero coeffs are teaching-scale.
+schema_version: 1
+vehicle_id: default_quadrotor_aero
+
+mass_kg: 0.5
+gravity_m_s2: 9.81
+arm_length_m: 0.25
+
+inertia:
+  ixx_kg_m2: 0.0075
+  iyy_kg_m2: 0.0075
+  izz_kg_m2: 0.013
+
+limits:
+  thrust_min_n: 0.0
+  thrust_max_n: 9.81
+  torque_max_nm: 1.0
+
+propulsion:
+  layout: x
+  ct_n_s2: 3.405e-6
+  cq_nm_s2: 5.4e-8
+  motor_time_const_s: 0.05
+  omega_min_rad_s: 0.0
+  omega_max_rad_s: 1200.0
+
+aero:
+  # Mild parasite drag (NED lin + quad)
+  drag_lin_ns_m: 0.05
+  drag_quad_ns2_m2: 0.02
+  rate_damp_nm_s: 0.002
+  # Lumped rotor-plane drag: f_xy = -k_h * T * v_xy (body)
+  prop_h_s_per_m: 0.08
+  ground_effect: none
+  rotor_radius_m: 0.1
+  ground_z_ned_m: 0.0
+  ge_exp_a: 0.5
+  ge_exp_b: 2.0
+  ge_kappa_max: 3.0

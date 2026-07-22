@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from uavsim.dynamics.aero import apply_aero
 from uavsim.dynamics.rotations import (
     euler_rate_matrix,
     euler_to_quat,
@@ -43,11 +44,20 @@ def state_derivative(x: np.ndarray, u: np.ndarray, vehicle: VehicleParams) -> np
     inertia = vehicle.inertia.as_diag()
 
     r_b2i = rotation_body_to_inertial(phi, theta, psi)
-    f_thrust_i = r_b2i @ np.array([0.0, 0.0, -f_thrust])
+    f_thrust_eff, f_aero_i, tau_eff, _kappa = apply_aero(
+        z_ned_m=float(x[2]),
+        v_ned=v,
+        omega_body=omega,
+        r_b2i=r_b2i,
+        thrust_n=f_thrust,
+        tau_body=tau,
+        vehicle=vehicle,
+    )
+    f_thrust_i = r_b2i @ np.array([0.0, 0.0, -f_thrust_eff])
     f_grav = np.array([0.0, 0.0, m * g])
-    a = (f_thrust_i + f_grav) / m
+    a = (f_thrust_i + f_grav + f_aero_i) / m
 
-    omega_dot = np.linalg.solve(inertia, tau - np.cross(omega, inertia @ omega))
+    omega_dot = np.linalg.solve(inertia, tau_eff - np.cross(omega, inertia @ omega))
     euler_dot = euler_rate_matrix(phi, theta) @ omega
 
     x_dot = np.zeros(STATE_DIM)
@@ -82,11 +92,20 @@ def state_derivative_quat(x: np.ndarray, u: np.ndarray, vehicle: VehicleParams) 
     inertia = vehicle.inertia.as_diag()
 
     r_b2i = rotation_body_to_inertial_quat(q)
-    f_thrust_i = r_b2i @ np.array([0.0, 0.0, -f_thrust])
+    f_thrust_eff, f_aero_i, tau_eff, _kappa = apply_aero(
+        z_ned_m=float(x[2]),
+        v_ned=v,
+        omega_body=omega,
+        r_b2i=r_b2i,
+        thrust_n=f_thrust,
+        tau_body=tau,
+        vehicle=vehicle,
+    )
+    f_thrust_i = r_b2i @ np.array([0.0, 0.0, -f_thrust_eff])
     f_grav = np.array([0.0, 0.0, m * g])
-    a = (f_thrust_i + f_grav) / m
+    a = (f_thrust_i + f_grav + f_aero_i) / m
 
-    omega_dot = np.linalg.solve(inertia, tau - np.cross(omega, inertia @ omega))
+    omega_dot = np.linalg.solve(inertia, tau_eff - np.cross(omega, inertia @ omega))
     q_dot = quat_derivative_body_rates(q, omega)
 
     x_dot = np.zeros(STATE_DIM_QUAT)

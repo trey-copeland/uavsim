@@ -33,4 +33,17 @@ def hover_linearization(vehicle: VehicleParams) -> tuple[np.ndarray, np.ndarray]
     b[9, 1] = 1.0 / vehicle.inertia.ixx_kg_m2
     b[10, 2] = 1.0 / vehicle.inertia.iyy_kg_m2
     b[11, 3] = 1.0 / vehicle.inertia.izz_kg_m2
+
+    # Linear body drag / rate damping (hover A); quadratic drag & GE omitted
+    m = vehicle.mass_kg
+    bl = float(vehicle.aero.drag_lin_ns_m)
+    if bl > 0.0:
+        a[6, 6] -= bl / m
+        a[7, 7] -= bl / m
+        a[8, 8] -= bl / m
+    rd = float(vehicle.aero.rate_damp_nm_s)
+    if rd > 0.0:
+        a[9, 9] -= rd / vehicle.inertia.ixx_kg_m2
+        a[10, 10] -= rd / vehicle.inertia.iyy_kg_m2
+        a[11, 11] -= rd / vehicle.inertia.izz_kg_m2
     return a, b

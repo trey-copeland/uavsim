@@ -14,7 +14,7 @@ Legend: **Done** · **Partial** · **TODO** · **Out of scope (core)**
 | V-1 | YAML vehicle definition + study path | **Done** | `configs/vehicles/`, `VehicleParams` |
 | V-2 | Shared params for plant / control / MC | **Done** | |
 | V-3 | Diagonal inertia only | **Partial** | Off-diagonal products **TODO** |
-| V-4 | Optional aero / drag coefficients on vehicle schema | **TODO** | Blocked by `extra="forbid"` until fields added |
+| V-4 | Optional aero / drag coefficients on vehicle schema | **Done** | `VehicleParams.aero` (`AeroParams`) |
 | V-5 | Enforce \(F_\max \ge mg\) at validate | **TODO** | Soft expectation today |
 | V-6 | Motor mixer uses `arm_length_m` | **Done** | X-quad allocation in `dynamics/mixer.py` |
 | V-7 | Arm mechanics / elasticity params | **TODO** | Parametric + lumped states |
@@ -80,11 +80,11 @@ Guide: [guidance.md](guidance.md)
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| D-1 | Nonlinear 6DOF body-wrench plant | **Done** | Euler default + optional quat plant; no drag |
-| D-2 | Hover analytic linearization for LQR | **Done** | Small-angle; revisit with D-10 |
+| D-1 | Nonlinear 6DOF body-wrench plant | **Done** | Euler default + optional quat plant; aero opt-in |
+| D-2 | Hover analytic linearization for LQR | **Done** | Small-angle + linear drag/rate damp; GE/quad/H omitted |
 | D-3 | `DynamicsModel` protocol + plant injection | **Done** | `dynamics/model.py`; `SimPlant(dynamics=…)` / `get_dynamics_model` |
-| D-4 | Vehicle aero params (drag, damping) | **TODO** | Plan D1 |
-| D-5 | Drag / damping in \(f(x,u,p)\) | **TODO** | Plan D3 |
+| D-4 | Vehicle aero params (drag, damping) | **Done** | `AeroParams` on vehicle YAML |
+| D-5 | Drag / damping in \(f(x,u,p)\) | **Done** | Body lin/quad, rate damp, prop H-force, ground effect |
 | D-6 | Numeric linearization utility | **TODO** | |
 | D-7 | Motor/prop first-order states | **Done** | `sim.plant: motors`; +4 ω states; `dynamics/motors.py` |
 | D-8 | Control allocation / mixer | **Done** | X-quad wrench ↔ forces; `dynamics/mixer.py` |
@@ -129,8 +129,8 @@ Hardware and transport live primarily in a **HIL companion** project; this backl
 1. ~~**D-10 / 5c**~~ — **Done** (quat plant, SO(3) control, aggressive F8, `DynamicsModel`).  
 2. ~~**Phase 5d observers**~~ — **Done** (EST-1…5, C-9/C-11: `linear_kf` / `mekf`, channels, `x_hat`).  
 3. ~~**D-7 + D-8**~~ — **Done** (mixer + first-order motors; `sim.plant: motors`).  
-4. **D-13 / V-7** — flexible / elastic lumped states ← **Now** (or drag D-4/D-5).  
-5. **D-4/D-5** — drag/aero as needed.  
+4. ~~**D-4 / D-5**~~ — **Done** (body drag, prop H-force, ground effect; `dynamics/aero.py`).  
+5. **D-13 / V-7** — flexible / elastic lumped states ← **Now**.  
 6. **G-5 / C-5** — registries when plugin ergonomics block experiments.  
 7. **V-8 / D-12 / S-7** — multi-airframe families after mixer + protocol.
 

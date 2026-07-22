@@ -1,0 +1,39 @@
+# Low-altitude vehicle: Cheeseman–Bennett ground effect + light drag.
+# Missions should fly with z < ground_z_ned_m (NED z+ down); AGL = ground_z - z.
+schema_version: 1
+vehicle_id: default_quadrotor_ge
+
+mass_kg: 0.5
+gravity_m_s2: 9.81
+arm_length_m: 0.25
+
+inertia:
+  ixx_kg_m2: 0.0075
+  iyy_kg_m2: 0.0075
+  izz_kg_m2: 0.013
+
+limits:
+  thrust_min_n: 0.0
+  thrust_max_n: 9.81
+  torque_max_nm: 1.0
+
+propulsion:
+  layout: x
+  ct_n_s2: 3.405e-6
+  cq_nm_s2: 5.4e-8
+  motor_time_const_s: 0.05
+  omega_min_rad_s: 0.0
+  omega_max_rad_s: 1200.0
+
+aero:
+  drag_lin_ns_m: 0.02
+  drag_quad_ns2_m2: 0.0
+  rate_damp_nm_s: 0.001
+  prop_h_s_per_m: 0.0
+  ground_effect: cheeseman
+  rotor_radius_m: 0.12
+  # Flat ground at z=1.05 m NED; hover_hold at z=1.0 → AGL≈0.05 m (h/R≈0.4)
+  ground_z_ned_m: 1.05
+  ge_exp_a: 0.5
+  ge_exp_b: 2.0
+  ge_kappa_max: 3.0
