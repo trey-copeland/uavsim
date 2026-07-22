@@ -16,9 +16,10 @@ from uavsim.viz.loaders import load_run, ned_to_plot
 
 GALLERY_SCHEMA = 1
 
-# Portfolio base case — estimation teaching matrix + ideal LQR + PID + MC
+# Portfolio base case — controller × sensor estimation matrix + MC
 # (relative study path, gallery id, role)
 BASE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
+    # LQR / LQG row
     ("configs/studies/figure_eight.yaml", "figure_eight_lqr", "ideal_lqr"),
     (
         "configs/studies/figure_eight_gps_imu_naive.yaml",
@@ -40,7 +41,28 @@ BASE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
         "imu_only_lqg",
         "est_imu_only_lqg",
     ),
-    ("configs/studies/figure_eight_pid.yaml", "figure_eight_pid", "tracking_pid"),
+    # PID row (same sensors / observers as LQR family)
+    ("configs/studies/figure_eight_pid.yaml", "figure_eight_pid", "ideal_pid"),
+    (
+        "configs/studies/figure_eight_gps_imu_naive_pid.yaml",
+        "gps_imu_naive_pid",
+        "est_gps_imu_naive_pid",
+    ),
+    (
+        "configs/studies/figure_eight_gps_imu_kf_pid.yaml",
+        "gps_imu_kf_pid",
+        "est_gps_imu_kf_pid",
+    ),
+    (
+        "configs/studies/figure_eight_ahrs_kf_pid.yaml",
+        "ahrs_kf_pid",
+        "est_ahrs_kf_pid",
+    ),
+    (
+        "configs/studies/figure_eight_imu_only_kf_pid.yaml",
+        "imu_only_kf_pid",
+        "est_imu_only_kf_pid",
+    ),
     (
         "configs/studies/figure_eight_gps_imu_lqg_mc.yaml",
         "gps_imu_lqg_mc",
@@ -51,30 +73,64 @@ BASE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
 # Browser payload cap (full n_trials still reported in mc.n_trials / summary)
 MC_TRIALS_IN_GALLERY = 400
 
-# Teaching matrix metadata (merged into showcase.json)
+# Sensor columns for overview grid (controller × sensors)
+_EST_COLUMNS: list[dict[str, str]] = [
+    {"id": "ideal", "label": "Ideal full state", "sensors": "x_true (no noise)"},
+    {
+        "id": "gps_imu_naive",
+        "label": "GPS+IMU naive",
+        "sensors": "pos + omega (noisy)",
+    },
+    {
+        "id": "gps_imu_filter",
+        "label": "GPS+IMU + KF",
+        "sensors": "pos + omega (noisy)",
+    },
+    {
+        "id": "ahrs",
+        "label": "GPS-denied AHRS",
+        "sensors": "att + omega (noisy)",
+    },
+    {
+        "id": "imu_only",
+        "label": "GPS-denied IMU-only",
+        "sensors": "omega only (noisy)",
+    },
+]
+
+# Teaching matrix: same figure-eight; rows = control law family, cols = sensors
 ESTIMATION_MATRIX: dict[str, Any] = {
-    "title": "Estimation & LQG teaching matrix",
+    "title": "Controller × sensor teaching matrix",
     "description": (
-        "Same elevated figure-eight and hover LQR gains. "
-        "Ideal LQR sees full true state. "
-        "GPS+IMU measures noisy position + body rates only. "
-        "Naive packs those into the control bus with zeros elsewhere; "
-        "LQG runs a linear KF (hover A,B) then the same K on x_hat. "
-        "AHRS-like = attitude + rates (GPS-denied with an attitude reference). "
-        "IMU-only = rates alone — position is not observable; expect drift."
+        "Same elevated figure-eight for every cell. "
+        "Rows: hover LQR (with KF = classic LQG) vs PID cascade. "
+        "Columns: full-state ideal, GPS+IMU naive (partial zeros on the bus), "
+        "GPS+IMU with linear KF, AHRS-like (att+ω), IMU-only (ω). "
+        "KF uses the hover linear model; it does not invent GPS when position "
+        "is unmeasured. Compare laws across a column — not only LQR vs PID ideal."
     ),
+    "columns": _EST_COLUMNS,
+    "rows": [
+        {"id": "lqr", "label": "LQR / LQG", "controller": "lqr"},
+        {"id": "pid", "label": "PID cascade", "controller": "pid"},
+    ],
     "scenarios": [
+        # —— LQR row ——
         {
-            "id": "ideal",
-            "label": "Ideal full state",
+            "id": "ideal_lqr",
+            "column": "ideal",
+            "controller": "lqr",
+            "label": "Ideal LQR",
             "sensors": "x_true (no noise)",
             "method": "LQR",
             "run_id": "figure_eight_lqr",
             "lesson": "Upper bound when the plant is fully observed.",
         },
         {
-            "id": "gps_imu_naive",
-            "label": "GPS + IMU — naive",
+            "id": "gps_imu_naive_lqr",
+            "column": "gps_imu_naive",
+            "controller": "lqr",
+            "label": "GPS+IMU naive → LQR",
             "sensors": "pos + omega (noisy)",
             "method": "partial_raw → LQR",
             "run_id": "gps_imu_naive",
@@ -82,7 +138,9 @@ ESTIMATION_MATRIX: dict[str, Any] = {
         },
         {
             "id": "gps_imu_lqg",
-            "label": "GPS + IMU — LQG",
+            "column": "gps_imu_filter",
+            "controller": "lqr",
+            "label": "GPS+IMU LQG",
             "sensors": "pos + omega (noisy)",
             "method": "linear_kf → LQR",
             "run_id": "gps_imu_lqg",
@@ -90,7 +148,9 @@ ESTIMATION_MATRIX: dict[str, Any] = {
         },
         {
             "id": "ahrs_lqg",
-            "label": "GPS-denied AHRS — LQG",
+            "column": "ahrs",
+            "controller": "lqr",
+            "label": "AHRS LQG",
             "sensors": "att + omega (noisy)",
             "method": "linear_kf → LQR",
             "run_id": "ahrs_lqg",
@@ -101,7 +161,9 @@ ESTIMATION_MATRIX: dict[str, Any] = {
         },
         {
             "id": "imu_only_lqg",
-            "label": "GPS-denied IMU-only — LQG",
+            "column": "imu_only",
+            "controller": "lqr",
+            "label": "IMU-only LQG",
             "sensors": "omega only (noisy)",
             "method": "linear_kf → LQR",
             "run_id": "imu_only_lqg",
@@ -109,6 +171,57 @@ ESTIMATION_MATRIX: dict[str, Any] = {
                 "Honesty case: rates alone do not observe position; "
                 "filter cannot invent GPS — soft failure / drift."
             ),
+        },
+        # —— PID row ——
+        {
+            "id": "ideal_pid",
+            "column": "ideal",
+            "controller": "pid",
+            "label": "Ideal PID",
+            "sensors": "x_true (no noise)",
+            "method": "PID cascade",
+            "run_id": "figure_eight_pid",
+            "lesson": "Full-state PID on the same path (second controller baseline).",
+        },
+        {
+            "id": "gps_imu_naive_pid",
+            "column": "gps_imu_naive",
+            "controller": "pid",
+            "label": "GPS+IMU naive → PID",
+            "sensors": "pos + omega (noisy)",
+            "method": "partial_raw → PID",
+            "run_id": "gps_imu_naive_pid",
+            "lesson": "Same incomplete bus as LQR naive — cascade also suffers zeros.",
+        },
+        {
+            "id": "gps_imu_kf_pid",
+            "column": "gps_imu_filter",
+            "controller": "pid",
+            "label": "GPS+IMU KF → PID",
+            "sensors": "pos + omega (noisy)",
+            "method": "linear_kf → PID",
+            "run_id": "gps_imu_kf_pid",
+            "lesson": "KF feeds x_hat to PID (not LQG; law is cascade, not K).",
+        },
+        {
+            "id": "ahrs_kf_pid",
+            "column": "ahrs",
+            "controller": "pid",
+            "label": "AHRS KF → PID",
+            "sensors": "att + omega (noisy)",
+            "method": "linear_kf → PID",
+            "run_id": "ahrs_kf_pid",
+            "lesson": "GPS-denied with attitude reference; compare RMSE to AHRS LQG.",
+        },
+        {
+            "id": "imu_only_kf_pid",
+            "column": "imu_only",
+            "controller": "pid",
+            "label": "IMU-only KF → PID",
+            "sensors": "omega only (noisy)",
+            "method": "linear_kf → PID",
+            "run_id": "imu_only_kf_pid",
+            "lesson": "Same observability wall as LQG: rates alone cannot hold position.",
         },
     ],
 }
@@ -338,11 +451,9 @@ def generate_base_case_gallery(
     Run the portfolio base-case studies and write ``docs/showcase``.
 
     Base case:
-      1. Ideal full-state LQR
-      2–5. Estimation matrix (GPS+IMU naive/LQG, AHRS LQG, IMU-only LQG)
-      6. PID cascade
-      7. Monte Carlo on GPS+IMU LQG
-      8. Envelope: time-scale limits of idealized full-state LQR
+      LQR/LQG and PID rows × sensor columns (ideal, GPS+IMU naive, GPS+IMU KF,
+      AHRS, IMU-only), plus Monte Carlo on GPS+IMU LQG and the linearization
+      envelope (ideal LQR limits).
 
     ``n_mc_trials`` overrides the study YAML when set (useful for smoke tests).
     """
@@ -357,11 +468,15 @@ def generate_base_case_gallery(
     entries: list[dict[str, Any]] = []
     labels = {
         "figure_eight_lqr": "Ideal LQR (full state)",
-        "gps_imu_naive": "GPS+IMU — naive partial LQR",
-        "gps_imu_lqg": "GPS+IMU — LQG",
-        "ahrs_lqg": "GPS-denied AHRS — LQG",
-        "imu_only_lqg": "GPS-denied IMU-only — LQG",
-        "figure_eight_pid": "PID cascade (full state)",
+        "gps_imu_naive": "GPS+IMU naive → LQR",
+        "gps_imu_lqg": "GPS+IMU LQG",
+        "ahrs_lqg": "AHRS LQG",
+        "imu_only_lqg": "IMU-only LQG",
+        "figure_eight_pid": "Ideal PID (full state)",
+        "gps_imu_naive_pid": "GPS+IMU naive → PID",
+        "gps_imu_kf_pid": "GPS+IMU KF → PID",
+        "ahrs_kf_pid": "AHRS KF → PID",
+        "imu_only_kf_pid": "IMU-only KF → PID",
         "gps_imu_lqg_mc": "GPS+IMU LQG Monte Carlo",
     }
     for rel, gid, role in BASE_CASE_STUDIES:
@@ -411,10 +526,10 @@ def generate_base_case_gallery(
         entries,
         title="uavsim · flight results",
         description=(
-            "Figure-eight SIL: ideal LQR, estimation/LQG sensor matrix "
-            "(GPS+IMU naive vs LQG, GPS-denied AHRS and IMU-only), PID, "
-            "Monte Carlo on GPS+IMU LQG, and a time-scale envelope for "
-            "hover-linearization limits. Simulation only."
+            "Figure-eight SIL: controller × sensor matrix (LQR/LQG and PID × "
+            "ideal, GPS+IMU naive, GPS+IMU KF, AHRS, IMU-only), Monte Carlo on "
+            "GPS+IMU LQG, and a time-scale envelope for hover-linearization "
+            "limits. Simulation only."
         ),
         # Primary compare: naive vs LQG on same sensors (teaching win)
         compare_ids=("gps_imu_naive", "gps_imu_lqg"),

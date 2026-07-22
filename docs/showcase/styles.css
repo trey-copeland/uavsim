@@ -88,3 +88,76 @@ select, input[type="range"] {
 .badge.weak { background: #3a3020; color: #d0b090; }
 .badge.pid { background: #3a2a1e; color: #ffc07e; }
 .badge.mc { background: #1e3a2f; color: #7dffb3; }
+.badge-row { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; vertical-align: middle; }
+
+/* Controller × sensor overview matrix */
+.matrix-wrap { overflow: hidden; }
+.matrix-scroll { overflow-x: auto; }
+table.controller-matrix {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0.5rem;
+  font-size: 0.85rem;
+  min-width: 720px;
+}
+table.controller-matrix th.corner,
+table.controller-matrix th.row-label {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  vertical-align: middle;
+  min-width: 7rem;
+}
+table.controller-matrix thead th {
+  text-align: center;
+  color: var(--text);
+  font-weight: 600;
+  padding: 0.25rem 0.35rem 0.5rem;
+  vertical-align: bottom;
+}
+table.controller-matrix thead th .col-sub {
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+}
+table.controller-matrix td {
+  vertical-align: stretch;
+  padding: 0;
+  width: 18%;
+}
+.matrix-cell {
+  margin: 0;
+  min-height: 7.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: border-color 0.12s ease;
+}
+.matrix-cell:hover { border-color: var(--accent); }
+.matrix-cell.cell-fail { border-color: #6a3030; }
+.matrix-cell.empty {
+  opacity: 0.35;
+  min-height: 4rem;
+  align-items: center;
+  justify-content: center;
+}
+.matrix-cell-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+.matrix-method {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.25;
+}
+.matrix-rmse { font-size: 1.25rem; }
+.matrix-meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}

@@ -5,15 +5,26 @@
 
   function roleBadge(role) {
     if (!role) return e("span", { className: "badge" }, "run");
-    if (role.includes("pid")) return e("span", { className: "badge pid" }, "PID");
     if (role.includes("monte_carlo") || role.includes("mc"))
       return e("span", { className: "badge mc" }, "MC");
-    if (role.includes("naive")) return e("span", { className: "badge naive" }, "naive");
-    if (role.includes("imu_only")) return e("span", { className: "badge weak" }, "IMU-only");
-    if (role.includes("ahrs")) return e("span", { className: "badge ahrs" }, "AHRS");
-    if (role.includes("lqg")) return e("span", { className: "badge lqg" }, "LQG");
-    if (role.includes("ideal") || role.includes("lqr"))
-      return e("span", { className: "badge lqr" }, "LQR");
+    const parts = [];
+    if (role.includes("naive"))
+      parts.push(e("span", { key: "n", className: "badge naive" }, "naive"));
+    else if (role.includes("imu_only"))
+      parts.push(e("span", { key: "i", className: "badge weak" }, "IMU-only"));
+    else if (role.includes("ahrs"))
+      parts.push(e("span", { key: "a", className: "badge ahrs" }, "AHRS"));
+    else if (role.includes("lqg"))
+      parts.push(e("span", { key: "g", className: "badge lqg" }, "LQG"));
+    else if (role.includes("kf"))
+      parts.push(e("span", { key: "k", className: "badge lqg" }, "KF"));
+
+    if (role.includes("pid"))
+      parts.push(e("span", { key: "p", className: "badge pid" }, "PID"));
+    else if (!role.includes("lqg") && (role.includes("lqr") || role.includes("ideal")))
+      parts.push(e("span", { key: "l", className: "badge lqr" }, "LQR"));
+
+    if (parts.length) return e("span", { className: "badge-row" }, parts);
     return e("span", { className: "badge" }, role);
   }
 
@@ -339,14 +350,142 @@
 
   function Overview({ doc, onSelect }) {
     const runs = doc.runs || [];
+    const byId = {};
+    runs.forEach(function (r) {
+      byId[r.id] = r;
+    });
+    const matrix = doc.estimation_matrix;
+    const columns = (matrix && matrix.columns) || null;
+    const rowDefs = (matrix && matrix.rows) || null;
+    const scenarios = (matrix && matrix.scenarios) || [];
+
+    function cellCard(sc) {
+      if (!sc) {
+        return e("div", { className: "matrix-cell empty", key: "empty" }, "—");
+      }
+      const run = sc.run_id ? byId[sc.run_id] : null;
+      const m = (sc.metrics || (run && run.metrics)) || {};
+      const ok = m.success;
+      return e(
+        "div",
+        {
+          key: sc.id || sc.run_id,
+          className: "matrix-cell card" + (ok === false ? " cell-fail" : ""),
+          style: { cursor: sc.run_id ? "pointer" : "default" },
+          onClick: function () {
+            if (sc.run_id && onSelect) onSelect(sc.run_id);
+          },
+          title: sc.lesson || sc.label || "",
+        },
+        e(
+          "div",
+          { className: "matrix-cell-head" },
+          e("span", { className: "matrix-method" }, sc.method || sc.label || ""),
+          run ? roleBadge(run.role) : null
+        ),
+        e(
+          "div",
+          { className: "stat matrix-rmse" },
+          fmt(m.rmse_position_m, 3),
+          e("span", null, "RMSE [m]")
+        ),
+        e(
+          "p",
+          { className: "matrix-meta" },
+          "max |e| ",
+          fmt(m.max_position_error_m, 2),
+          " · ",
+          e("span", { className: ok ? "ok" : "fail" }, ok === true ? "ok" : ok === false ? "fail" : "—")
+        )
+      );
+    }
+
+    // Extra runs not in the matrix (e.g. Monte Carlo)
+    const matrixRunIds = {};
+    scenarios.forEach(function (s) {
+      if (s.run_id) matrixRunIds[s.run_id] = true;
+    });
+    const extra = runs.filter(function (r) {
+      return !matrixRunIds[r.id];
+    });
+
+    const gridBlock =
+      columns && rowDefs && scenarios.length
+        ? e(
+            "div",
+            { className: "card matrix-wrap", style: { gridColumn: "1 / -1" } },
+            e("h2", null, matrix.title || "Controller × sensor matrix"),
+            e(
+              "p",
+              { style: { color: "var(--muted)", fontSize: "0.9rem", marginTop: 0 } },
+              "Click a cell to open Flight 3D. Compare down a column (same sensors, different law) ",
+              "or across a row (same law, harder sensors)."
+            ),
+            e(
+              "div",
+              { className: "table-wrap matrix-scroll" },
+              e(
+                "table",
+                { className: "controller-matrix" },
+                e(
+                  "thead",
+                  null,
+                  e(
+                    "tr",
+                    null,
+                    e("th", { className: "corner" }, "Law \\ sensors"),
+                    columns.map(function (c) {
+                      return e(
+                        "th",
+                        { key: c.id },
+                        e("div", null, c.label),
+                        e(
+                          "div",
+                          { className: "col-sub" },
+                          c.sensors || ""
+                        )
+                      );
+                    })
+                  )
+                ),
+                e(
+                  "tbody",
+                  null,
+                  rowDefs.map(function (row) {
+                    return e(
+                      "tr",
+                      { key: row.id },
+                      e("th", { className: "row-label" }, row.label),
+                      columns.map(function (col) {
+                        const sc = scenarios.find(function (s) {
+                          return s.column === col.id && s.controller === row.controller;
+                        });
+                        return e("td", { key: col.id }, cellCard(sc));
+                      })
+                    );
+                  })
+                )
+              )
+            )
+          )
+        : null;
+
     return e(
       "div",
       { className: "grid cols-3" },
-      runs.map((r) => {
+      gridBlock,
+      extra.map(function (r) {
         const m = r.metrics || {};
         return e(
           "div",
-          { key: r.id, className: "card", style: { cursor: "pointer" }, onClick: () => onSelect(r.id) },
+          {
+            key: r.id,
+            className: "card",
+            style: { cursor: "pointer" },
+            onClick: function () {
+              onSelect(r.id);
+            },
+          },
           e("h3", null, r.label, " ", roleBadge(r.role)),
           e("div", { className: "stat" }, fmt(m.rmse_position_m), e("span", null, "RMSE position [m]")),
           e(
@@ -377,7 +516,7 @@
           "p",
           { style: { margin: 0, color: "var(--muted)", fontSize: "0.9rem" } },
           doc.description ||
-            "LQR and PID on a gentle square, plus hover Monte Carlo under mass and inertia uncertainty."
+            "Controller × sensor matrix on the elevated figure-eight, plus Monte Carlo and envelope."
         )
       )
     );
@@ -1077,28 +1216,56 @@
       );
     }
     const scenarios = matrix.scenarios;
-    const barIds = scenarios.map(function (s) {
-      return s.run_id;
-    });
-    const rmse = scenarios.map(function (s) {
-      const m = s.metrics || {};
-      const v = m.rmse_position_m;
+    const columns = matrix.columns || [];
+    // Grouped bar chart: x = sensor column, series = controller family
+    const ctrlOrder = ["lqr", "pid"];
+    const ctrlColors = { lqr: "#5b9fd4", pid: "#e6a05c" };
+    const colIds = columns.length
+      ? columns.map(function (c) {
+          return c.id;
+        })
+      : scenarios.map(function (s) {
+          return s.id;
+        });
+    const colLabels = columns.length
+      ? columns.map(function (c) {
+          return c.label;
+        })
+      : scenarios.map(function (s) {
+          return s.label;
+        });
+
+    function rmseFor(colId, controller) {
+      const s = scenarios.find(function (sc) {
+        if (sc.column && sc.controller)
+          return sc.column === colId && sc.controller === controller;
+        // legacy single-row matrix
+        return sc.id === colId;
+      });
+      if (!s || !s.metrics) return null;
+      const v = s.metrics.rmse_position_m;
       return v != null && Number.isFinite(+v) ? +v : null;
-    });
-    // Cap bar for naive blow-up so LQG bars stay readable; annotate large values
-    const displayRmse = rmse.map(function (v) {
-      if (v == null) return null;
-      return Math.min(v, 5);
-    });
-    const labels = scenarios.map(function (s) {
-      return s.label;
-    });
-    const colors = scenarios.map(function (s) {
-      if (s.id && s.id.includes("naive")) return "#c07070";
-      if (s.id && s.id.includes("imu")) return "#a08060";
-      if (s.id && s.id.includes("ahrs")) return "#80a0c0";
-      if (s.id && s.id.includes("gps_imu_lqg")) return "#c9a227";
-      return "#5b9fd4";
+    }
+
+    const barTraces = ctrlOrder.map(function (ctrl) {
+      const raw = colIds.map(function (cid) {
+        return rmseFor(cid, ctrl);
+      });
+      const display = raw.map(function (v) {
+        return v == null ? null : Math.min(v, 5);
+      });
+      return {
+        x: colLabels,
+        y: display,
+        name: ctrl === "lqr" ? "LQR / LQG" : "PID",
+        type: "bar",
+        marker: { color: ctrlColors[ctrl] },
+        text: raw.map(function (v) {
+          return v == null ? "—" : v > 5 ? ">5 (" + fmt(v, 1) + ")" : fmt(v, 3);
+        }),
+        textposition: "outside",
+        hovertemplate: "%{x}<br>" + (ctrl === "lqr" ? "LQR/LQG" : "PID") + " RMSE %{text}<extra></extra>",
+      };
     });
 
     const plotTheme = {
@@ -1114,13 +1281,13 @@
       e(
         "div",
         { className: "card" },
-        e("h2", null, matrix.title || "Estimation & LQG"),
+        e("h2", null, matrix.title || "Controller × sensor matrix"),
         e("p", null, matrix.description || ""),
         e(
           "p",
           { style: { color: "var(--muted)", fontSize: "0.9rem" } },
-          "Bars capped at 5 m RMSE for readability when naive partial feedback diverges. ",
-          "See table for raw values. Click a scenario to open Flight 3D."
+          "Grouped bars: LQR/LQG vs PID per sensor column. Display capped at 5 m RMSE. ",
+          "Click a table row to open Flight 3D."
         )
       ),
       e(
@@ -1128,32 +1295,25 @@
         { className: "card" },
         e(PlotDiv, {
           id: "est-rmse-bars",
-          data: [
-            {
-              x: labels,
-              y: displayRmse,
-              type: "bar",
-              marker: { color: colors },
-              text: rmse.map(function (v) {
-                return v == null ? "—" : v > 5 ? ">5 (" + fmt(v, 1) + ")" : fmt(v, 3);
-              }),
-              textposition: "outside",
-              hovertemplate: "%{x}<br>RMSE %{text}<extra></extra>",
-            },
-          ],
+          data: barTraces,
           layout: {
             ...plotTheme,
-            height: 340,
-            title: { text: "Position RMSE by estimation scenario", font: { size: 13 } },
+            barmode: "group",
+            height: 360,
+            title: {
+              text: "Position RMSE: LQR/LQG vs PID by sensors",
+              font: { size: 13 },
+            },
             yaxis: { title: "RMSE position [m] (display cap 5)", gridcolor: "#2a2f36" },
-            xaxis: { tickangle: -20 },
+            xaxis: { tickangle: -18 },
+            legend: { orientation: "h", y: 1.12 },
           },
         })
       ),
       e(
         "div",
         { className: "card" },
-        e("h3", null, "Scenario matrix"),
+        e("h3", null, "Scenario table"),
         e(
           "div",
           { className: "table-wrap" },
@@ -1166,7 +1326,7 @@
               e(
                 "tr",
                 null,
-                ["Scenario", "Sensors", "Method", "RMSE [m]", "max |e| [m]", "ok", "Lesson"].map(
+                ["Scenario", "Law", "Sensors", "Method", "RMSE [m]", "max |e| [m]", "ok", "Lesson"].map(
                   function (h) {
                     return e("th", { key: h }, h);
                   }
@@ -1192,6 +1352,7 @@
                     },
                   },
                   e("td", null, s.label),
+                  e("td", null, s.controller === "pid" ? "PID" : s.controller === "lqr" ? "LQR" : "—"),
                   e("td", null, s.sensors),
                   e("td", null, s.method),
                   e("td", null, fmt(m.rmse_position_m, 4)),
@@ -1214,20 +1375,26 @@
           e(
             "li",
             null,
-            e("strong", null, "Benefit: "),
-            "GPS+IMU LQG ≪ naive on the same sensors (reconstruction + noise rejection)."
+            e("strong", null, "Filter benefit (either law): "),
+            "GPS+IMU + KF ≪ naive partial on the same sensors."
           ),
           e(
             "li",
             null,
-            e("strong", null, "GPS-denied win: "),
-            "AHRS-like (att+ω) LQG stays finite; still far from ideal without position."
+            e("strong", null, "Law comparison: "),
+            "Ideal / filtered columns show whether PID or hover LQR tracks better under the same information."
           ),
           e(
             "li",
             null,
-            e("strong", null, "Weakness: "),
-            "IMU-only (ω) cannot observe position — LQG does not invent GPS."
+            e("strong", null, "GPS-denied: "),
+            "AHRS (att+ω) stays finite; IMU-only (ω) cannot observe position for either controller."
+          ),
+          e(
+            "li",
+            null,
+            e("strong", null, "Naming: "),
+            "LQG = linear KF + LQR. PID+KF is the cascade law on x_hat, not classical LQG."
           ),
           e(
             "li",

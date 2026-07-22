@@ -1,0 +1,41 @@
+# Teaching baseline: PID on naive partial sensors (GPS pos + gyro), no filter.
+# Same channels as figure_eight_gps_imu_naive; unmeasured states zeroed on bus.
+schema_version: 1
+study_id: figure_eight_gps_imu_naive_pid
+seed: 7
+
+vehicle: configs/vehicles/default_quadrotor.yaml
+
+controller:
+  type: pid_cascade
+  kp_pos: [2.5, 2.5, 6.0]
+  kd_pos: [2.0, 2.0, 3.5]
+  kp_att: [8.0, 8.0, 2.0]
+  kd_rate: [0.8, 0.8, 0.4]
+  max_tilt_rad: 0.436
+
+guidance:
+  type: waypoints
+  mission_file: configs/missions/figure_eight.yaml
+  method: auto
+  yaw_mode: constant
+  sample_dt_s: 0.01
+  fail_on_infeasible: false
+
+sim:
+  dt_s: 0.01
+  method: rk45
+  rtol: 1.0e-5
+  atol: 1.0e-7
+  attitude: euler
+  observer:
+    type: partial_raw
+    seed: 7
+    pos_sigma_m: 0.05
+    vel_sigma_m_s: 0.05
+    att_sigma_rad: 0.03
+    omega_sigma_rad_s: 0.04
+    channels: [pos, omega]
+
+metrics:
+  position_bound_m: 1.5

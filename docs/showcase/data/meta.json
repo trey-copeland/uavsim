@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-21T04:47:06.345074+00:00",
+  "generated_at": "2026-07-22T01:53:50.939326+00:00",
   "uavsim_version": "0.1.0",
   "runs": [
     "figure_eight_lqr",
@@ -9,6 +9,10 @@
     "ahrs_lqg",
     "imu_only_lqg",
     "figure_eight_pid",
+    "gps_imu_naive_pid",
+    "gps_imu_kf_pid",
+    "ahrs_kf_pid",
+    "imu_only_kf_pid",
     "gps_imu_lqg_mc"
   ],
   "has_envelope": true,
