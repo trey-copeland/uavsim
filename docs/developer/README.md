@@ -8,9 +8,9 @@ Guides for **using** and **extending** `uavsim` without reading the whole tree.
 | [Airframe families](airframes.md) | Quad today; tilt-rotor / multi-airframe vision; HIL rig tie-in |
 | [Control](control.md) | Built-in LQR & PID, tuning, adding a new control law |
 | [Guidance & navigation](guidance.md) | Hold / waypoints, missions, adding a guidance backend |
-| [Dynamics](dynamics.md) | Euler/quat plants, `DynamicsModel`, SO(3) error; drag/flex plan |
-| [Estimation](estimation.md) | KF/MEKF observers, partial sensors, `sim.observer` |
-| [Extensibility backlog](EXTENSIBILITY_TODO.md) | Consolidated **TODOs** (plugins, observers, airframes, HIL) |
+| [Dynamics](dynamics.md) | Euler/quat/motors plants, aero/GE, `DynamicsModel`, SO(3); flex next |
+| [Estimation](estimation.md) | KF/MEKF/partial_raw, channels (GPS, AHRS, **flow+alt**), `sim.observer` |
+| [Extensibility backlog](EXTENSIBILITY_TODO.md) | Consolidated **TODOs** (plugins, flex, airframes, HIL) |
 
 **Related product docs**
 
@@ -28,16 +28,17 @@ Study YAML
   ├─ vehicle        → VehicleParams (configs/vehicles/)
   ├─ controller     → Controller protocol (lqr_hover | pid_cascade | …)
   ├─ guidance       → GuidanceBackend.plan → ReferenceTrajectory
-  └─ sim            → plant (euler|quat) → optional observer → control → metrics/artifacts
+  └─ sim            → plant (wrench|motors × euler|quat) → optional observer → control → metrics
 ```
 
 **Hard rules (do not violate when extending)**
 
 1. **`control` must not import `guidance`** (or concrete waypoint types).
-2. **`dynamics` owns `f(x,u,p)`** — not gains, not missions.
+2. **`dynamics` owns `f(x,u,p)`** — not gains, not missions. Aero/GE live on `vehicle.aero` + `dynamics/aero.py`.
 3. **`reference` is backend-agnostic** — planners produce it; sim/control only `evaluate(t)`.
-4. **Viz/report only read run dirs** — never live sim state.
+4. **Viz/report only read run dirs** — never live sim state. Showcase Compare is a pure consumer UI.
 5. Prefer **config + registry/factory** over hard-coding new types in the CLI.
+6. Controllers always consume **Euler 12-state** \(\hat x\) (or truth); new sensors map through `estimation` channels.
 
 ## Frames & state (all guides)
 
@@ -66,8 +67,8 @@ uv run pytest -q
 ```text
 src/uavsim/
   vehicles/     # params only
-  dynamics/     # f, linearize, DynamicsModel, SO(3) error
-  estimation/   # observers (KF/MEKF), measurements
+  dynamics/     # f, linearize, mixer, motors, aero, DynamicsModel, SO(3)
+  estimation/   # observers (KF/MEKF/partial_raw), channels, measurements
   reference/    # ReferenceTrajectory, feasibility
   guidance/     # planners + registry
   control/      # laws + factory + export

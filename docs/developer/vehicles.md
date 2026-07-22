@@ -108,8 +108,9 @@ print(v.mass_kg, v.u_hover())
 | Gap | Why it matters | Status |
 |-----|----------------|--------|
 | Off-diagonal inertia products | Real CAD inertia tensors | **TODO** — model is diagonal-only |
-| Extra vehicle fields (drag coeffs, battery) | Config for aero | **TODO** — `extra="forbid"` until schema extended |
-| Propulsion `ct` / `cq` / motor τ | Mixer + motor plant | **Done** — optional `propulsion:` block |
+| Battery / extra mission params | Endurance studies | **TODO** — `extra="forbid"` until schema extended |
+| Propulsion `ct` / `cq` / motor τ / ω limits | Mixer + motor plant | **Done** — optional `propulsion:` block |
+| Aero drag / prop H / ground effect | Nonlinear \(f\) | **Done** — `aero:` defaults off; demos `*_aero.yaml`, `*_ge.yaml` |
 | Control allocation / mixer | Map wrench ↔ motor forces; arm length used | **Done** — `sim.plant: motors` |
 | Multi-vehicle / heterogeneous fleets | Formation, different platforms | **Out of core scope** |
 | Validation \(F_\max \ge mg\) as hard error | Catch bad configs early | **TODO** (soft today) |

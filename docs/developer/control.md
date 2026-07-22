@@ -182,7 +182,7 @@ If the law needs synthesis (like LQR), expose `design_my_law(vehicle, **weights)
 | Plugin discovery (entry points / external packages) | **TODO** |
 | Geometric / SE(3) controller | **TODO** (SPEC Should alternate — PID shipped first) |
 | Discrete-time / sample-rate aware laws | **TODO** — continuous ODE + hold for now |
-| Measurement-based laws / observers | **Done (5d)** — `sim.observer.type: none \| linear_kf \| mekf`; optional `channels`; `x_hat` in timeseries; see [estimation.md](estimation.md) |
+| Measurement-based laws / observers | **Done (5d)** — `none \| linear_kf \| mekf \| partial_raw`; channels incl. `body_vel`/`alt`; `x_hat` in timeseries; see [estimation.md](estimation.md) |
 | Per-trial redesign of non-LQR laws in MC | Partial — `redesign_controller` re-runs factory; document per law |
 
 See [EXTENSIBILITY_TODO.md](EXTENSIBILITY_TODO.md).

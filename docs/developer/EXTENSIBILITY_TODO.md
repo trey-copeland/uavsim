@@ -106,7 +106,7 @@ Guide: [dynamics.md](dynamics.md) · [airframes.md](airframes.md) · ROADMAP Pha
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
 | S-1 | Study composes vehicle + controller + guidance | **Done** | |
-| S-2 | MC param perturbation of vehicle | **Done** | mass/I/arm |
+| S-2 | MC param perturbation of vehicle | **Done** | mass/I/arm; optional propulsion scatter (`ct`/`cq`/τ/ω_max) |
 | S-3 | MC redesign non-LQR controllers | **Partial** | Factory re-run; validate per law |
 | S-4 | Study-selected dynamics backend | **Partial** | `sim.attitude: euler\|quat` wired; arbitrary named `dynamics.type` still open |
 | S-7 | Airframe selector in studies + MC perturbations | **TODO** | Comparative robustness (e.g. quad vs tilt-rotor) |
@@ -130,12 +130,14 @@ Hardware and transport live primarily in a **HIL companion** project; this backl
 **SIL (Track A — do now while HIL rig is ordered/built):**
 
 1. ~~**D-10 / 5c**~~ — **Done** (quat plant, SO(3) control, aggressive F8, `DynamicsModel`).  
-2. ~~**Phase 5d observers**~~ — **Done** (EST-1…5, C-9/C-11: `linear_kf` / `mekf`, channels, `x_hat`).  
+2. ~~**Phase 5d observers**~~ — **Done** (EST-1…6, C-9/C-11: KF/MEKF/partial_raw, flow+alt, `x_hat`).  
 3. ~~**D-7 + D-8**~~ — **Done** (mixer + first-order motors; `sim.plant: motors`).  
 4. ~~**D-4 / D-5**~~ — **Done** (body drag, prop H-force, ground effect; `dynamics/aero.py`).  
-5. **D-13 / V-7** — flexible / elastic lumped states ← **Now**.  
-6. **G-5 / C-5** — registries when plugin ergonomics block experiments.  
-7. **V-8 / D-12 / S-7** — multi-airframe families after mixer + protocol.
+5. ~~**EST-6 GPS-denied flow+alt**~~ — **Done** (showcase matrix column + demos).  
+6. **D-13 / V-7** — flexible / elastic lumped states ← **Now**.  
+7. **G-5 / C-5** — registries when plugin ergonomics block experiments.  
+8. **EST-7 / EST-8** — state-dep. flow \(H\), accel-aided MEKF (as HIL approaches).  
+9. **V-8 / D-12 / S-7** — multi-airframe families after mixer + protocol.
 
 **HIL rig (Track B — parallel, long lead; software when hardware exists):**
 
@@ -144,13 +146,13 @@ Hardware and transport live primarily in a **HIL companion** project; this backl
 3. Companion: NATS/MQTT + dashboard (COMM-1); DDS/CAN later (COMM-2).  
 4. Phase 7 transport + SIL↔HIL compare (**uses 5d observer path**).
 
-Do **not** block SIL plant work on the rig. Prefer finishing motors/mixer (and observers already shipped) before claiming HIL-ready control.
+Do **not** block SIL plant work on the rig. Motors, observers, and basic aero are shipped; claim HIL-ready control only after transport + fixed-step seams.
 
 ---
 
 ## Vision note (2026-07)
 
-Design extensions so we can grow **mission envelope** (quaternions), **plant fidelity** (motors, flex), and **HIL** without breaking:
+Design extensions so we can grow **mission envelope** (quaternions), **plant fidelity** (motors, aero, flex), **estimation** (GPS-denied aids), and **HIL** without breaking:
 
 - default quadrotor SIL demos and showcase regression  
 - Monte Carlo / export / compare  

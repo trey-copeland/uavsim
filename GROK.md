@@ -180,11 +180,11 @@ Carry these from SPEC §7; architecture doc will refine layout.
 
 ## 7. Near-term process (stand-up path)
 
-**Done:** SPEC v0.2+, architecture v0.4, `ROADMAP.md`, process docs, MIT license.
+**Done (product core through Track A plant/estimation):** SPEC v0.2+, ARCH v0.7, phases 0–5d, motors/mixer, aero/GE, GPS-denied flow+alt, portfolio showcase matrix. Process docs + MIT.
 
-**Next:** see **`ROADMAP.md`** (Phase 2 waypoint guidance).
+**Next:** see **`ROADMAP.md`** (flex D-13 / V-7; Phase 6 nav as needed; HIL when rig ready).
 
-Prefer implementing against `docs/ARCHITECTURE.md`; if reality forces a change, update ARCH + ROADMAP in the same change set.
+Prefer implementing against `docs/ARCHITECTURE.md`; if reality forces a change, update ARCH + ROADMAP (and EXTENSIBILITY_TODO) in the same change set.
 
 ---
 

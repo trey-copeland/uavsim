@@ -200,13 +200,14 @@ Shipped: `EulerRigidBodyDynamics`, `QuatRigidBodyDynamics`; `SimPlant` injects v
 |------|--------|
 | `DynamicsModel` + Euler/quat plants | **Done** (D-3, D-10 core) |
 | SO(3) attitude error in control/metrics | **Done** |
-| Translational drag (vehicle / prop) | **TODO** — not in \(f\) |
-| Aero moments / rate damping | **TODO** |
-| Study-selected custom dynamics type beyond euler/quat | **Partial** (S-4) |
-| Numeric linearization helper | **TODO** |
-| Motor/prop states | **TODO** (D-7) |
-| Mixer / allocation | **TODO** (D-8) |
-| Wind / disturbance injection | **TODO** (could be \(u\) or force in \(f\)) |
-| Native 13-state timeseries export | **TODO** (optional) |
+| Body drag + prop H-force + rate damp | **Done** (D-4/D-5; `aero.py`, defaults off) |
+| Ground-effect κ on thrust | **Done** (Cheeseman / exp; `AeroParams.ground_effect`) |
+| Motor/prop first-order states | **Done** (D-7; `sim.plant: motors`) |
+| Mixer / allocation | **Done** (D-8; X-quad) |
+| Study-selected custom dynamics type beyond euler/quat/motors | **Partial** (S-4) |
+| Numeric linearization helper | **TODO** (D-6) |
+| Wind / disturbance injection | **TODO** (D-9) |
+| Flexible / elastic modes | **TODO** (D-13 / V-7) ← next plant fidelity |
+| Native 13-state timeseries export | **TODO** (optional polish) |
 
 Prefer a new `DynamicsModel` subclass (or optional aero terms inside the default models) over forking `closed_loop` for research plant changes.

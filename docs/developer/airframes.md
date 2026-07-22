@@ -11,25 +11,27 @@
 
 | Family | Model | Actuation | Status |
 |--------|--------|-----------|--------|
-| Quadrotor | Rigid **6-DoF** NED / FRD-like; Euler default or optional **quat** plant | Body wrench \([F, \tau]\) (mixer **TODO** D-8) | **Shipped** — default vehicle + studies |
+| Quadrotor | Rigid **6-DoF** NED / FRD-like; Euler default or optional **quat** plant | Body wrench \([F, \tau]\); optional **mixer + motors** (`sim.plant: motors`) | **Shipped** — default vehicle + studies + aero opt-in |
 
 See [vehicles.md](vehicles.md) and [dynamics.md](dynamics.md) for today’s contracts.
 
 ---
 
-## SIL foundation (Phase 5c/5d — landed)
+## SIL foundation (Phase 5c/5d + plant fidelity — landed)
 
 Shipped while the HIL rig is ordered/built:
 
 1. ~~**D-10**~~ — quaternion / SO(3) attitude + error-state control/metrics.  
 2. ~~**D-3**~~ — `DynamicsModel` protocol.  
-3. ~~**5d observers**~~ — `linear_kf` / `mekf` in the loop (default full-state unchanged).  
+3. ~~**5d observers**~~ — `linear_kf` / `mekf` / `partial_raw` (default full-state unchanged); EST-6 flow+alt.  
+4. ~~**D-7 / D-8**~~ — first-order motors + X-quad mixer.  
+5. ~~**D-4 / D-5**~~ — body drag, prop H-force, ground effect (`vehicle.aero`).  
 
-**Next before multi-airframe:** **D-7/D-8 → D-13** — motors/mixer, then flexible/elastic lumped states.
+**Next before multi-airframe:** **D-13 / V-7** — flexible/elastic lumped states.
 
 ---
 
-## Planned (additive, after motors/mixer)
+## Planned (additive, after flex / as research needs)
 
 | Family | Sketch | Design notes |
 |--------|--------|--------------|

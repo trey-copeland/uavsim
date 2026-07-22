@@ -1,7 +1,7 @@
 # Architecture — `uavsim` / quadrotor-sim
 
-**Status:** v0.6 (stand-up map)  
-**Last updated:** 2026-07-20  
+**Status:** v0.7 (stand-up map)  
+**Last updated:** 2026-07-22  
 **Normative product intent:** [`SPEC.md`](../SPEC.md) (v0.2+)  
 **Working agreements:** [`GROK.md`](../GROK.md)  
 **How to extend (research users):** [`docs/developer/`](developer/README.md) · backlog [`EXTENSIBILITY_TODO.md`](developer/EXTENSIBILITY_TODO.md)
@@ -491,7 +491,7 @@ For HIL-ready design:
 
 - Define **`MeasurementBus`** early even if SIL fills it from full state (`x` → ideal measurements).
 - Controllers that need full state take measurements (SIL may fill from `x_true`).  
-- **Phase 5d (shipped):** optional `StateObserver` (`linear_kf` / `mekf`) between plant outputs and `Controller.compute` — default remains ideal full state (`none`).
+- **Phase 5d (shipped):** optional `StateObserver` (`linear_kf` / `mekf` / `partial_raw`) between plant outputs and `Controller.compute` — default remains ideal full state (`none`). Channels include GPS-style `pos`/`omega`, AHRS `att`/`omega`, and GPS-denied **`body_vel`/`alt`** (optical-flow + altitude proxy).
 - Avoid baking `compute(t, x, …)` as the *only* possible signature forever — prefer:
 
 ```text
@@ -593,8 +593,8 @@ The architecture is intended to grow **beyond a single quadrotor** without rewri
 
 **Seams**
 
-- Pluggable **`DynamicsModel`** (D-3) for custom \(f(x, u, p)\) with optional extra states (tilt angles, airspeed, motor speeds, …).
-- Generalized **`VehicleParams`** and actuator **mixer** (D-7/D-8) so allocation is not hard-coded as body-wrench forever.
+- Pluggable **`DynamicsModel`** (D-3) for custom \(f(x, u, p)\) with optional extra states (tilt angles, airspeed, motor speeds, …). **Shipped:** Euler/quat rigid body + optional first-order motors.
+- Generalized **`VehicleParams`** and actuator **mixer** (D-7/D-8 **shipped** for X-quad; body-wrench remains the default controller interface).
 - Mode-aware guidance / controllers and trim conditions where the airframe needs them.
 - **Airframe selector** in study configs (S-7) so MC and compare can span families.
 
@@ -603,7 +603,7 @@ The architecture is intended to grow **beyond a single quadrotor** without rewri
 - **Tilt-rotor / hybrid VTOL:** variable thrust vectoring, hover / transition / cruise modes, hybrid aero.
 - **Others:** fixed-wing, coaxial, etc., as research needs justify.
 
-**Design guardrails** (apply to high-priority work — motor dynamics, observers, HIL rig, comms):
+**Design guardrails** (apply to high-priority work — flex modes, multi-airframe, HIL rig, comms):
 
 1. Keep core **6-DoF rigid-body quadrotor** as the reusable base and default demo path.  
 2. Prefer **additive** states / params — do not break the shipped 12-state NED Euler plant.  
@@ -842,7 +842,10 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | 5b | Visualization pack + showcase | interactive 3D, MC plots, Pages gallery |
 | 5c | Quaternion plant + SO(3) error + `DynamicsModel` | aggressive mission path; plant seams |
 | 5d | Observer-in-the-loop (KF/MEKF) | control from estimates; default full-state |
-| — | Motors / mixer (D-7/D-8) | **next** SIL plant fidelity |
+| — | Motors / mixer (D-7/D-8) | **Done** (`sim.plant: motors`) |
+| — | Aero / GE (D-4/D-5) | **Done** (`AeroParams`, defaults off) |
+| — | GPS-denied flow+alt (EST-6) | **Done** (`body_vel`/`alt`; showcase matrix) |
+| — | Flex / elastic plant (D-13 / V-7) | **next** SIL plant fidelity |
 | 6 | Post-core: non-waypoint guidance | — |
 | 7 | Post-core: fixed-step + HIL transport + SIL↔HIL compare | — |
 
@@ -870,6 +873,7 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | 2026-07-20 | Multi-airframe extensibility (§8.6): additive dynamics/params; HIL companion for rig; preserve MC/compare/viz |
 | 2026-07-20 | Phase **5c** priority: quaternion attitude (D-10) + `DynamicsModel` (D-3) while HIL rig is built in parallel; Euler 12-state remains shipped default until 5c exit |
 | 2026-07-20 | Docs audit: `estimation` package + 5c/5d as shipped; layout/DAG/phase table synced |
+| 2026-07-22 | Motors/aero/GE shipped; EST-6 flow+alt; phase table next = flex (D-13); showcase controller×sensor matrix |
 
 ---
 
@@ -884,6 +888,7 @@ No MATLAB bit-parity goldens. Soft metric bands only.
 | v0.4 | 2026-07-18 | §10.4–10.5 compare/artifact quality; phase table with export/compare before HIL; SPEC v0.2 alignment |
 | v0.5 | 2026-07-20 | §8.6 multi-airframe extensibility + developer airframes guide; guardrails for motor/HIL/comms |
 | v0.6 | 2026-07-20 | `uavsim.estimation`; DynamicsModel/quat/observer status; doc map + phase rows for 5b–5d |
+| v0.7 | 2026-07-22 | Motors/mixer + aero/GE + flow+alt estimation; flex next; phase table sync |
 
 ---
 

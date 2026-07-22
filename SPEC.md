@@ -2,9 +2,9 @@
 
 **Working title / repo:** `quadrotor-sim`  
 **CLI / product name:** `uavsim`  
-**Status:** Living core specification (v0.2.3)  
+**Status:** Living core specification (v0.2.4)  
 **Author:** Trey Copeland  
-**Last updated:** 2026-07-20  
+**Last updated:** 2026-07-22  
 **License (intent):** MIT  
 
 **Companion docs**
@@ -339,13 +339,14 @@ Documented as roadmap, not core-complete *implementation* commitments. **Archite
 
 **Other GNC / product**
 
-- ~~Sensor models and EKF / state estimation~~ → **Promoted to Phase 5d (ROADMAP)** — ideal full-state bus remains default; observer-in-the-loop is in-scope SIL before HIL  
-- Motor dynamics, propeller maps, allocation (+/X configs) beyond torque/thrust interface
-- Environment: wind, drag, ground effect, rotor interaction
-- Multi-vehicle / formation
-- Gain scheduling, adaptive / robust advanced controllers (beyond LQR + one alternate)
-- **HIL / PIL execution** (real FC or target processor in the loop) — **design seams in ARCH §7A**; not a core implementation commitment
-- Full interactive web UI (static results gallery is optional flex, not required)
+- ~~Sensor models and EKF / state estimation~~ → **Shipped Phase 5d** — ideal full-state bus remains default; `linear_kf` / `mekf` / `partial_raw`; GPS-denied channels (`body_vel`, `alt`, …)  
+- ~~Motor dynamics + allocation (first-order ω, X-quad mixer)~~ → **Shipped** (`sim.plant: motors`, D-7/D-8); richer propeller maps / + configs still open  
+- ~~Body drag / prop H / ground effect (basic)~~ → **Shipped** (`vehicle.aero`, defaults off); **still deferred:** wind fields, rotor–rotor interaction, full BEMT  
+- Flexible / elastic body (lumped modes) — ROADMAP next plant fidelity  
+- Multi-vehicle / formation  
+- Gain scheduling, adaptive / robust advanced controllers (beyond LQR + PID)  
+- **HIL / PIL execution** (real FC or target processor in the loop) — **design seams in ARCH §7A**; not a core implementation commitment  
+- Full interactive web UI (static results gallery / Pages showcase is optional portfolio flex, not required)
 
 Deferred items should **not** force core interfaces into a dead end (see §7).
 
@@ -1019,6 +1020,7 @@ Phases are sequential **capability gates**, not strict calendar. Systems work is
 | v0.2.1 | 2026-07-18 | Link `ROADMAP.md` as sequencing home; §19 points to roadmap |
 | v0.2.2 | 2026-07-19 | §11A visualization pack V1–V8; S5b interactive 3D; Phase 5b |
 | v0.2.3 | 2026-07-20 | Docs audit: heritage plant posture = 5c done; companion docs map includes developer hub + README; sensor/EKF still deferred → 5d (see ROADMAP) |
+| v0.2.4 | 2026-07-22 | Deferred list: 5d estimation + motors/mixer + basic aero/GE marked shipped; wind/BEMT/flex remain open; flex next on ROADMAP |
 
 ---
 

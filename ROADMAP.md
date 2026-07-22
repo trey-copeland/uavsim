@@ -1,7 +1,7 @@
 # ROADMAP — `uavsim` / quadrotor-sim
 
 **Status:** Active  
-**Last updated:** 2026-07-20  
+**Last updated:** 2026-07-22  
 **Normative detail:** [`SPEC.md`](SPEC.md) (requirements, stories, acceptance) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (how) · [`GROK.md`](GROK.md) (process) · [developer hub](docs/developer/README.md)
 
 This roadmap is the **sequencing and prioritization** view. It does not replace the SPEC.
@@ -57,7 +57,8 @@ Ship when SPEC §17 holds, especially:
 | Phase 5b Visualization pack (S5 / §11A V1–V8) | **Done** |
 | Portfolio advertise (Pages + LinkedIn) | **Done** |
 | Phase 5c Attitude / plant fidelity (quaternions → richer missions) | **Done** (optional native 13-state export still open) |
-| Phase 5d Observer-in-the-loop (KF/EKF) | **Done** (`linear_kf`, `mekf`, partial channels, `x_hat` log) |
+| Phase 5d Observer-in-the-loop (KF/EKF) | **Done** (`linear_kf`, `mekf`, `partial_raw`, channels incl. flow+alt, `x_hat` log) |
+| Showcase controller × sensor matrix | **Done** (LQR/LQG + PID × ideal/GPS/AHRS/flow/IMU; interactive Compare) |
 | HIL test rig (hardware order/build) | **In progress (parallel, long lead)** |
 | Motors / mixer (D-7, D-8) | **Done** (`sim.plant: motors`, figure_eight_motors) |
 | Drag / aero / ground effect (D-4, D-5) | **Done** (`AeroParams`, figure_eight_aero, hover_ground_effect) |
@@ -153,13 +154,14 @@ Track against [`docs/developer/EXTENSIBILITY_TODO.md`](docs/developer/EXTENSIBIL
 
 | Theme | Intent | Notes |
 |-------|--------|-------|
-| Motor / mixer foundation | First-order motor states + allocation | D-7, D-8 — after D-3 |
-| Flexible body | Lumped elasticity / arm modes | V-7; needs extra states on DynamicsModel |
-| Pluggable airframe families | Tilt-rotor VTOL, hybrids, etc. | V-8, D-12; after mixer |
+| Motor / mixer foundation | First-order motor states + allocation | **Done** D-7, D-8 |
+| Aero / GE | Body drag, prop H, ground effect | **Done** D-4, D-5 |
+| Flexible body | Lumped elasticity / arm modes | V-7 / D-13 ← **next** |
+| Pluggable airframe families | Tilt-rotor VTOL, hybrids, etc. | V-8, D-12; after flex/mixer |
 | HIL companion + rig | myDAQ, high-rate sensors, NATS/MQTT | D-11, COMM-*, INSTR-1; Track B |
 | Comparative MC | Airframe selector in studies | S-7 |
 
-**Priority alignment:** **quaternions + dynamics protocol first** → motors/flex → multi-airframe → full HIL software. Preserve MC, export/compare, and viz; rebaseline soft metrics when the state layout changes.
+**Priority alignment:** quats + protocol + motors + aero **shipped** → **flex** → multi-airframe → full HIL software. Preserve MC, export/compare, and viz; rebaseline soft metrics when the state layout changes.
 
 ---
 

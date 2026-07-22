@@ -14,9 +14,10 @@ uv run uavsim report runs/<study_id>_<timestamp>/ --interactive
 # Full portfolio rollup (React SPA + frozen base-case JSON)
 uv run uavsim gallery --base-case
 python -m http.server 8765 --directory docs/showcase
+# Overview: controller × sensor matrix · Compare: pick A/B runs in the browser
 ```
 
-See also [`docs/showcase/README.md`](showcase/README.md) for GitHub Pages.
+See also [`docs/showcase/README.md`](showcase/README.md) for GitHub Pages, matrix studies, and rebuild notes.
 
 Dual-run:
 
