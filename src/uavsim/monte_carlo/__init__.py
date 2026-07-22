@@ -1,6 +1,12 @@
 """Monte Carlo engine, sharding, merge, and docker orchestration hooks."""
 
-from uavsim.monte_carlo.docker_run import default_image_name, docker_available, docker_study
+from uavsim.monte_carlo.docker_run import (
+    default_image_name,
+    docker_available,
+    docker_study,
+    ensure_image,
+    image_is_stale,
+)
 from uavsim.monte_carlo.engine import MonteCarloResult, default_mc_progress, run_monte_carlo
 from uavsim.monte_carlo.io import read_trials_csv, write_trials_csv, write_trials_json
 from uavsim.monte_carlo.perturb import PerturbationSpec, perturb_vehicle, trial_rng
@@ -25,6 +31,8 @@ __all__ = [
     "default_mc_progress",
     "docker_available",
     "docker_study",
+    "ensure_image",
+    "image_is_stale",
     "merge_shard_directories",
     "merge_trial_rows",
     "partition_trials",

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "title": "uavsim \u00b7 flight results",
   "description": "Figure-eight SIL: controller \u00d7 sensor matrix (LQR/LQG and PID \u00d7 ideal, GPS+IMU naive/KF, AHRS, optical-flow+altitude, IMU-only), Monte Carlo on GPS+IMU LQG, and a time-scale envelope for hover-linearization limits. Simulation only.",
-  "generated_at": "2026-07-22T02:14:00.953246+00:00",
+  "generated_at": "2026-07-22T02:46:33.490226+00:00",
   "uavsim_version": "0.1.0",
   "runs": [
     {
@@ -10,7 +10,7 @@
       "label": "Ideal LQR (full state)",
       "role": "ideal_lqr",
       "study_id": "figure_eight",
-      "source_run": "figure_eight_20260722T020932Z",
+      "source_run": "figure_eight_20260722T024201Z",
       "metrics": {
         "attitude_error_model": "so3_geodesic",
         "control_effort_proxy": 156.98555275445594,
@@ -37,6 +37,7 @@
         "sim_message": "The solver successfully reached the end of the integration interval.",
         "sim_success": true,
         "success": true,
+        "success_pos_limit_m": 1.5,
         "t_final_s": 32.0,
         "time_in_bounds_frac": 1.0
       },
@@ -8499,7 +8500,7 @@
       "label": "GPS+IMU naive \u2192 LQR",
       "role": "est_gps_imu_naive",
       "study_id": "figure_eight_gps_imu_naive",
-      "source_run": "figure_eight_gps_imu_naive_20260722T020934Z",
+      "source_run": "figure_eight_gps_imu_naive_20260722T024202Z",
       "metrics": {
         "attitude_error_model": "so3_geodesic",
         "control_effort_proxy": 307.4926975207503,
@@ -8526,6 +8527,7 @@
         "sim_message": "euler/partial_raw RK4 ok",
         "sim_success": true,
         "success": false,
+        "success_pos_limit_m": 4.5,
         "t_final_s": 32.0,
         "time_in_bounds_frac": 0.06279287722586692
       },
@@ -16988,7 +16990,7 @@
       "label": "GPS+IMU LQG",
       "role": "est_gps_imu_lqg",
       "study_id": "figure_eight_gps_imu_lqg",
-      "source_run": "figure_eight_gps_imu_lqg_20260722T020935Z",
+      "source_run": "figure_eight_gps_imu_lqg_20260722T024204Z",
       "metrics": {
         "attitude_error_model": "so3_geodesic",
         "control_effort_proxy": 157.56179674967007,
@@ -17015,6 +17017,7 @@
         "sim_message": "euler/linear_kf RK4 ok",
         "sim_success": true,
         "success": true,
+        "success_pos_limit_m": 2.25,
         "t_final_s": 32.0,
         "time_in_bounds_frac": 1.0
       },
@@ -25477,7 +25480,7 @@
       "label": "AHRS LQG",
       "role": "est_ahrs_lqg",
       "study_id": "figure_eight_ahrs_lqg",
-      "source_run": "figure_eight_ahrs_lqg_20260722T020937Z",
+      "source_run": "figure_eight_ahrs_lqg_20260722T024206Z",
       "metrics": {
         "attitude_error_model": "so3_geodesic",
         "control_effort_proxy": 156.98213882026872,
@@ -25503,7 +25506,8 @@
         "sim_attitude": "euler",
         "sim_message": "euler/linear_kf RK4 ok",
         "sim_success": true,
-        "success": true,
+        "success": false,
+        "success_pos_limit_m": 3.0,
         "t_final_s": 32.0,
         "time_in_bounds_frac": 0.28334895345204625
       },
@@ -25526,7 +25530,7 @@
       },
       "manifest": {
         "seed": 7,
-        "status": "success",
+        "status": "failed",
         "execution": {
           "mode": "local",
           "shards": 1,
@@ -33966,7 +33970,7 @@
       "label": "Flow+alt LQG",
       "role": "est_flow_alt_lqg",
       "study_id": "figure_eight_flow_alt_lqg",
-      "source_run": "figure_eight_flow_alt_lqg_20260722T020939Z",
+      "source_run": "figure_eight_flow_alt_lqg_20260722T024208Z",
       "metrics": {
         "attitude_error_model": "so3_geodesic",
         "control_effort_proxy": 157.07568236714087,
@@ -33993,6 +33997,7 @@
         "sim_message": "euler/linear_kf RK4 ok",
         "sim_success": true,
         "success": true,
+        "success_pos_limit_m": 3.0,
         "t_final_s": 32.0,
         "time_in_bounds_frac": 1.0
       },
@@ -42455,7 +42460,7 @@
       "label": "IMU-only LQG",
       "role": "est_imu_only_lqg",
       "study_id": "figure_eight_imu_only_lqg",
-      "source_run": "figure_eight_imu_only_lqg_20260722T020941Z",
+      "source_run": "figure_eight_imu_only_lqg_20260722T024209Z",
       "metrics": {
         "attitude_error_model": "so3_geodesic",
         "control_effort_proxy": 156.96105820995783,
@@ -42482,6 +42487,7 @@
         "sim_message": "euler/linear_kf RK4 ok",
         "sim_success": true,
         "success": false,
+        "success_pos_limit_m": 6.0,
         "t_final_s": 32.0,
         "time_in_bounds_frac": 0.169009684473602
       },
@@ -50944,7 +50950,7 @@
       "label": "Ideal PID (full state)",
       "role": "ideal_pid",
       "study_id": "figure_eight_pid",
-      "source_run": "figure_eight_pid_20260722T020944Z",
+      "source_run": "figure_eight_pid_20260722T024213Z",
       "metrics": {
         "attitude_error_model": "so3_geodesic",
         "control_effort_proxy": 157.0126347548749,
@@ -50971,6 +50977,7 @@
         "sim_message": "The solver successfully reached the end of the integration interval.",
         "sim_success": true,
         "success": true,
+        "success_pos_limit_m": 2.25,
         "t_final_s": 32.0,
         "time_in_bounds_frac": 1.0
       },
@@ -59433,7 +59440,7 @@
       "label": "GPS+IMU naive \u2192 PID",
       "role": "est_gps_imu_naive_pid",
       "study_id": "figure_eight_gps_imu_naive_pid",
-      "source_run": "figure_eight_gps_imu_naive_pid_20260722T020946Z",
+      "source_run": "figure_eight_gps_imu_naive_pid_20260722T024215Z",
       "metrics": {
         "attitude_error_model": "so3_geodesic",
         "control_effort_proxy": 293.5957460102606,
@@ -59460,6 +59467,7 @@
         "sim_message": "euler/partial_raw RK4 ok",
         "sim_success": true,
         "success": false,
+        "success_pos_limit_m": 4.5,
         "t_final_s": 32.0,
         "time_in_bounds_frac": 0.11215245235863792
       },
@@ -67922,7 +67930,7 @@
       "label": "GPS+IMU KF \u2192 PID",
       "role": "est_gps_imu_kf_pid",
       "study_id": "figure_eight_gps_imu_kf_pid",
-      "source_run": "figure_eight_gps_imu_kf_pid_20260722T020947Z",
+      "source_run": "figure_eight_gps_imu_kf_pid_20260722T024217Z",
       "metrics": {
         "attitude_error_model": "so3_geodesic",
         "control_effort_proxy": 157.07596185996306,
@@ -67949,6 +67957,7 @@
         "sim_message": "euler/linear_kf RK4 ok",
         "sim_success": true,
         "success": true,
+        "success_pos_limit_m": 2.25,
         "t_final_s": 32.0,
         "time_in_bounds_frac": 1.0
       },
@@ -76411,7 +76420,7 @@
       "label": "AHRS KF \u2192 PID",
       "role": "est_ahrs_kf_pid",
       "study_id": "figure_eight_ahrs_kf_pid",
-      "source_run": "figure_eight_ahrs_kf_pid_20260722T020949Z",
+      "source_run": "figure_eight_ahrs_kf_pid_20260722T024218Z",
       "metrics": {
         "attitude_error_model": "so3_geodesic",
         "control_effort_proxy": 156.9672145533618,
@@ -76437,7 +76446,8 @@
         "sim_attitude": "euler",
         "sim_message": "euler/linear_kf RK4 ok",
         "sim_success": true,
-        "success": true,
+        "success": false,
+        "success_pos_limit_m": 3.0,
         "t_final_s": 32.0,
         "time_in_bounds_frac": 0.2942830365510778
       },
@@ -76460,7 +76470,7 @@
       },
       "manifest": {
         "seed": 7,
-        "status": "success",
+        "status": "failed",
         "execution": {
           "mode": "local",
           "shards": 1,
@@ -84900,7 +84910,7 @@
       "label": "Flow+alt KF \u2192 PID",
       "role": "est_flow_alt_kf_pid",
       "study_id": "figure_eight_flow_alt_kf_pid",
-      "source_run": "figure_eight_flow_alt_kf_pid_20260722T020951Z",
+      "source_run": "figure_eight_flow_alt_kf_pid_20260722T024220Z",
       "metrics": {
         "attitude_error_model": "so3_geodesic",
         "control_effort_proxy": 157.02653434119154,
@@ -84927,6 +84937,7 @@
         "sim_message": "euler/linear_kf RK4 ok",
         "sim_success": true,
         "success": true,
+        "success_pos_limit_m": 3.0,
         "t_final_s": 32.0,
         "time_in_bounds_frac": 1.0
       },
@@ -93389,7 +93400,7 @@
       "label": "IMU-only KF \u2192 PID",
       "role": "est_imu_only_kf_pid",
       "study_id": "figure_eight_imu_only_kf_pid",
-      "source_run": "figure_eight_imu_only_kf_pid_20260722T020953Z",
+      "source_run": "figure_eight_imu_only_kf_pid_20260722T024222Z",
       "metrics": {
         "attitude_error_model": "so3_geodesic",
         "control_effort_proxy": 156.9624012368482,
@@ -93416,6 +93427,7 @@
         "sim_message": "euler/linear_kf RK4 ok",
         "sim_success": true,
         "success": false,
+        "success_pos_limit_m": 6.0,
         "t_final_s": 32.0,
         "time_in_bounds_frac": 0.16494845360824742
       },
@@ -101878,7 +101890,7 @@
       "label": "GPS+IMU LQG Monte Carlo",
       "role": "monte_carlo",
       "study_id": "figure_eight_gps_imu_lqg_mc",
-      "source_run": "figure_eight_gps_imu_lqg_mc_20260722T020954Z",
+      "source_run": "figure_eight_gps_imu_lqg_mc_20260722T024224Z",
       "metrics": {
         "attitude_error_model": "so3_geodesic",
         "control_effort_proxy": 157.56179674967007,
@@ -101905,6 +101917,7 @@
         "sim_message": "euler/linear_kf RK4 ok",
         "sim_success": true,
         "success": true,
+        "success_pos_limit_m": 2.25,
         "t_final_s": 32.0,
         "time_in_bounds_frac": 1.0
       },
@@ -116103,7 +116116,7 @@
         "law": "lqr",
         "observer": "none",
         "study_id": "envelope_tau1_lqr",
-        "run_dir": "envelope_tau1_lqr_20260722T021348Z",
+        "run_dir": "envelope_tau1_lqr_20260722T024620Z",
         "success": true,
         "sim_success": true,
         "rmse_position_m": 0.036719928555947384,
@@ -116122,7 +116135,7 @@
         "law": "lqg",
         "observer": "linear_kf",
         "study_id": "envelope_tau1_lqg",
-        "run_dir": "envelope_tau1_lqg_20260722T021350Z",
+        "run_dir": "envelope_tau1_lqg_20260722T024622Z",
         "success": true,
         "sim_success": true,
         "rmse_position_m": 0.039595063698754256,
@@ -116141,7 +116154,7 @@
         "law": "lqr",
         "observer": "none",
         "study_id": "envelope_tau0.75_lqr",
-        "run_dir": "envelope_tau0.75_lqr_20260722T021352Z",
+        "run_dir": "envelope_tau0.75_lqr_20260722T024624Z",
         "success": true,
         "sim_success": true,
         "rmse_position_m": 0.06426379575704443,
@@ -116160,7 +116173,7 @@
         "law": "lqg",
         "observer": "linear_kf",
         "study_id": "envelope_tau0.75_lqg",
-        "run_dir": "envelope_tau0.75_lqg_20260722T021353Z",
+        "run_dir": "envelope_tau0.75_lqg_20260722T024625Z",
         "success": true,
         "sim_success": true,
         "rmse_position_m": 0.06705020922824945,
@@ -116179,7 +116192,7 @@
         "law": "lqr",
         "observer": "none",
         "study_id": "envelope_tau0.5_lqr",
-        "run_dir": "envelope_tau0.5_lqr_20260722T021355Z",
+        "run_dir": "envelope_tau0.5_lqr_20260722T024627Z",
         "success": true,
         "sim_success": true,
         "rmse_position_m": 0.10026627097202474,
@@ -116198,7 +116211,7 @@
         "law": "lqg",
         "observer": "linear_kf",
         "study_id": "envelope_tau0.5_lqg",
-        "run_dir": "envelope_tau0.5_lqg_20260722T021355Z",
+        "run_dir": "envelope_tau0.5_lqg_20260722T024627Z",
         "success": true,
         "sim_success": true,
         "rmse_position_m": 0.10134875319000718,
@@ -116217,7 +116230,7 @@
         "law": "lqr",
         "observer": "none",
         "study_id": "envelope_tau0.35_lqr",
-        "run_dir": "envelope_tau0.35_lqr_20260722T021357Z",
+        "run_dir": "envelope_tau0.35_lqr_20260722T024629Z",
         "success": true,
         "sim_success": true,
         "rmse_position_m": 0.18948451743339695,
@@ -116236,7 +116249,7 @@
         "law": "lqg",
         "observer": "linear_kf",
         "study_id": "envelope_tau0.35_lqg",
-        "run_dir": "envelope_tau0.35_lqg_20260722T021357Z",
+        "run_dir": "envelope_tau0.35_lqg_20260722T024630Z",
         "success": true,
         "sim_success": true,
         "rmse_position_m": 0.19186113130801707,
@@ -116255,8 +116268,8 @@
         "law": "lqr",
         "observer": "none",
         "study_id": "envelope_tau0.25_lqr",
-        "run_dir": "envelope_tau0.25_lqr_20260722T021358Z",
-        "success": true,
+        "run_dir": "envelope_tau0.25_lqr_20260722T024631Z",
+        "success": false,
         "sim_success": true,
         "rmse_position_m": 0.3250777329099505,
         "max_position_error_m": 0.6456268990451154,
@@ -116274,8 +116287,8 @@
         "law": "lqg",
         "observer": "linear_kf",
         "study_id": "envelope_tau0.25_lqg",
-        "run_dir": "envelope_tau0.25_lqg_20260722T021358Z",
-        "success": true,
+        "run_dir": "envelope_tau0.25_lqg_20260722T024631Z",
+        "success": false,
         "sim_success": true,
         "rmse_position_m": 0.34147252382422033,
         "max_position_error_m": 0.6915696504706587,
@@ -116293,7 +116306,7 @@
         "law": "lqr",
         "observer": "none",
         "study_id": "envelope_tau0.2_lqr",
-        "run_dir": "envelope_tau0.2_lqr_20260722T021359Z",
+        "run_dir": "envelope_tau0.2_lqr_20260722T024632Z",
         "success": false,
         "sim_success": true,
         "rmse_position_m": 0.44040637431873075,
@@ -116312,7 +116325,7 @@
         "law": "lqg",
         "observer": "linear_kf",
         "study_id": "envelope_tau0.2_lqg",
-        "run_dir": "envelope_tau0.2_lqg_20260722T021359Z",
+        "run_dir": "envelope_tau0.2_lqg_20260722T024632Z",
         "success": false,
         "sim_success": true,
         "rmse_position_m": 0.5845344021012983,
@@ -116331,7 +116344,7 @@
         "law": "lqr",
         "observer": "none",
         "study_id": "envelope_tau0.15_lqr",
-        "run_dir": "envelope_tau0.15_lqr_20260722T021400Z",
+        "run_dir": "envelope_tau0.15_lqr_20260722T024633Z",
         "success": false,
         "sim_success": true,
         "rmse_position_m": 0.7771121433595637,
@@ -116350,7 +116363,7 @@
         "law": "lqg",
         "observer": "linear_kf",
         "study_id": "envelope_tau0.15_lqg",
-        "run_dir": "envelope_tau0.15_lqg_20260722T021400Z",
+        "run_dir": "envelope_tau0.15_lqg_20260722T024633Z",
         "success": false,
         "sim_success": true,
         "rmse_position_m": 21.059031783678584,
@@ -116366,16 +116379,16 @@
     ],
     "boundary": {
       "lqr": {
-        "last_success_time_scale": 0.25,
-        "first_fail_time_scale": 0.2,
-        "last_success_peak_tilt_deg": 39.22289696743904,
-        "first_fail_peak_tilt_deg": 59.52175172722452
+        "last_success_time_scale": 0.35,
+        "first_fail_time_scale": 0.25,
+        "last_success_peak_tilt_deg": 18.876147485370893,
+        "first_fail_peak_tilt_deg": 39.22289696743904
       },
       "lqg": {
-        "last_success_time_scale": 0.25,
-        "first_fail_time_scale": 0.2,
-        "last_success_peak_tilt_deg": 39.888546012003644,
-        "first_fail_peak_tilt_deg": 66.56611636886478
+        "last_success_time_scale": 0.35,
+        "first_fail_time_scale": 0.25,
+        "last_success_peak_tilt_deg": 20.926991422826926,
+        "first_fail_peak_tilt_deg": 39.888546012003644
       }
     },
     "notes": [
@@ -116444,7 +116457,10 @@
         "metrics": {
           "rmse_position_m": 0.036719928555947384,
           "max_position_error_m": 0.06484956101925414,
+          "time_in_bounds_frac": 1.0,
+          "position_bound_m": 0.5,
           "success": true,
+          "success_pos_limit_m": 1.5,
           "observer_id": "none",
           "peak_tilt_deg": 1.5691058784620497
         }
@@ -116461,7 +116477,10 @@
         "metrics": {
           "rmse_position_m": 1953.2506547479554,
           "max_position_error_m": 4489.685376962187,
+          "time_in_bounds_frac": 0.06279287722586692,
+          "position_bound_m": 1.5,
           "success": false,
+          "success_pos_limit_m": 4.5,
           "observer_id": "partial_raw",
           "peak_tilt_deg": 495504.31702158257
         }
@@ -116478,7 +116497,10 @@
         "metrics": {
           "rmse_position_m": 0.044129494689062125,
           "max_position_error_m": 0.09422441983294634,
+          "time_in_bounds_frac": 1.0,
+          "position_bound_m": 0.75,
           "success": true,
+          "success_pos_limit_m": 2.25,
           "observer_id": "linear_kf",
           "peak_tilt_deg": 19.557508034303048
         }
@@ -116491,11 +116513,14 @@
         "sensors": "att + omega (noisy)",
         "method": "linear_kf \u2192 LQR",
         "run_id": "ahrs_lqg",
-        "lesson": "No GPS: attitude+rates still let the KF help; position tracking degrades but stays finite vs naive blow-up.",
+        "lesson": "No GPS: attitude+rates keep the vehicle finite, but multi-meter path error fails tracking success (3\u00d7 bound). Not a navigable GPS-denied story.",
         "metrics": {
           "rmse_position_m": 2.272970520199455,
           "max_position_error_m": 4.2974128738311235,
-          "success": true,
+          "time_in_bounds_frac": 0.28334895345204625,
+          "position_bound_m": 1.0,
+          "success": false,
+          "success_pos_limit_m": 3.0,
           "observer_id": "linear_kf",
           "peak_tilt_deg": 2.474898255438451
         }
@@ -116508,11 +116533,14 @@
         "sensors": "body_vel + alt + omega",
         "method": "linear_kf \u2192 LQR",
         "run_id": "flow_alt_lqg",
-        "lesson": "Practical GPS-denied stack: body velocity (optical-flow proxy) + altitude + gyro. Better path hold than AHRS; still no global XY GPS.",
+        "lesson": "Practical GPS-denied teaching stack: body-velocity proxy (optical-flow stand-in; KF H is hover-linear) + altitude + gyro. LQG here = linear KF + hover LQR on x_hat \u2014 not classical LQG design.",
         "metrics": {
           "rmse_position_m": 0.05681803020479951,
           "max_position_error_m": 0.11016041428539236,
+          "time_in_bounds_frac": 1.0,
+          "position_bound_m": 1.0,
           "success": true,
+          "success_pos_limit_m": 3.0,
           "observer_id": "linear_kf",
           "peak_tilt_deg": 3.9881667092965376
         }
@@ -116529,7 +116557,10 @@
         "metrics": {
           "rmse_position_m": 56.88030086092053,
           "max_position_error_m": 144.027186209786,
+          "time_in_bounds_frac": 0.169009684473602,
+          "position_bound_m": 2.0,
           "success": false,
+          "success_pos_limit_m": 6.0,
           "observer_id": "linear_kf",
           "peak_tilt_deg": 5.191683846030697
         }
@@ -116546,7 +116577,10 @@
         "metrics": {
           "rmse_position_m": 0.22495111160433526,
           "max_position_error_m": 0.43940178563489884,
+          "time_in_bounds_frac": 1.0,
+          "position_bound_m": 0.75,
           "success": true,
+          "success_pos_limit_m": 2.25,
           "observer_id": "none",
           "peak_tilt_deg": 2.322475803886719
         }
@@ -116563,7 +116597,10 @@
         "metrics": {
           "rmse_position_m": 1365.865522610545,
           "max_position_error_m": 3327.9450916202477,
+          "time_in_bounds_frac": 0.11215245235863792,
+          "position_bound_m": 1.5,
           "success": false,
+          "success_pos_limit_m": 4.5,
           "observer_id": "partial_raw",
           "peak_tilt_deg": 148.76887088853536
         }
@@ -116580,7 +116617,10 @@
         "metrics": {
           "rmse_position_m": 0.2242683458378535,
           "max_position_error_m": 0.47669900325094683,
+          "time_in_bounds_frac": 1.0,
+          "position_bound_m": 0.75,
           "success": true,
+          "success_pos_limit_m": 2.25,
           "observer_id": "linear_kf",
           "peak_tilt_deg": 9.286315055830261
         }
@@ -116597,7 +116637,10 @@
         "metrics": {
           "rmse_position_m": 2.35448751627083,
           "max_position_error_m": 4.229753591636554,
-          "success": true,
+          "time_in_bounds_frac": 0.2942830365510778,
+          "position_bound_m": 1.0,
+          "success": false,
+          "success_pos_limit_m": 3.0,
           "observer_id": "linear_kf",
           "peak_tilt_deg": 2.732211925358643
         }
@@ -116614,7 +116657,10 @@
         "metrics": {
           "rmse_position_m": 0.23479350220183218,
           "max_position_error_m": 0.4963723379960476,
+          "time_in_bounds_frac": 1.0,
+          "position_bound_m": 1.0,
           "success": true,
+          "success_pos_limit_m": 3.0,
           "observer_id": "linear_kf",
           "peak_tilt_deg": 3.1950962587669767
         }
@@ -116631,7 +116677,10 @@
         "metrics": {
           "rmse_position_m": 56.896409236692634,
           "max_position_error_m": 143.85123216823163,
+          "time_in_bounds_frac": 0.16494845360824742,
+          "position_bound_m": 2.0,
           "success": false,
+          "success_pos_limit_m": 6.0,
           "observer_id": "linear_kf",
           "peak_tilt_deg": 5.818508523791169
         }

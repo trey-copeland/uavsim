@@ -430,6 +430,9 @@
       const run = sc.run_id ? byId[sc.run_id] : null;
       const m = (sc.metrics || (run && run.metrics)) || {};
       const ok = m.success;
+      const tib = m.time_in_bounds_frac;
+      const tibStr =
+        tib != null && Number.isFinite(+tib) ? Math.round(100 * +tib) + "% in-bound" : null;
       return e(
         "div",
         {
@@ -459,7 +462,8 @@
           "max |e| ",
           fmtMaxE(m.max_position_error_m),
           " · ",
-          e("span", { className: ok ? "ok" : "fail" }, ok === true ? "ok" : ok === false ? "fail" : "—")
+          e("span", { className: ok ? "ok" : "fail" }, ok === true ? "ok" : ok === false ? "fail" : "—"),
+          tibStr ? e("span", null, " · " + tibStr) : null
         )
       );
     }
@@ -1648,7 +1652,24 @@
                   e("td", null, s.method),
                   e("td", null, fmt(m.rmse_position_m, 4)),
                   e("td", null, fmt(m.max_position_error_m, 3)),
-                  e("td", null, ok === true ? "yes" : ok === false ? "no" : "—"),
+                  e(
+                    "td",
+                    null,
+                    ok === true
+                      ? "yes"
+                      : ok === false
+                        ? "no"
+                        : "—",
+                    m.time_in_bounds_frac != null
+                      ? e(
+                          "span",
+                          { style: { color: "var(--muted)", fontSize: "0.8rem" } },
+                          " (",
+                          fmt(100 * m.time_in_bounds_frac, 0),
+                          "% tib)"
+                        )
+                      : null
+                  ),
                   e("td", { style: { maxWidth: "22rem", fontSize: "0.85rem" } }, s.lesson || "")
                 );
               })

@@ -92,3 +92,37 @@ def test_ahrs_lqg_finite_imu_only_worse(tmp_path: Path) -> None:
     # AHRS-like stays much closer to the path than rate-only
     assert float(ahrs.metrics["rmse_position_m"]) < float(imu.metrics["rmse_position_m"])
     assert float(ahrs.metrics["max_position_error_m"]) < 10.0
+    # Honesty: multi-meter AHRS path is not tracking success (3× bound rule)
+    assert ahrs.metrics["success"] is False
+    assert imu.metrics["success"] is False
+
+
+def test_flow_alt_lqg_tracks_and_beats_ahrs(tmp_path: Path) -> None:
+    """GPS-denied flow+alt proxy should nearly match GPS+IMU LQG and beat AHRS."""
+    out = tmp_path / "runs"
+    flow = run_nominal_study(
+        ROOT / "configs" / "studies" / "figure_eight_flow_alt_lqg.yaml",
+        output_root=out,
+        run_mc=False,
+    )
+    ahrs = run_nominal_study(
+        ROOT / "configs" / "studies" / "figure_eight_ahrs_lqg.yaml",
+        output_root=out,
+        run_mc=False,
+    )
+    assert flow.metrics["observer_id"] == "linear_kf"
+    assert flow.metrics["success"] is True
+    rmse = float(flow.metrics["rmse_position_m"])
+    assert rmse < 0.15, f"flow+alt LQG RMSE {rmse}"
+    assert rmse < float(ahrs.metrics["rmse_position_m"])
+
+
+def test_flow_alt_kf_pid_tracks(tmp_path: Path) -> None:
+    r = run_nominal_study(
+        ROOT / "configs" / "studies" / "figure_eight_flow_alt_kf_pid.yaml",
+        output_root=tmp_path / "runs",
+        run_mc=False,
+    )
+    assert r.metrics["observer_id"] == "linear_kf"
+    assert r.metrics["success"] is True
+    assert float(r.metrics["rmse_position_m"]) < 0.4

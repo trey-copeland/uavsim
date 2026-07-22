@@ -16,6 +16,10 @@ does not overwrite the image virtualenv.
 
 Override image name with `UAVSIM_DOCKER_IMAGE` if desired.
 
+**Stale images:** host orchestration rebuilds `uavsim:local` when `src/uavsim`,
+`pyproject.toml` / `uv.lock`, the Dockerfile, or `configs/vehicles` are newer
+than the image. Force with `UAVSIM_DOCKER_REBUILD=1`.
+
 ## Single-container study
 
 ```bash
@@ -23,7 +27,7 @@ docker run --rm -v "$PWD":/work -w /work uavsim:local \
   study configs/studies/hover_mc_smoke.yaml --output runs
 ```
 
-Or via CLI orchestration (builds image if missing):
+Or via CLI orchestration (rebuilds if missing/stale):
 
 ```bash
 uv run uavsim study configs/studies/hover_mc_smoke.yaml \

@@ -60,11 +60,12 @@ def compute_metrics(
     peak_tilt = float(max(peak_roll, peak_pitch))
     peak_speed = float(np.max(np.linalg.norm(x[:, 6:9], axis=1)))
 
-    success = bool(
-        np.isfinite(x).all()
-        and max_pos < max(5.0 * position_bound_m, 1.0)
-        and max_att < np.deg2rad(60.0)
-    )
+    # Tracking success (portfolio-honest):
+    # peak |e| within 3× the study position_bound (not 5× with a 1 m floor,
+    # which previously marked multi-meter AHRS paths as success=True).
+    # Attitude: peak geodesic error under 45° (was 60°).
+    pos_limit = 3.0 * float(position_bound_m)
+    success = bool(np.isfinite(x).all() and max_pos <= pos_limit and max_att < np.deg2rad(45.0))
 
     return {
         "rmse_position_m": rmse_pos,
@@ -72,6 +73,7 @@ def compute_metrics(
         "final_position_error_m": final_pos,
         "time_in_bounds_frac": time_in_bounds,
         "position_bound_m": position_bound_m,
+        "success_pos_limit_m": pos_limit,
         "rmse_attitude_rad": rmse_att,
         "max_attitude_error_rad": max_att,
         "rmse_attitude_rotvec_rad": rmse_att_vec,

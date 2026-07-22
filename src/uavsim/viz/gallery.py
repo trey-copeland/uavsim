@@ -171,8 +171,8 @@ ESTIMATION_MATRIX: dict[str, Any] = {
             "method": "linear_kf → LQR",
             "run_id": "ahrs_lqg",
             "lesson": (
-                "No GPS: attitude+rates still let the KF help; "
-                "position tracking degrades but stays finite vs naive blow-up."
+                "No GPS: attitude+rates keep the vehicle finite, but multi-meter path "
+                "error fails tracking success (3× bound). Not a navigable GPS-denied story."
             ),
         },
         {
@@ -184,8 +184,9 @@ ESTIMATION_MATRIX: dict[str, Any] = {
             "method": "linear_kf → LQR",
             "run_id": "flow_alt_lqg",
             "lesson": (
-                "Practical GPS-denied stack: body velocity (optical-flow proxy) "
-                "+ altitude + gyro. Better path hold than AHRS; still no global XY GPS."
+                "Practical GPS-denied teaching stack: body-velocity proxy "
+                "(optical-flow stand-in; KF H is hover-linear) + altitude + gyro. "
+                "LQG here = linear KF + hover LQR on x_hat — not classical LQG design."
             ),
         },
         {
@@ -388,7 +389,10 @@ def build_gallery_document(
                 row["metrics"] = {
                     "rmse_position_m": m.get("rmse_position_m"),
                     "max_position_error_m": m.get("max_position_error_m"),
+                    "time_in_bounds_frac": m.get("time_in_bounds_frac"),
+                    "position_bound_m": m.get("position_bound_m"),
                     "success": m.get("success"),
+                    "success_pos_limit_m": m.get("success_pos_limit_m"),
                     "observer_id": m.get("observer_id"),
                     "peak_tilt_deg": (
                         float(m["peak_tilt_rad"]) * 180.0 / 3.141592653589793

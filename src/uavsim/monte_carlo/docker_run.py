@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -62,17 +63,93 @@ def run_in_docker(
     return subprocess.run(cmd, check=False, capture_output=True, text=True)
 
 
-def ensure_image(image: str, *, repo_root: Path, build: bool = True) -> None:
-    """Build image from repo Dockerfile if missing and ``build`` is True."""
+def _image_created_unix(image: str) -> float | None:
+    """Return image Created time as unix epoch, or None if missing/unparseable."""
     inspect = subprocess.run(
-        ["docker", "image", "inspect", image],
+        ["docker", "image", "inspect", "--format", "{{.Created}}", image],
         check=False,
         capture_output=True,
+        text=True,
     )
-    if inspect.returncode == 0:
+    if inspect.returncode != 0:
+        return None
+    raw = (inspect.stdout or "").strip()
+    if not raw:
+        return None
+    # Docker: 2026-07-18T12:34:56.123456789Z
+    try:
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        # trim sub-microsecond digits if present
+        if "." in raw:
+            head, rest = raw.split(".", 1)
+            frac = ""
+            tz = ""
+            for i, ch in enumerate(rest):
+                if ch.isdigit():
+                    frac += ch
+                else:
+                    tz = rest[i:]
+                    break
+            frac = (frac + "000000")[:6]
+            raw = f"{head}.{frac}{tz}"
+        return datetime.fromisoformat(raw).timestamp()
+    except ValueError:
+        return None
+
+
+def _source_tree_mtime(repo_root: Path) -> float:
+    """Newest mtime among paths that affect the installed package in the image."""
+    roots = [
+        repo_root / "src" / "uavsim",
+        repo_root / "pyproject.toml",
+        repo_root / "uv.lock",
+        repo_root / "containers" / "Dockerfile",
+        repo_root / "configs" / "vehicles",
+    ]
+    newest = 0.0
+    for p in roots:
+        if p.is_file():
+            newest = max(newest, p.stat().st_mtime)
+        elif p.is_dir():
+            for f in p.rglob("*"):
+                if f.is_file():
+                    newest = max(newest, f.stat().st_mtime)
+    return newest
+
+
+def image_is_stale(image: str, repo_root: Path) -> bool:
+    """True if image missing or older than package/Dockerfile/vehicle configs."""
+    created = _image_created_unix(image)
+    if created is None:
+        return True
+    return created < _source_tree_mtime(repo_root.resolve())
+
+
+def ensure_image(
+    image: str,
+    *,
+    repo_root: Path,
+    build: bool = True,
+    force_rebuild: bool | None = None,
+) -> None:
+    """
+    Ensure ``image`` exists and matches current sources.
+
+    Rebuilds when missing, when sources are newer than the image, when
+    ``force_rebuild=True``, or when env ``UAVSIM_DOCKER_REBUILD=1``.
+    """
+    if force_rebuild is None:
+        force_rebuild = os.environ.get("UAVSIM_DOCKER_REBUILD", "").strip() in (
+            "1",
+            "true",
+            "yes",
+        )
+    stale = force_rebuild or image_is_stale(image, repo_root)
+    if not stale:
         return
     if not build:
-        msg = f"Docker image not found: {image}"
+        msg = f"Docker image missing or stale: {image}"
         raise RuntimeError(msg)
     dockerfile = repo_root / "containers" / "Dockerfile"
     if not dockerfile.is_file():
@@ -85,7 +162,7 @@ def ensure_image(image: str, *, repo_root: Path, build: bool = True) -> None:
         image,
         "-f",
         str(dockerfile),
-        str(repo_root),
+        str(repo_root.resolve()),
     ]
     result = subprocess.run(build_cmd, check=False, capture_output=True, text=True)
     if result.returncode != 0:
@@ -103,6 +180,7 @@ def docker_study(
     force_mc: bool | None = None,
     shards: int = 1,
     extra_args: list[str] | None = None,
+    force_rebuild: bool | None = None,
 ) -> dict[str, Any]:
     """
     Run a full study inside one container (local shards if shards>1 inside).
@@ -110,9 +188,11 @@ def docker_study(
     Mounts repo as /work so configs are shared with the host. Output under the
     repo is written relative to /work; output outside the repo is bind-mounted
     at /out.
+
+    Image is rebuilt when sources are newer than the tag (or force_rebuild).
     """
     image = image or default_image_name()
-    ensure_image(image, repo_root=repo_root)
+    ensure_image(image, repo_root=repo_root, force_rebuild=force_rebuild)
     study_path = study_path.resolve()
     output_root = output_root.resolve()
     output_root.mkdir(parents=True, exist_ok=True)

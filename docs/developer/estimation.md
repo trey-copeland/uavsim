@@ -76,7 +76,12 @@ No framework refactor was required: new channels and noise keys plug into the ex
 | `t`, `x`, `u` | True plant (Euler 12-state) and controls |
 | `x_hat` | Observer estimate when an observer is active |
 
-Metrics may include `observer_id`, `rmse_estimate_position_m`, `rmse_estimate_attitude_rad`, `peak_tilt_rad`.
+Metrics may include `observer_id`, `rmse_estimate_position_m`, `rmse_estimate_attitude_rad`, `peak_tilt_rad`,
+`time_in_bounds_frac`, `success_pos_limit_m`.
+
+**`success` (tracking):** peak position error ≤ **3×** `metrics.position_bound_m` and peak attitude
+error &lt; 45°. This is intentionally tighter than an older 5×/1 m floor that marked multi-meter
+AHRS paths as “ok.” `sim_success` still means the plant finished with finite state.
 
 ---
 
