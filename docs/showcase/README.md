@@ -25,6 +25,7 @@ Single-page React app for the portfolio base case: a **controller × sensor** ma
 Mission: [`configs/missions/figure_eight.yaml`](../../configs/missions/figure_eight.yaml) — constant yaw, ≥4 s segments, altitude undulation.
 
 **Naming:** LQG = linear KF + hover LQR. PID+KF is the cascade on \(\hat x\), not classical LQG.  
+**Full honesty list:** [docs/LIMITATIONS.md](../LIMITATIONS.md).  
 **Flow+alt:** body-frame velocity (optical-flow *proxy*) + NED \(z\) altitude + gyro — practical GPS-denied teaching column.
 
 Data lives in `data/showcase.json` (browser-safe, downsampled). No build step: React + Plotly load from CDN.

@@ -110,6 +110,7 @@ uv run uavsim simulate configs/studies/figure_eight_flow_alt_kf_pid.yaml
 
 ## Related
 
+- **Scope & limitations:** [`docs/LIMITATIONS.md`](../LIMITATIONS.md)  
 - Backlog: [`EXTENSIBILITY_TODO.md`](EXTENSIBILITY_TODO.md) (EST-*, C-9/C-11)  
 - Plant / quat: [`dynamics.md`](dynamics.md)  
 - Showcase: [`docs/showcase/README.md`](../showcase/README.md)  

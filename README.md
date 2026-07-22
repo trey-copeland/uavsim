@@ -9,7 +9,8 @@
 | **Heritage** | Redesign of **[quad_uav](https://github.com/trey-copeland/quad_uav)** (ME590 MATLAB) — not a line-for-line port |
 | **License** | [MIT](LICENSE) |
 
-> **Simulation only.** Not flight-critical or certified software.
+> **Simulation only.** Not flight-critical or certified software.  
+> **Scope & honesty:** [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — what LQG means, sensor proxies, and what results do *not* claim.
 
 ---
 

@@ -16,6 +16,7 @@ Guides for **using** and **extending** `uavsim` without reading the whole tree.
 
 | Doc | Role |
 |-----|------|
+| [`docs/LIMITATIONS.md`](../LIMITATIONS.md) | **Scope & known limitations** (interview / portfolio honesty) |
 | [`SPEC.md`](../../SPEC.md) | Requirements and MoSCoW |
 | [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) | Package map, import rules, data flow |
 | [`docs/viz.md`](../viz.md) | Reports and figures |
