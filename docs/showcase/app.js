@@ -183,9 +183,13 @@
   const VALUE_PROP =
     "SIL comparison of hover LQR and cascade PID under the same sensor suites.";
   const DEFAULT_TITLE = "uavsim · controller × sensor flight study";
-  const STUDY_SUMMARY =
-    "Twelve controller×sensor stacks on one figure-eight. Ideal full-state is the upper bound; " +
-    "partial_raw and IMU-only cases are expected to fail position bounds — that is the point.";
+  /** Fallback About panel when gallery JSON has no ui.about_paragraphs */
+  const ABOUT_PARAGRAPHS = [
+    "Offline SIL results for a quadrotor figure-eight: the same path flown by hover LQR and cascade PID under several sensor suites (ideal full state, GPS+IMU naive, GPS+IMU + linear KF, AHRS, optical-flow proxy + altitude, IMU-only).",
+    "Two missions share that geometry. Baseline uses constant yaw and the portfolio timing. Near-envelope compresses time (τ★≈0.28) and adds scheduled yaw so tilt and heading demand are visible under ideal LQR.",
+    "Ideal full-state is the tracking upper bound. Stacks that do not observe position (or feed an incomplete state bus) are expected to exceed the position bound; those cases are included on purpose.",
+    "Also included: Monte Carlo on GPS+IMU LQG, and a time-scale envelope over every matrix stack. Simulation only — not flight software.",
+  ];
 
   /** GPS+IMU naive vs KF columns (same bus; shows value of a state estimate). */
   const TEACHING_PAIR_COLUMNS = { gps_imu_naive: true, gps_imu_filter: true };
@@ -1253,8 +1257,7 @@
           e(
             "p",
             { className: "hero-cta-copy" },
-            STUDY_SUMMARY,
-            " The envelope-edge mission (τ★≈0.28 + scheduled yaw) has visible tilt and heading change under ideal LQR."
+            "Start on the near-envelope mission in Flight 3D (τ★≈0.28 + scheduled yaw) so tilt and heading change under ideal LQR are easy to see. The matrix and envelope tabs use the same stacks for cross-comparison."
           ),
           e(
             "div",
@@ -3760,12 +3763,16 @@
               ? e(
                   "div",
                   { className: "about-panel" },
-                  e("p", null, STUDY_SUMMARY),
-                  e("p", { className: "muted" }, doc.description || ""),
+                  (
+                    (doc.ui && doc.ui.about_paragraphs) ||
+                    ABOUT_PARAGRAPHS
+                  ).map(function (para, i) {
+                    return e("p", { key: i }, para);
+                  }),
                   e(
                     "p",
                     { className: "desktop-note" },
-                    "Best viewed on a wide screen — the matrix and envelope tables are dense by design."
+                    "Best on a wide display — the matrix and envelope tables are dense by design."
                   )
                 )
               : null

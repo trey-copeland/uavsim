@@ -836,16 +836,32 @@ def generate_base_case_gallery(
             }
         )
 
+    about_paragraphs = [
+        (
+            "Offline SIL results for a quadrotor figure-eight: the same path flown by "
+            "hover LQR and cascade PID under several sensor suites (ideal full state, "
+            "GPS+IMU naive, GPS+IMU + linear KF, AHRS, optical-flow proxy + altitude, "
+            "IMU-only)."
+        ),
+        (
+            "Two missions share that geometry. Baseline uses constant yaw and the "
+            "portfolio timing. Near-envelope compresses time (τ★≈0.28) and adds "
+            "scheduled yaw so tilt and heading demand are visible under ideal LQR."
+        ),
+        (
+            "Ideal full-state is the tracking upper bound. Stacks that do not observe "
+            "position (or feed an incomplete state bus) are expected to exceed the "
+            "position bound; those cases are included on purpose."
+        ),
+        (
+            "Also included: Monte Carlo on GPS+IMU LQG, and a time-scale envelope over "
+            "every matrix stack. Simulation only — not flight software."
+        ),
+    ]
     doc = build_gallery_document(
         entries,
         title="uavsim · controller × sensor flight study",
-        description=(
-            "Figure-eight SIL with dual missions: baseline (constant yaw) and "
-            "near-envelope (τ★ + scheduled yaw). Full controller × sensor matrix "
-            "on both (LQR/LQG and PID × ideal, GPS+IMU naive/KF, AHRS, flow+alt, "
-            "IMU-only), Monte Carlo, and a time-scale envelope for "
-            "hover-linearization limits. Simulation only."
-        ),
+        description=" ".join(about_paragraphs),
         # Primary compare: naive vs LQG on baseline (teaching win)
         compare_ids=("gps_imu_naive", "gps_imu_lqg"),
         envelope=envelope_doc,
@@ -859,6 +875,7 @@ def generate_base_case_gallery(
     doc["ui"]["value_prop"] = (
         "SIL comparison of hover LQR and cascade PID under the same sensor suites."
     )
+    doc["ui"]["about_paragraphs"] = about_paragraphs
     doc["ui"]["tabs"] = [
         "overview",
         "flight",
