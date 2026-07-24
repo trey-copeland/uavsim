@@ -1054,6 +1054,34 @@
       setFrame(0);
     }, [run && run.id]);
 
+    // ← / → step scrubber (Shift = ±10 frames). Ignore when typing in form fields.
+    useEffect(() => {
+      if (!ts) return;
+      const nFrames = ts.t.length;
+      function onKey(ev) {
+        if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+        const tag = (ev.target && ev.target.tagName) || "";
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+          // Still allow arrows on the range slider itself
+          if (!(ev.target.type === "range")) return;
+        }
+        if (ev.target && ev.target.isContentEditable) return;
+        const step = ev.shiftKey ? 10 : 1;
+        const delta = ev.key === "ArrowRight" ? step : -step;
+        ev.preventDefault();
+        setFrame(function (prev) {
+          const next = prev + delta;
+          if (next < 0) return 0;
+          if (next > nFrames - 1) return nFrames - 1;
+          return next;
+        });
+      }
+      window.addEventListener("keydown", onKey);
+      return function () {
+        window.removeEventListener("keydown", onKey);
+      };
+    }, [ts, run && run.id]);
+
     if (!ts) return e("div", { className: "card" }, "No timeseries for this run.");
 
     const n = ts.t.length;
@@ -1093,6 +1121,7 @@
             onChange: function (ev) {
               setFrame(Number(ev.target.value));
             },
+            title: "Drag or use ← → keys (Shift for ±10)",
           }),
           e(
             "span",
@@ -1100,6 +1129,11 @@
             i + 1,
             " / ",
             n
+          ),
+          e(
+            "span",
+            { className: "flight-keys muted", title: "Keyboard" },
+            "← →"
           )
         )
       ),

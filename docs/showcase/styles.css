@@ -179,6 +179,13 @@ select, input[type="range"] {
   accent-color: var(--accent);
 }
 .flight-frame { font-size: 0.8rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.flight-keys {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+  user-select: none;
+  white-space: nowrap;
+}
 .flight-stage {
   display: grid;
   grid-template-columns: 1fr 1fr;
