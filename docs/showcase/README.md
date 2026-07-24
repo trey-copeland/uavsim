@@ -30,6 +30,17 @@ Mission: [`configs/missions/figure_eight.yaml`](../../configs/missions/figure_ei
 
 Data lives in `data/showcase.json` (browser-safe, downsampled). No build step: React + Plotly load from CDN.
 
+### Flight tab
+
+Dual-pane scrubber view:
+
+| Panel | Content |
+|-------|---------|
+| **Trajectory** (left) | Path + reference, trail, velocity arrow, body triad at the vehicle |
+| **Vehicle attitude & wrench** (right) | X-quad mesh at origin, RGB body axes, thrust (−body \(z\)) and torque arrows scaled by magnitude, numeric HUD for \(F\), \(\|\tau\|\), \(\phi\theta\psi\), \(\|v\|\) |
+
+Uses existing timeseries fields (`euler_deg`, `u`, `vel_ned`, `omega`, `limits`) — no gallery rebuild required for the UI.
+
 ## Rebuild gallery
 
 ```bash

@@ -202,14 +202,152 @@
     );
   }
 
+  // --- 3D attitude helpers (ZYX Euler body→NED, plot frame N/E/up) ---
+  function deg2rad(d) {
+    return (d * Math.PI) / 180;
+  }
+  function matMulVec(R, v) {
+    return [
+      R[0][0] * v[0] + R[0][1] * v[1] + R[0][2] * v[2],
+      R[1][0] * v[0] + R[1][1] * v[1] + R[1][2] * v[2],
+      R[2][0] * v[0] + R[2][1] * v[1] + R[2][2] * v[2],
+    ];
+  }
+  /** Body→NED rotation, ZYX (φ, θ, ψ) in radians. */
+  function rotationBodyToNed(phi, theta, psi) {
+    const cph = Math.cos(phi);
+    const sph = Math.sin(phi);
+    const cth = Math.cos(theta);
+    const sth = Math.sin(theta);
+    const cps = Math.cos(psi);
+    const sps = Math.sin(psi);
+    // Rz(psi) @ Ry(theta) @ Rx(phi)
+    return [
+      [cps * cth, cps * sth * sph - sps * cph, cps * sth * cph + sps * sph],
+      [sps * cth, sps * sth * sph + cps * cph, sps * sth * cph - cps * sph],
+      [-sth, cth * sph, cth * cph],
+    ];
+  }
+  function bodyToPlot(R, vb) {
+    const ned = matMulVec(R, vb);
+    return [ned[0], ned[1], -ned[2]];
+  }
+  function arrowSeg(R, originBody, dirBody, length) {
+    const o = bodyToPlot(R, originBody);
+    const d = bodyToPlot(R, dirBody);
+    const n = Math.hypot(d[0], d[1], d[2]) || 1;
+    return {
+      x: [o[0], o[0] + (d[0] / n) * length],
+      y: [o[1], o[1] + (d[1] / n) * length],
+      z: [o[2], o[2] + (d[2] / n) * length],
+    };
+  }
   /**
-   * Flight 3D: newPlot once per run (fixed FOV), restyle-only on scrub.
+   * X-quad mesh + wrench arrows in plot frame for current Euler (deg) and u.
+   */
+  function vehicleGeom(eulerDeg, u, limits) {
+    const phi = deg2rad(eulerDeg[0]);
+    const theta = deg2rad(eulerDeg[1]);
+    const psi = deg2rad(eulerDeg[2]);
+    const R = rotationBodyToNed(phi, theta, psi);
+    const L = 0.38; // arm (body x/y projection)
+    const motorsB = [
+      [L, L, 0],
+      [-L, L, 0],
+      [-L, -L, 0],
+      [L, -L, 0],
+    ];
+    // Frame: cross arms + short body box outline
+    const segs = [
+      // diagonal arms
+      [motorsB[0], motorsB[2]],
+      [motorsB[1], motorsB[3]],
+      // body square
+      [
+        [0.1, 0.1, 0],
+        [-0.1, 0.1, 0],
+      ],
+      [
+        [-0.1, 0.1, 0],
+        [-0.1, -0.1, 0],
+      ],
+      [
+        [-0.1, -0.1, 0],
+        [0.1, -0.1, 0],
+      ],
+      [
+        [0.1, -0.1, 0],
+        [0.1, 0.1, 0],
+      ],
+    ];
+    const fx = [];
+    const fy = [];
+    const fz = [];
+    segs.forEach(function (pair) {
+      const a = bodyToPlot(R, pair[0]);
+      const b = bodyToPlot(R, pair[1]);
+      fx.push(a[0], b[0], null);
+      fy.push(a[1], b[1], null);
+      fz.push(a[2], b[2], null);
+    });
+    const motors = motorsB.map(function (m) {
+      return bodyToPlot(R, m);
+    });
+
+    // Body axes triad (unit length ~0.22)
+    const axLen = 0.28;
+    const axes = {
+      x: arrowSeg(R, [0, 0, 0], [1, 0, 0], axLen),
+      y: arrowSeg(R, [0, 0, 0], [0, 1, 0], axLen),
+      z: arrowSeg(R, [0, 0, 0], [0, 0, 1], axLen),
+    };
+
+    const F = +u[0] || 0;
+    const tx = +u[1] || 0;
+    const ty = +u[2] || 0;
+    const tz = +u[3] || 0;
+    const tNorm = Math.hypot(tx, ty, tz);
+    const Fmax = (limits && limits.thrust_max_n) || 10;
+    const Tmax = (limits && limits.torque_max_nm) || 1;
+    // Thrust along −body z (up in plot when level)
+    const thrustLen = 0.2 + 0.75 * Math.min(1.2, Math.max(0, F / Fmax));
+    const thrust = arrowSeg(R, [0, 0, 0], [0, 0, -1], thrustLen);
+    // Resultant torque in body frame
+    let torque = { x: [0, 0], y: [0, 0], z: [0, 0] };
+    if (tNorm > 1e-9) {
+      const tLen = 0.15 + 0.65 * Math.min(1.2, tNorm / Math.max(Tmax, 1e-6));
+      torque = arrowSeg(R, [0, 0, 0], [tx, ty, tz], tLen);
+    }
+    // Per-axis torque ticks (body axes, signed length)
+    const tScale = 0.55 / Math.max(Tmax, 1e-6);
+    const tAx = arrowSeg(R, [0, 0, 0], [1, 0, 0], tx * tScale);
+    const tAy = arrowSeg(R, [0, 0, 0], [0, 1, 0], ty * tScale);
+    const tAz = arrowSeg(R, [0, 0, 0], [0, 0, 1], tz * tScale);
+
+    return {
+      frame: { x: fx, y: fy, z: fz },
+      motors: motors,
+      axes: axes,
+      thrust: thrust,
+      torque: torque,
+      tAx: tAx,
+      tAy: tAy,
+      tAz: tAz,
+      F: F,
+      tau: [tx, ty, tz],
+      tNorm: tNorm,
+    };
+  }
+
+  /**
+   * Flight path 3D: newPlot once per run (fixed FOV), restyle-only on scrub.
+   * Also draws a small body-frame triad at the vehicle for attitude context.
    */
   function Flight3DView({ runId, ts, frame }) {
     const ref = useRef(null);
     const ready = useRef(false);
     const boundsRef = useRef(null);
-    const idxRef = useRef({ trail: 1, veh: 2, vel: 3 });
+    const idxRef = useRef({ trail: 1, veh: 2, vel: 3, triad: 4 });
 
     function applyFrame(i) {
       if (!ref.current || !window.Plotly || !ready.current || !ts || !ts.pos_plot) return;
@@ -221,11 +359,22 @@
       const halfH = bounds ? bounds.halfH : 1;
       const v = ts.vel_ned[ii];
       const vNorm = Math.hypot(v[0], v[1], v[2]) || 1;
-      const vLen = 0.12 * 2 * halfH;
+      const vLen = 0.14 * 2 * halfH;
       const px = pos[ii][0];
       const py = pos[ii][1];
       const pz = pos[ii][2];
       const ix = idxRef.current;
+
+      // Local triad at vehicle (plot frame) from current Euler
+      const eu = ts.euler_deg[ii];
+      const R = rotationBodyToNed(deg2rad(eu[0]), deg2rad(eu[1]), deg2rad(eu[2]));
+      const s = 0.1 * 2 * halfH;
+      const ax = bodyToPlot(R, [s, 0, 0]);
+      const ay = bodyToPlot(R, [0, s, 0]);
+      const az = bodyToPlot(R, [0, 0, -s]); // −body z ≈ up when level
+      const triadX = [px, px + ax[0], null, px, px + ay[0], null, px, px + az[0]];
+      const triadY = [py, py + ax[1], null, py, py + ay[1], null, py, py + az[1]];
+      const triadZ = [pz, pz + ax[2], null, pz, pz + ay[2], null, pz, pz + az[2]];
 
       Plotly.restyle(
         ref.current,
@@ -236,6 +385,7 @@
             }),
             [px],
             [px, px + (v[0] / vNorm) * vLen],
+            triadX,
           ],
           y: [
             trail.map(function (p) {
@@ -243,6 +393,7 @@
             }),
             [py],
             [py, py + (v[1] / vNorm) * vLen],
+            triadY,
           ],
           z: [
             trail.map(function (p) {
@@ -250,13 +401,13 @@
             }),
             [pz],
             [pz, pz - (v[2] / vNorm) * vLen],
+            triadZ,
           ],
         },
-        [ix.trail, ix.veh, ix.vel]
+        [ix.trail, ix.veh, ix.vel, ix.triad]
       );
     }
 
-    // Full (re)build when run changes
     useEffect(() => {
       if (!ref.current || !window.Plotly || !ts || !ts.pos_plot) return;
       const pos = ts.pos_plot;
@@ -269,17 +420,15 @@
           title: title,
           range: range.slice(),
           autorange: false,
-          gridcolor: "#2d3a4d",
+          gridcolor: "#243044",
           zerolinecolor: "#3a4a60",
           showbackground: true,
-          backgroundcolor: "rgba(12,16,24,0.9)",
+          backgroundcolor: "rgba(10,14,22,0.95)",
         };
       };
 
       const traces = [];
-      // 0: invisible FOV corners (forces initial camera to the full box)
       traces.push(cornerTrace(bounds));
-      // 1: full path
       traces.push({
         type: "scatter3d",
         mode: "lines",
@@ -292,7 +441,7 @@
         z: pos.map(function (p) {
           return p[2];
         }),
-        line: { color: "rgba(100,140,200,0.45)", width: 4 },
+        line: { color: "rgba(80,120,180,0.35)", width: 5 },
         name: "path",
         hoverinfo: "skip",
       });
@@ -310,21 +459,20 @@
           z: ts.ref_plot.map(function (p) {
             return p[2];
           }),
-          line: { color: "orange", width: 2, dash: "dash" },
+          line: { color: "rgba(255,165,40,0.85)", width: 3, dash: "dash" },
           name: "reference",
-          opacity: 0.75,
           hoverinfo: "skip",
         });
         next = 3;
       }
-      idxRef.current = { trail: next, veh: next + 1, vel: next + 2 };
+      idxRef.current = { trail: next, veh: next + 1, vel: next + 2, triad: next + 3 };
       traces.push({
         type: "scatter3d",
         mode: "lines",
         x: [pos[0][0]],
         y: [pos[0][1]],
         z: [pos[0][2]],
-        line: { color: "#3d9cf0", width: 6 },
+        line: { color: "#5b9fd4", width: 8 },
         name: "trail",
       });
       traces.push({
@@ -333,7 +481,12 @@
         x: [pos[0][0]],
         y: [pos[0][1]],
         z: [pos[0][2]],
-        marker: { size: 5, color: "#e7ecf3" },
+        marker: {
+          size: 7,
+          color: "#e8f4ff",
+          line: { color: "#5b9fd4", width: 2 },
+          symbol: "circle",
+        },
         name: "vehicle",
       });
       traces.push({
@@ -342,15 +495,25 @@
         x: [pos[0][0], pos[0][0]],
         y: [pos[0][1], pos[0][1]],
         z: [pos[0][2], pos[0][2]],
-        line: { color: "#3ecf8e", width: 6 },
+        line: { color: "#3ecf8e", width: 7 },
         name: "velocity",
+      });
+      traces.push({
+        type: "scatter3d",
+        mode: "lines",
+        x: [0, 0],
+        y: [0, 0],
+        z: [0, 0],
+        line: { color: "rgba(231,236,243,0.85)", width: 4 },
+        name: "body axes",
+        hoverinfo: "skip",
       });
 
       const layout = {
-        paper_bgcolor: "#0c1018",
-        plot_bgcolor: "#0c1018",
+        paper_bgcolor: "#0a0e16",
+        plot_bgcolor: "#0a0e16",
         font: { color: "#e7ecf3", size: 11 },
-        margin: { l: 0, r: 0, t: 10, b: 0 },
+        margin: { l: 0, r: 0, t: 8, b: 0 },
         uirevision: "flight-static-" + runId,
         scene: {
           xaxis: axis("N [m]", bounds.x),
@@ -358,17 +521,16 @@
           zaxis: axis("up [m]", bounds.z),
           aspectmode: "manual",
           aspectratio: bounds.ar,
-          bgcolor: "#0c1018",
-          // Farther isometric-ish eye so the whole FOV fits on first paint
+          bgcolor: "#0a0e16",
           camera: {
-            eye: { x: 2.4, y: 2.4, z: 1.55 },
+            eye: { x: 2.35, y: 2.35, z: 1.5 },
             center: { x: 0, y: 0, z: 0 },
             up: { x: 0, y: 0, z: 1 },
           },
         },
         showlegend: true,
-        legend: { orientation: "h", y: 1.08 },
-        height: 520,
+        legend: { orientation: "h", y: 1.1, font: { size: 10 } },
+        height: 480,
       };
 
       Plotly.newPlot(ref.current, traces, layout, {
@@ -387,13 +549,300 @@
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [runId, ts]);
 
-    // Scrub: restyle only
     useEffect(() => {
       applyFrame(frame);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [frame, runId]);
 
-    return e("div", { className: "plot", ref: ref, id: "flight3d-" + runId });
+    return e("div", { className: "plot plot-flight", ref: ref, id: "flight3d-" + runId });
+  }
+
+  /**
+   * Vehicle attitude + wrench: X-quad mesh, body axes, thrust (−body z) and torque arrows.
+   * Uses same scrub index as the path plot. Fixed cube FOV at origin.
+   */
+  function VehicleAttitudeView({ runId, ts, frame, limits }) {
+    const ref = useRef(null);
+    const ready = useRef(false);
+    // trace indices: 0 bounds, 1 frame, 2 motors, 3 ax, 4 ay, 5 az, 6 thrust, 7 torque, 8–10 tau axes
+    const IDX = { frame: 1, motors: 2, ax: 3, ay: 4, az: 5, thrust: 6, torque: 7, tAx: 8, tAy: 9, tAz: 10 };
+
+    function applyFrame(i) {
+      if (!ref.current || !window.Plotly || !ready.current || !ts) return;
+      const n = ts.t.length;
+      const ii = Math.max(0, Math.min(i, n - 1));
+      const g = vehicleGeom(ts.euler_deg[ii], ts.u[ii], limits);
+      const m = g.motors;
+      Plotly.restyle(
+        ref.current,
+        {
+          x: [
+            g.frame.x,
+            m.map(function (p) {
+              return p[0];
+            }),
+            g.axes.x.x,
+            g.axes.y.x,
+            g.axes.z.x,
+            g.thrust.x,
+            g.torque.x,
+            g.tAx.x,
+            g.tAy.x,
+            g.tAz.x,
+          ],
+          y: [
+            g.frame.y,
+            m.map(function (p) {
+              return p[1];
+            }),
+            g.axes.x.y,
+            g.axes.y.y,
+            g.axes.z.y,
+            g.thrust.y,
+            g.torque.y,
+            g.tAx.y,
+            g.tAy.y,
+            g.tAz.y,
+          ],
+          z: [
+            g.frame.z,
+            m.map(function (p) {
+              return p[2];
+            }),
+            g.axes.x.z,
+            g.axes.y.z,
+            g.axes.z.z,
+            g.thrust.z,
+            g.torque.z,
+            g.tAx.z,
+            g.tAy.z,
+            g.tAz.z,
+          ],
+        },
+        [IDX.frame, IDX.motors, IDX.ax, IDX.ay, IDX.az, IDX.thrust, IDX.torque, IDX.tAx, IDX.tAy, IDX.tAz]
+      );
+    }
+
+    useEffect(() => {
+      if (!ref.current || !window.Plotly || !ts) return;
+      ready.current = false;
+      const g0 = vehicleGeom(ts.euler_deg[0], ts.u[0], limits);
+      const span = 1.05;
+      const bounds = {
+        x: [-span, span],
+        y: [-span, span],
+        z: [-span, span],
+      };
+      const ax = function (title) {
+        return {
+          title: title,
+          range: [-span, span],
+          autorange: false,
+          gridcolor: "#243044",
+          zerolinecolor: "#3a4a60",
+          showbackground: true,
+          backgroundcolor: "rgba(10,14,22,0.95)",
+          showspikes: false,
+        };
+      };
+      const line3 = function (seg, color, width, name, showleg) {
+        return {
+          type: "scatter3d",
+          mode: "lines",
+          x: seg.x,
+          y: seg.y,
+          z: seg.z,
+          line: { color: color, width: width },
+          name: name,
+          showlegend: !!showleg,
+          hoverinfo: "name",
+        };
+      };
+      const m0 = g0.motors;
+      const traces = [
+        cornerTrace(bounds),
+        {
+          type: "scatter3d",
+          mode: "lines",
+          x: g0.frame.x,
+          y: g0.frame.y,
+          z: g0.frame.z,
+          line: { color: "#8ab4e8", width: 8 },
+          name: "airframe",
+          hoverinfo: "skip",
+        },
+        {
+          type: "scatter3d",
+          mode: "markers",
+          x: m0.map(function (p) {
+            return p[0];
+          }),
+          y: m0.map(function (p) {
+            return p[1];
+          }),
+          z: m0.map(function (p) {
+            return p[2];
+          }),
+          marker: {
+            size: 8,
+            color: ["#5b9fd4", "#e6b450", "#5b9fd4", "#e6b450"],
+            symbol: "circle",
+            line: { width: 1, color: "#0a0e16" },
+          },
+          name: "motors",
+          hoverinfo: "skip",
+        },
+        line3(g0.axes.x, "#f07178", 6, "body +x", true),
+        line3(g0.axes.y, "#3ecf8e", 6, "body +y", true),
+        line3(g0.axes.z, "#5b9fd4", 6, "body +z", true),
+        line3(g0.thrust, "#4fd1ff", 12, "thrust −z", true),
+        line3(g0.torque, "#e6b450", 10, "torque τ", true),
+        line3(g0.tAx, "rgba(240,113,120,0.55)", 5, "τφ", false),
+        line3(g0.tAy, "rgba(62,207,142,0.55)", 5, "τθ", false),
+        line3(g0.tAz, "rgba(91,159,212,0.55)", 5, "τψ", false),
+      ];
+      const layout = {
+        paper_bgcolor: "#0a0e16",
+        plot_bgcolor: "#0a0e16",
+        font: { color: "#e7ecf3", size: 11 },
+        margin: { l: 0, r: 0, t: 8, b: 0 },
+        uirevision: "veh-static-" + runId,
+        scene: {
+          xaxis: ax("N"),
+          yaxis: ax("E"),
+          zaxis: ax("up"),
+          aspectmode: "cube",
+          bgcolor: "#0a0e16",
+          camera: {
+            eye: { x: 1.55, y: 1.55, z: 1.15 },
+            center: { x: 0, y: 0, z: 0 },
+            up: { x: 0, y: 0, z: 1 },
+          },
+        },
+        showlegend: true,
+        legend: { orientation: "h", y: 1.12, font: { size: 10 } },
+        height: 480,
+      };
+      Plotly.newPlot(ref.current, traces, layout, {
+        responsive: true,
+        displayModeBar: "hover",
+        displaylogo: false,
+      }).then(function () {
+        ready.current = true;
+        applyFrame(0);
+      });
+      return function () {
+        ready.current = false;
+        if (ref.current && window.Plotly) Plotly.purge(ref.current);
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [runId, ts]);
+
+    useEffect(() => {
+      applyFrame(frame);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [frame, runId]);
+
+    return e("div", { className: "plot plot-vehicle", ref: ref, id: "veh3d-" + runId });
+  }
+
+  function WrenchHud({ ts, frame, limits }) {
+    const i = Math.max(0, Math.min(frame, ts.t.length - 1));
+    const u = ts.u[i];
+    const eu = ts.euler_deg[i];
+    const v = ts.vel_ned[i];
+    const w = ts.omega[i];
+    const F = u[0];
+    const tNorm = Math.hypot(u[1], u[2], u[3]);
+    const vNorm = Math.hypot(v[0], v[1], v[2]);
+    const Fmax = (limits && limits.thrust_max_n) || null;
+    const Tmax = (limits && limits.torque_max_nm) || null;
+    const fFrac = Fmax ? Math.min(1, Math.max(0, F / Fmax)) : null;
+    const tFrac = Tmax ? Math.min(1, Math.max(0, tNorm / Tmax)) : null;
+
+    function bar(frac, color) {
+      if (frac === null) return null;
+      return e(
+        "div",
+        { className: "hud-bar" },
+        e("div", {
+          className: "hud-bar-fill",
+          style: { width: 100 * frac + "%", background: color },
+        })
+      );
+    }
+
+    return e(
+      "div",
+      { className: "wrench-hud" },
+      e(
+        "div",
+        { className: "hud-block" },
+        e("div", { className: "hud-label" }, "Thrust F"),
+        e("div", { className: "hud-value accent-f" }, fmt(F, 3), e("span", { className: "hud-unit" }, " N")),
+        bar(fFrac, "linear-gradient(90deg,#1a6a9a,#4fd1ff)"),
+        Fmax ? e("div", { className: "hud-sub" }, fmt(100 * fFrac, 0), "% of limit ", fmt(Fmax, 1), " N") : null
+      ),
+      e(
+        "div",
+        { className: "hud-block" },
+        e("div", { className: "hud-label" }, "Torque |τ|"),
+        e("div", { className: "hud-value accent-t" }, fmt(tNorm, 4), e("span", { className: "hud-unit" }, " N·m")),
+        bar(tFrac, "linear-gradient(90deg,#8a6a20,#e6b450)"),
+        e(
+          "div",
+          { className: "hud-sub mono" },
+          "τφ ",
+          fmt(u[1], 3),
+          " · τθ ",
+          fmt(u[2], 3),
+          " · τψ ",
+          fmt(u[3], 3)
+        )
+      ),
+      e(
+        "div",
+        { className: "hud-block" },
+        e("div", { className: "hud-label" }, "Attitude φ θ ψ"),
+        e(
+          "div",
+          { className: "hud-value mono" },
+          fmt(eu[0], 1),
+          "°  ",
+          fmt(eu[1], 1),
+          "°  ",
+          fmt(eu[2], 1),
+          "°"
+        ),
+        e(
+          "div",
+          { className: "hud-sub mono" },
+          "pqr ",
+          fmt(w[0], 2),
+          " ",
+          fmt(w[1], 2),
+          " ",
+          fmt(w[2], 2),
+          " rad/s"
+        )
+      ),
+      e(
+        "div",
+        { className: "hud-block" },
+        e("div", { className: "hud-label" }, "Speed |v|"),
+        e("div", { className: "hud-value" }, fmt(vNorm, 3), e("span", { className: "hud-unit" }, " m/s")),
+        e(
+          "div",
+          { className: "hud-sub mono" },
+          "NED ",
+          fmt(v[0], 2),
+          " ",
+          fmt(v[1], 2),
+          " ",
+          fmt(v[2], 2)
+        )
+      )
+    );
   }
 
   function Overview({ doc, onSelect }) {
@@ -601,7 +1050,6 @@
   function FlightTab({ run }) {
     const ts = run.timeseries;
     const [frame, setFrame] = useState(0);
-    // Reset scrub when switching runs (new id).
     useEffect(() => {
       setFrame(0);
     }, [run && run.id]);
@@ -610,218 +1058,288 @@
 
     const n = ts.t.length;
     const i = Math.min(frame, n - 1);
-    const v = ts.vel_ned[i];
-    const u = ts.u[i];
-    const hud =
-      "t=" +
-      fmt(ts.t[i], 2) +
-      "s | |v|=" +
-      fmt(Math.hypot(v[0], v[1], v[2]), 3) +
-      " m/s | F=" +
-      fmt(u[0], 2) +
-      " N | |τ|=" +
-      fmt(Math.hypot(u[1], u[2], u[3]), 3) +
-      " · φθψ=(" +
-      fmt(ts.euler_deg[i][0], 1) +
-      "," +
-      fmt(ts.euler_deg[i][1], 1) +
-      "," +
-      fmt(ts.euler_deg[i][2], 1) +
-      ")°";
+    const limits = run.limits || {};
 
     return e(
       "div",
-      null,
+      { className: "flight-tab" },
       e(
         "div",
-        { className: "row" },
-        e("strong", null, run.label),
-        roleBadge(run.role),
-        e("label", null, "scrub "),
-        e("input", {
-          type: "range",
-          min: 0,
-          max: n - 1,
-          value: i,
-          onChange: (ev) => setFrame(Number(ev.target.value)),
-          style: { width: "240px" },
-        }),
-        e("span", { style: { color: "var(--muted)", fontSize: "0.85rem" } }, hud)
+        { className: "flight-toolbar card" },
+        e(
+          "div",
+          { className: "flight-toolbar-left" },
+          e("strong", null, run.label),
+          roleBadge(run.role),
+          e(
+            "span",
+            { className: "flight-time mono" },
+            "t = ",
+            fmt(ts.t[i], 2),
+            " s",
+            e("span", { className: "muted" }, " / ", fmt(ts.t[n - 1], 1), " s")
+          )
+        ),
+        e(
+          "div",
+          { className: "flight-scrub" },
+          e("label", { htmlFor: "flight-scrub-" + run.id }, "scrub"),
+          e("input", {
+            id: "flight-scrub-" + run.id,
+            type: "range",
+            min: 0,
+            max: n - 1,
+            value: i,
+            onChange: function (ev) {
+              setFrame(Number(ev.target.value));
+            },
+          }),
+          e(
+            "span",
+            { className: "flight-frame mono muted" },
+            i + 1,
+            " / ",
+            n
+          )
+        )
       ),
-      e("div", { className: "card" }, e(Flight3DView, { runId: run.id, ts: ts, frame: i })),
+      e(
+        "div",
+        { className: "flight-stage" },
+        e(
+          "div",
+          { className: "card flight-panel" },
+          e("h3", { className: "panel-title" }, "Trajectory"),
+          e(
+            "p",
+            { className: "panel-sub" },
+            "NED path in plot frame (N, E, up). Blue trail = history · green = velocity · axes at vehicle."
+          ),
+          e(Flight3DView, { runId: run.id, ts: ts, frame: i })
+        ),
+        e(
+          "div",
+          { className: "card flight-panel flight-panel-vehicle" },
+          e("h3", { className: "panel-title" }, "Vehicle attitude & wrench"),
+          e(
+            "p",
+            { className: "panel-sub" },
+            "X-quad body at origin. Cyan = thrust (−body z) · gold = τ · RGB = body axes. Length ∝ magnitude."
+          ),
+          e(VehicleAttitudeView, {
+            runId: run.id,
+            ts: ts,
+            frame: i,
+            limits: limits,
+          }),
+          e(WrenchHud, { ts: ts, frame: i, limits: limits })
+        )
+      ),
       e(
         "div",
         { className: "grid cols-1", style: { marginTop: "1rem" } },
-        e("div", { className: "card" }, e(PlotDiv, {
-          id: "pos_ts",
-          data: [
-            { x: ts.t, y: ts.pos_ned.map((p) => p[0]), name: "N", type: "scatter", mode: "lines" },
-            { x: ts.t, y: ts.pos_ned.map((p) => p[1]), name: "E", type: "scatter", mode: "lines" },
-            { x: ts.t, y: ts.pos_ned.map((p) => p[2]), name: "D", type: "scatter", mode: "lines" },
-            {
-              x: [ts.t[i], ts.t[i]],
-              y: [
-                Math.min.apply(
-                  null,
-                  ts.pos_ned.map(function (p) {
-                    return Math.min(p[0], p[1], p[2]);
-                  })
-                ),
-                Math.max.apply(
-                  null,
-                  ts.pos_ned.map(function (p) {
-                    return Math.max(p[0], p[1], p[2]);
-                  })
-                ),
-              ],
-              mode: "lines",
-              line: { color: "white", dash: "dot", width: 1 },
-              showlegend: false,
-              hoverinfo: "skip",
+        e(
+          "div",
+          { className: "card" },
+          e(PlotDiv, {
+            id: "pos_ts",
+            data: [
+              {
+                x: ts.t,
+                y: ts.pos_ned.map(function (p) {
+                  return p[0];
+                }),
+                name: "N",
+                type: "scatter",
+                mode: "lines",
+                line: { color: "#5b9fd4" },
+              },
+              {
+                x: ts.t,
+                y: ts.pos_ned.map(function (p) {
+                  return p[1];
+                }),
+                name: "E",
+                type: "scatter",
+                mode: "lines",
+                line: { color: "#3ecf8e" },
+              },
+              {
+                x: ts.t,
+                y: ts.pos_ned.map(function (p) {
+                  return p[2];
+                }),
+                name: "D",
+                type: "scatter",
+                mode: "lines",
+                line: { color: "#e6b450" },
+              },
+              {
+                x: [ts.t[i], ts.t[i]],
+                y: [
+                  Math.min.apply(
+                    null,
+                    ts.pos_ned.map(function (p) {
+                      return Math.min(p[0], p[1], p[2]);
+                    })
+                  ),
+                  Math.max.apply(
+                    null,
+                    ts.pos_ned.map(function (p) {
+                      return Math.max(p[0], p[1], p[2]);
+                    })
+                  ),
+                ],
+                mode: "lines",
+                line: { color: "rgba(255,255,255,0.55)", dash: "dot", width: 1 },
+                showlegend: false,
+                hoverinfo: "skip",
+              },
+            ],
+            layout: {
+              title: "Position NED",
+              paper_bgcolor: "#0a0e16",
+              plot_bgcolor: "#0a0e16",
+              font: { color: "#e7ecf3", size: 11 },
+              margin: { t: 28, r: 10, b: 40, l: 50 },
+              height: 260,
+              legend: { orientation: "h" },
+              xaxis: { title: "t [s]", gridcolor: "#2d3a4d", zeroline: false },
+              yaxis: { title: "m", gridcolor: "#2d3a4d", zeroline: false },
             },
-          ],
-          layout: {
-            title: "Position NED",
-            paper_bgcolor: "#0c1018",
-            plot_bgcolor: "#0c1018",
-            font: { color: "#e7ecf3", size: 11 },
-            margin: { t: 40, r: 10, b: 40, l: 50 },
-            height: 260,
-            legend: { orientation: "h" },
-            xaxis: { title: "t [s]", gridcolor: "#2d3a4d", zeroline: false },
-            yaxis: { title: "m", gridcolor: "#2d3a4d", zeroline: false },
-          },
-        })),
-        // Stacked force / torque — magnitudes differ by ~10³
-        e("div", { className: "card" }, e(PlotDiv, {
-          id: "u_ts_stacked",
-          data: [
-            {
-              x: ts.t,
-              y: ts.u.map(function (uu) {
-                return uu[0];
-              }),
-              name: "F",
-              type: "scatter",
-              mode: "lines",
-              line: { color: "#3d9cf0" },
-              yaxis: "y",
-            },
-            {
-              x: [ts.t[i], ts.t[i]],
-              y: [
-                Math.min.apply(
-                  null,
-                  ts.u.map(function (uu) {
-                    return uu[0];
-                  })
-                ),
-                Math.max.apply(
-                  null,
-                  ts.u.map(function (uu) {
-                    return uu[0];
-                  })
-                ),
-              ],
-              mode: "lines",
-              line: { color: "rgba(255,255,255,0.5)", dash: "dot", width: 1 },
-              showlegend: false,
-              hoverinfo: "skip",
-              yaxis: "y",
-            },
-            {
-              x: ts.t,
-              y: ts.u.map(function (uu) {
-                return uu[1];
-              }),
-              name: "τφ",
-              type: "scatter",
-              mode: "lines",
-              line: { color: "#e6b450" },
-              yaxis: "y2",
-            },
-            {
-              x: ts.t,
-              y: ts.u.map(function (uu) {
-                return uu[2];
-              }),
-              name: "τθ",
-              type: "scatter",
-              mode: "lines",
-              line: { color: "#3ecf8e" },
-              yaxis: "y2",
-            },
-            {
-              x: ts.t,
-              y: ts.u.map(function (uu) {
-                return uu[3];
-              }),
-              name: "τψ",
-              type: "scatter",
-              mode: "lines",
-              line: { color: "#f07178" },
-              yaxis: "y2",
-            },
-            {
-              x: [ts.t[i], ts.t[i]],
-              y: (function () {
-                const tqs = ts.u.map(function (uu) {
-                  return [uu[1], uu[2], uu[3]];
-                });
-                let lo = Infinity;
-                let hi = -Infinity;
-                for (let k = 0; k < tqs.length; k++) {
-                  for (let j = 0; j < 3; j++) {
-                    lo = Math.min(lo, tqs[k][j]);
-                    hi = Math.max(hi, tqs[k][j]);
+          })
+        ),
+        e(
+          "div",
+          { className: "card" },
+          e(PlotDiv, {
+            id: "u_ts_stacked",
+            data: [
+              {
+                x: ts.t,
+                y: ts.u.map(function (uu) {
+                  return uu[0];
+                }),
+                name: "F",
+                type: "scatter",
+                mode: "lines",
+                line: { color: "#4fd1ff" },
+                yaxis: "y",
+              },
+              {
+                x: [ts.t[i], ts.t[i]],
+                y: [
+                  Math.min.apply(
+                    null,
+                    ts.u.map(function (uu) {
+                      return uu[0];
+                    })
+                  ),
+                  Math.max.apply(
+                    null,
+                    ts.u.map(function (uu) {
+                      return uu[0];
+                    })
+                  ),
+                ],
+                mode: "lines",
+                line: { color: "rgba(255,255,255,0.5)", dash: "dot", width: 1 },
+                showlegend: false,
+                hoverinfo: "skip",
+                yaxis: "y",
+              },
+              {
+                x: ts.t,
+                y: ts.u.map(function (uu) {
+                  return uu[1];
+                }),
+                name: "τφ",
+                type: "scatter",
+                mode: "lines",
+                line: { color: "#f07178" },
+                yaxis: "y2",
+              },
+              {
+                x: ts.t,
+                y: ts.u.map(function (uu) {
+                  return uu[2];
+                }),
+                name: "τθ",
+                type: "scatter",
+                mode: "lines",
+                line: { color: "#3ecf8e" },
+                yaxis: "y2",
+              },
+              {
+                x: ts.t,
+                y: ts.u.map(function (uu) {
+                  return uu[3];
+                }),
+                name: "τψ",
+                type: "scatter",
+                mode: "lines",
+                line: { color: "#5b9fd4" },
+                yaxis: "y2",
+              },
+              {
+                x: [ts.t[i], ts.t[i]],
+                y: (function () {
+                  const tqs = ts.u.map(function (uu) {
+                    return [uu[1], uu[2], uu[3]];
+                  });
+                  let lo = Infinity;
+                  let hi = -Infinity;
+                  for (let k = 0; k < tqs.length; k++) {
+                    for (let j = 0; j < 3; j++) {
+                      lo = Math.min(lo, tqs[k][j]);
+                      hi = Math.max(hi, tqs[k][j]);
+                    }
                   }
-                }
-                if (!Number.isFinite(lo) || lo === hi) {
-                  lo = -0.01;
-                  hi = 0.01;
-                }
-                return [lo, hi];
-              })(),
-              mode: "lines",
-              line: { color: "rgba(255,255,255,0.5)", dash: "dot", width: 1 },
-              showlegend: false,
-              hoverinfo: "skip",
-              yaxis: "y2",
+                  if (!Number.isFinite(lo) || lo === hi) {
+                    lo = -0.01;
+                    hi = 0.01;
+                  }
+                  return [lo, hi];
+                })(),
+                mode: "lines",
+                line: { color: "rgba(255,255,255,0.5)", dash: "dot", width: 1 },
+                showlegend: false,
+                hoverinfo: "skip",
+                yaxis: "y2",
+              },
+            ],
+            layout: {
+              title: "Control u(t) — force & torques",
+              paper_bgcolor: "#0a0e16",
+              plot_bgcolor: "#0a0e16",
+              font: { color: "#e7ecf3", size: 11 },
+              margin: { t: 28, r: 20, b: 40, l: 55 },
+              height: 360,
+              legend: { orientation: "h", y: 1.12 },
+              yaxis: {
+                title: "F [N]",
+                domain: [0.58, 1.0],
+                gridcolor: "#2d3a4d",
+                zeroline: false,
+                titlefont: { size: 11 },
+              },
+              yaxis2: {
+                title: "τ [N·m]",
+                domain: [0.0, 0.48],
+                gridcolor: "#2d3a4d",
+                zeroline: true,
+                zerolinecolor: "#3a4a60",
+                titlefont: { size: 11 },
+              },
+              xaxis: {
+                title: "t [s]",
+                gridcolor: "#2d3a4d",
+                zeroline: false,
+                anchor: "y2",
+              },
             },
-          ],
-          layout: {
-            title: "Control u(t) — force & torques stacked",
-            paper_bgcolor: "#0c1018",
-            plot_bgcolor: "#0c1018",
-            font: { color: "#e7ecf3", size: 11 },
-            margin: { t: 40, r: 20, b: 40, l: 55 },
-            height: 380,
-            legend: { orientation: "h", y: 1.12 },
-            // Top: thrust [N]
-            yaxis: {
-              title: "F [N]",
-              domain: [0.58, 1.0],
-              gridcolor: "#2d3a4d",
-              zeroline: false,
-              titlefont: { size: 11 },
-            },
-            // Bottom: body torques [N·m]
-            yaxis2: {
-              title: "τ [N·m]",
-              domain: [0.0, 0.48],
-              gridcolor: "#2d3a4d",
-              zeroline: true,
-              zerolinecolor: "#3a4a60",
-              titlefont: { size: 11 },
-            },
-            xaxis: {
-              title: "t [s]",
-              gridcolor: "#2d3a4d",
-              zeroline: false,
-              anchor: "y2",
-            },
-          },
-        }))
+          })
+        )
       )
     );
   }
