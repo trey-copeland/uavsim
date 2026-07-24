@@ -89,37 +89,105 @@
     return sc.metrics || {};
   }
 
-  function MissionSelector({ doc, missionId, onChange, className }) {
+  /** Segmented mission control (2 options → chips, not a dropdown). */
+  function MissionSelector({ doc, missionId, onChange, className, showHint }) {
     const missions = (doc && doc.missions) || [];
     if (!missions.length) return null;
+    const activeId = missionId || missions[0].id;
+    const active = getMission(doc, activeId);
     return e(
       "div",
       { className: "mission-selector " + (className || "") },
-      e("label", { className: "mission-label" }, "Mission"),
+      e("span", { className: "mission-label", id: "mission-label" }, "Mission"),
       e(
-        "select",
+        "div",
         {
-          value: missionId || missions[0].id,
-          onChange: function (ev) {
-            onChange(ev.target.value);
-          },
-          "aria-label": "Mission",
+          className: "mission-seg",
+          role: "group",
+          "aria-labelledby": "mission-label",
         },
         missions.map(function (m) {
+          const on = m.id === activeId;
           return e(
-            "option",
-            { key: m.id, value: m.id },
+            "button",
+            {
+              key: m.id,
+              type: "button",
+              className: "mission-seg-btn" + (on ? " active" : ""),
+              "aria-pressed": on ? "true" : "false",
+              onClick: function () {
+                if (!on) onChange(m.id);
+              },
+            },
             m.short_label || m.label || m.id
           );
         })
       ),
-      (function () {
-        const m = getMission(doc, missionId);
-        if (!m || !m.description) return null;
-        return e("span", { className: "mission-hint", title: m.description }, m.description);
-      })()
+      showHint && active && active.description
+        ? e("span", { className: "mission-hint", title: active.description }, active.description)
+        : null
     );
   }
+
+  /** Compact in-tab reminder — primary control stays in the sticky header. */
+  function ActiveMissionChip({ doc, missionId }) {
+    const m = getMission(doc, missionId);
+    if (!m) return null;
+    return e(
+      "span",
+      { className: "active-mission-chip", title: m.description || "" },
+      "Active mission · ",
+      e("strong", null, m.short_label || m.label || m.id)
+    );
+  }
+
+  /** Guided 4-step story for portfolio reviewers. */
+  function StoryStrip({ activeTab, onNavigate }) {
+    const steps = [
+      { id: "overview", n: "1", label: "Matrix", blurb: "Compare stacks" },
+      { id: "flight", n: "2", label: "Flight", blurb: "Scrub the path" },
+      { id: "estimation", n: "3", label: "Filter win", blurb: "LQR vs PID" },
+      { id: "envelope", n: "4", label: "Envelope", blurb: "Where they break" },
+    ];
+    return e(
+      "nav",
+      { className: "story-strip", "aria-label": "Suggested reading path" },
+      e("span", { className: "story-strip-label" }, "Story"),
+      steps.map(function (s, i) {
+        const on = activeTab === s.id;
+        return e(
+          React.Fragment,
+          { key: s.id },
+          i > 0 ? e("span", { className: "story-arrow", "aria-hidden": "true" }, "→") : null,
+          e(
+            "button",
+            {
+              type: "button",
+              className: "story-step" + (on ? " active" : ""),
+              onClick: function () {
+                onNavigate(s.id);
+              },
+              "aria-current": on ? "step" : undefined,
+            },
+            e("span", { className: "story-n" }, s.n),
+            e("span", { className: "story-text" },
+              e("span", { className: "story-title" }, s.label),
+              e("span", { className: "story-blurb" }, s.blurb)
+            )
+          )
+        );
+      })
+    );
+  }
+
+  const VALUE_PROP =
+    "Where hover LQR and estimators hold — and where they don’t.";
+  const DEFAULT_TITLE = "uavsim · controller × sensor flight study";
+  const HONESTY_LINE =
+    "Same mission, twelve stacks — from ideal LQR to IMU-only — so the demo fails on purpose where physics and observability demand it.";
+
+  /** Teaching pair scenario ids (GPS+IMU naive vs filtered). */
+  const TEACHING_PAIR_COLUMNS = { gps_imu_naive: true, gps_imu_filter: true };
 
   /**
    * Fit a viewing box to path geometry (meters, plot frame N/E/up).
@@ -928,7 +996,14 @@
     );
   }
 
-  function Overview({ doc, onSelect, missionId, onMissionChange }) {
+  function Overview({
+    doc,
+    onSelect,
+    missionId,
+    onOpenHeroFlight,
+    onGoEstimation,
+    onGoEnvelope,
+  }) {
     const mission = getMission(doc, missionId);
     const runs = runsForMission(doc, missionId);
     const byId = {};
@@ -939,11 +1014,11 @@
     const columns = (matrix && matrix.columns) || null;
     const rowDefs = (matrix && matrix.rows) || null;
     const scenarios = (matrix && matrix.scenarios) || [];
+    const [highlightPair, setHighlightPair] = useState(true);
 
     function fmtRmse(v) {
       if (v === null || v === undefined || !Number.isFinite(+v)) return "—";
       const x = +v;
-      // Keep digit bands similar width across the grid
       if (x >= 100) return x.toFixed(0);
       if (x >= 10) return x.toFixed(1);
       return x.toFixed(3);
@@ -967,11 +1042,16 @@
       const tib = m.time_in_bounds_frac;
       const tibStr =
         tib != null && Number.isFinite(+tib) ? Math.round(100 * +tib) + "% in-bound" : null;
+      const teach =
+        highlightPair && sc.column && TEACHING_PAIR_COLUMNS[sc.column];
       return e(
         "div",
         {
           key: (sc.id || rid) + ":" + (missionId || ""),
-          className: "matrix-cell card" + (ok === false ? " cell-fail" : ""),
+          className:
+            "matrix-cell card" +
+            (ok === false ? " cell-fail" : "") +
+            (teach ? " cell-teach" : ""),
           style: { cursor: rid ? "pointer" : "default" },
           onClick: function () {
             if (rid && onSelect) onSelect(rid);
@@ -993,16 +1073,13 @@
         e(
           "p",
           { className: "matrix-meta" },
-          "max |e| ",
-          fmtMaxE(m.max_position_error_m),
-          " · ",
-          e("span", { className: ok ? "ok" : "fail" }, ok === true ? "ok" : ok === false ? "fail" : "—"),
-          tibStr ? e("span", null, " · " + tibStr) : null
+          e("span", { className: ok ? "ok" : "fail" }, ok === true ? "pass" : ok === false ? "fail" : "—"),
+          e("span", { className: "matrix-meta-sec" }, " · max |e| ", fmtMaxE(m.max_position_error_m), " m"),
+          tibStr ? e("span", { className: "matrix-meta-sec" }, " · ", tibStr) : null
         )
       );
     }
 
-    // Extra runs not in the matrix (e.g. Monte Carlo) for this mission
     const matrixRunIds = {};
     scenarios.forEach(function (s) {
       const rid = scenarioRunId(s, missionId);
@@ -1021,20 +1098,36 @@
               "div",
               { className: "row matrix-mission-row" },
               e("h2", { style: { margin: 0, flex: "1 1 auto" } }, matrix.title || "Controller × sensor matrix"),
-              e(MissionSelector, {
-                doc: doc,
-                missionId: missionId,
-                onChange: onMissionChange,
-              })
+              e(ActiveMissionChip, { doc: doc, missionId: missionId })
             ),
             e(
               "p",
-              { style: { color: "var(--muted)", fontSize: "0.9rem", marginTop: 0 } },
-              mission && mission.description
-                ? mission.description + " "
-                : "",
-              "Click a cell to open Flight 3D. Compare down a column (same sensors, different law) ",
-              "or across a row (same law, harder sensors)."
+              { className: "matrix-lead" },
+              "Decision grid: click a cell to open Flight 3D. Compare ",
+              e("strong", null, "down a column"),
+              " (same sensors) or ",
+              e("strong", null, "across a row"),
+              " (harder sensing)."
+            ),
+            e(
+              "div",
+              { className: "matrix-legend" },
+              e("span", { className: "legend-item" }, e("span", { className: "lg pass" }), " pass"),
+              e("span", { className: "legend-item" }, e("span", { className: "lg fail" }), " fail (honesty)"),
+              e("span", { className: "legend-item" }, e("span", { className: "lg teach" }), " teaching pair"),
+              e("span", { className: "legend-item muted" }, "click cell → Flight"),
+              e(
+                "label",
+                { className: "legend-toggle" },
+                e("input", {
+                  type: "checkbox",
+                  checked: highlightPair,
+                  onChange: function (ev) {
+                    setHighlightPair(ev.target.checked);
+                  },
+                }),
+                " Highlight GPS+IMU naive vs KF"
+              )
             ),
             e(
               "div",
@@ -1047,7 +1140,12 @@
                   null,
                   e("col", { className: "row-head" }),
                   columns.map(function (c) {
-                    return e("col", { key: c.id, className: "sensor" });
+                    return e("col", {
+                      key: c.id,
+                      className:
+                        "sensor" +
+                        (highlightPair && TEACHING_PAIR_COLUMNS[c.id] ? " col-teach" : ""),
+                    });
                   })
                 ),
                 e(
@@ -1060,7 +1158,11 @@
                     columns.map(function (c) {
                       return e(
                         "th",
-                        { key: c.id },
+                        {
+                          key: c.id,
+                          className:
+                            highlightPair && TEACHING_PAIR_COLUMNS[c.id] ? "th-teach" : "",
+                        },
                         e("div", { className: "col-label" }, c.label),
                         e(
                           "div",
@@ -1095,7 +1197,58 @@
 
     return e(
       "div",
-      { className: "grid cols-3" },
+      { className: "grid cols-3 overview-grid" },
+      e(
+        "div",
+        { className: "card hero-cta", style: { gridColumn: "1 / -1" } },
+        e("div", { className: "hero-cta-body" },
+          e("div", { className: "hero-cta-kicker" }, "Hero path · 90 seconds"),
+          e("h2", { className: "hero-cta-title" }, "Scrub the near-envelope figure-eight"),
+          e(
+            "p",
+            { className: "hero-cta-copy" },
+            HONESTY_LINE,
+            " Start in Flight 3D on the edge mission (τ★ + scheduled yaw) so attitude actually moves."
+          ),
+          e(
+            "div",
+            { className: "hero-cta-actions" },
+            e(
+              "button",
+              {
+                type: "button",
+                className: "btn-primary",
+                onClick: function () {
+                  if (onOpenHeroFlight) onOpenHeroFlight();
+                },
+              },
+              "Open Flight · envelope edge"
+            ),
+            e(
+              "button",
+              {
+                type: "button",
+                className: "btn-ghost",
+                onClick: function () {
+                  if (onGoEstimation) onGoEstimation();
+                },
+              },
+              "See filter win"
+            ),
+            e(
+              "button",
+              {
+                type: "button",
+                className: "btn-ghost",
+                onClick: function () {
+                  if (onGoEnvelope) onGoEnvelope();
+                },
+              },
+              "Where stacks break"
+            )
+          )
+        )
+      ),
       gridBlock,
       extra.map(function (r) {
         const m = r.metrics || {};
@@ -1116,8 +1269,8 @@
             { style: { margin: "0.5rem 0 0", fontSize: "0.85rem", color: "var(--muted)" } },
             "max |e| ",
             fmt(m.max_position_error_m),
-            " m · success ",
-            e("span", { className: m.success ? "ok" : "fail" }, String(m.success))
+            " m · ",
+            e("span", { className: m.success ? "ok" : "fail" }, m.success ? "pass" : "fail")
           ),
           r.mc
             ? e(
@@ -1130,18 +1283,7 @@
               )
             : null
         );
-      }),
-      e(
-        "div",
-        { className: "card", style: { gridColumn: "1 / -1" } },
-        e("h2", null, "About these runs"),
-        e(
-          "p",
-          { style: { margin: 0, color: "var(--muted)", fontSize: "0.9rem" } },
-          doc.description ||
-            "Controller × sensor matrix on the elevated figure-eight, plus Monte Carlo and envelope."
-        )
-      )
+      })
     );
   }
 
@@ -1865,7 +2007,7 @@
     return rows;
   }
 
-  function CompareTab({ doc, missionId, onMissionChange }) {
+  function CompareTab({ doc, missionId }) {
     const mission = getMission(doc, missionId);
     const runs = runsForMission(doc, missionId);
     // Prefer runs with metrics; timeseries optional for path overlay
@@ -2027,16 +2169,20 @@
           "div",
           { className: "row matrix-mission-row" },
           e("h2", { style: { margin: 0, flex: "1 1 auto" } }, "Compare runs"),
-          e(MissionSelector, {
-            doc: doc,
-            missionId: missionId,
-            onChange: onMissionChange,
-          })
+          e(ActiveMissionChip, { doc: doc, missionId: missionId })
         ),
         e(
           "p",
-          { style: { color: "var(--muted)", fontSize: "0.9rem", marginTop: 0 } },
-          "Pick any two gallery runs (filtered by mission). Metrics are B − A. Path overlay needs timeseries on both."
+          { className: "compare-caption" },
+          e("strong", null, "Default pair: "),
+          "GPS+IMU naive vs GPS+IMU LQG — the ",
+          e("em", null, "filter benefit"),
+          " teaching win. Metrics are B − A. Path overlay needs timeseries on both."
+        ),
+        e(
+          "p",
+          { style: { color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 } },
+          "Power tool: pick any two runs for the active mission."
         ),
         e(
           "div",
@@ -2163,7 +2309,7 @@
     );
   }
 
-  function EstimationTab({ doc, onSelectRun, missionId, onMissionChange }) {
+  function EstimationTab({ doc, onSelectRun, missionId }) {
     const matrix = doc.estimation_matrix;
     if (!matrix || !matrix.scenarios || !matrix.scenarios.length) {
       return e(
@@ -2248,30 +2394,25 @@
         e(
           "div",
           { className: "row matrix-mission-row" },
-          e("h2", { style: { margin: 0, flex: "1 1 auto" } }, matrix.title || "Controller × sensor matrix"),
-          e(MissionSelector, {
-            doc: doc,
-            missionId: missionId,
-            onChange: onMissionChange,
-          })
+          e("h2", { style: { margin: 0, flex: "1 1 auto" } }, "Filter win · LQR/LQG vs PID"),
+          e(ActiveMissionChip, { doc: doc, missionId: missionId })
         ),
-        e("p", null, matrix.description || ""),
-        mission && mission.description
-          ? e(
-              "p",
-              { style: { color: "var(--accent)", fontSize: "0.9rem" } },
-              "Active mission: ",
-              e("strong", null, mission.label || mission.id),
-              " — ",
-              mission.description
-            )
-          : null,
         e(
           "p",
-          { style: { color: "var(--muted)", fontSize: "0.9rem" } },
-          "Grouped bars: LQR/LQG vs PID per sensor column. Display capped at 5 m RMSE. ",
-          "Click a table row to open Flight 3D."
-        )
+          { className: "matrix-lead" },
+          "Same cells as the Overview matrix — deeper view. ",
+          e("strong", null, "Teaching move: "),
+          "GPS+IMU naive vs GPS+IMU + KF under either law. ",
+          "Display RMSE capped at 5 m; click a row to open Flight 3D."
+        ),
+        mission
+          ? e(
+              "p",
+              { style: { color: "var(--muted)", fontSize: "0.85rem" } },
+              mission.short_label || mission.label,
+              mission.description ? " — " + mission.description : ""
+            )
+          : null
       ),
       e(
         "div",
@@ -2484,14 +2625,33 @@
       if (p.law && p.family) familyOf[p.law] = p.family;
     });
 
+    const ENV_DEFAULT_ON = {
+      ideal_lqr: true,
+      ideal_pid: true,
+      gps_imu_lqg: true,
+      flow_alt_lqg: true,
+      gps_imu_naive_lqr: true,
+    };
     const [familyFilter, setFamilyFilter] = useState("all");
     const [visible, setVisible] = useState(function () {
       const init = {};
       lawIds.forEach(function (id) {
-        init[id] = true;
+        // Recommended teaching set by default — not all 12 (reduces plot noise)
+        init[id] = !!ENV_DEFAULT_ON[id];
+        if (!Object.keys(ENV_DEFAULT_ON).length) init[id] = true;
       });
+      // If none of the defaults exist (legacy data), show all
+      const any = lawIds.some(function (id) {
+        return init[id];
+      });
+      if (!any) {
+        lawIds.forEach(function (id) {
+          init[id] = true;
+        });
+      }
       return init;
     });
+    const [sweepOpen, setSweepOpen] = useState(false);
     // Sweep table state
     const [sweepSuccess, setSweepSuccess] = useState("all"); // all | ok | fail
     const [sweepQuery, setSweepQuery] = useState("");
@@ -2966,6 +3126,30 @@
               },
             },
             "PID only"
+          ),
+          e(
+            "button",
+            {
+              type: "button",
+              className: "env-chip",
+              onClick: function () {
+                setFamilyFilter("all");
+                const next = {};
+                lawIds.forEach(function (id) {
+                  next[id] = !!ENV_DEFAULT_ON[id];
+                });
+                const any = lawIds.some(function (id) {
+                  return next[id];
+                });
+                if (!any) {
+                  lawIds.forEach(function (id) {
+                    next[id] = true;
+                  });
+                }
+                setVisible(next);
+              },
+            },
+            "Recommended set"
           )
         ),
         e(
@@ -3086,114 +3270,139 @@
         })
       ),
 
-      // Interactive sweep table
+      // Full sweep data — collapsed by default (portfolio path stays above the fold)
       e(
         "div",
         { className: "card" },
-        e("h3", null, "Sweep table"),
         e(
-          "div",
-          { className: "row data-table-toolbar" },
-          e(
-            "label",
-            { className: "toolbar-field" },
-            e("span", null, "Success"),
-            e(
-              "select",
-              {
-                value: sweepSuccess,
-                onChange: function (ev) {
-                  setSweepSuccess(ev.target.value);
-                },
-              },
-              e("option", { value: "all" }, "All"),
-              e("option", { value: "ok" }, "Pass only"),
-              e("option", { value: "fail" }, "Fail only")
-            )
-          ),
-          e(
-            "label",
-            { className: "toolbar-field grow" },
-            e("span", null, "Search"),
-            e("input", {
-              type: "search",
-              placeholder: "scheme or family…",
-              value: sweepQuery,
-              onChange: function (ev) {
-                setSweepQuery(ev.target.value);
-              },
-            })
-          ),
+          "button",
+          {
+            type: "button",
+            className: "collapse-toggle",
+            "aria-expanded": sweepOpen ? "true" : "false",
+            onClick: function () {
+              setSweepOpen(!sweepOpen);
+            },
+          },
+          e("span", null, sweepOpen ? "▼" : "▶", " Full sweep data"),
           e(
             "span",
-            { className: "toolbar-count" },
-            sweepRows.length,
-            " / ",
+            { className: "collapse-meta" },
             points.filter(function (p) {
               return activeSet[p.law];
             }).length,
-            " rows"
+            " points · sort / filter inside"
           )
         ),
-        e(
-          "div",
-          { className: "table-wrap data-table-wrap scroll-y" },
-          e(
-            "table",
-            { className: "metrics data-table sticky-head" },
-            e(
-              "thead",
-              null,
+        sweepOpen
+          ? e(
+              "div",
+              { className: "collapse-body" },
               e(
-                "tr",
-                null,
-                thSortable("τ", "time_scale", sweepSort, setSweepSort),
-                thSortable("Scheme", "scheme", sweepSort, setSweepSort),
-                thSortable("Family", "family", sweepSort, setSweepSort),
-                thSortable("OK", "success", sweepSort, setSweepSort),
-                thSortable("RMSE [m]", "rmse_position_m", sweepSort, setSweepSort),
-                thSortable("max |e| [m]", "max_position_error_m", sweepSort, setSweepSort),
-                thSortable("Tilt [°]", "peak_tilt_deg", sweepSort, setSweepSort),
-                thSortable("v [m/s]", "peak_speed_m_s", sweepSort, setSweepSort)
-              )
-            ),
-            e(
-              "tbody",
-              null,
-              sweepRows.length
-                ? sweepRows.map(function (p, i) {
-                    return e(
-                      "tr",
-                      {
-                        key: p.law + "-" + p.time_scale + "-" + i,
-                        className: p.success ? "" : "row-fail",
+                "div",
+                { className: "row data-table-toolbar" },
+                e(
+                  "label",
+                  { className: "toolbar-field" },
+                  e("span", null, "Success"),
+                  e(
+                    "select",
+                    {
+                      value: sweepSuccess,
+                      onChange: function (ev) {
+                        setSweepSuccess(ev.target.value);
                       },
-                      e("td", { className: "num" }, fmtMaybe(p.time_scale, 2)),
-                      e("td", null, p.scheme),
-                      e("td", null, p.family),
-                      e(
-                        "td",
-                        null,
-                        e(
-                          "span",
-                          { className: p.success ? "pill ok" : "pill fail" },
-                          p.success ? "pass" : "fail"
-                        )
-                      ),
-                      e("td", { className: "num" }, fmtMaybe(p.rmse_position_m, 4)),
-                      e("td", { className: "num" }, fmtMaybe(p.max_position_error_m, 3)),
-                      e("td", { className: "num" }, fmtMaybe(p.peak_tilt_deg, 1)),
-                      e("td", { className: "num" }, fmtMaybe(p.peak_speed_m_s, 2))
-                    );
-                  })
-                : e(
-                    "tr",
-                    null,
-                    e("td", { colSpan: 8, style: { color: "var(--muted)" } }, "No rows match filters.")
+                    },
+                    e("option", { value: "all" }, "All"),
+                    e("option", { value: "ok" }, "Pass only"),
+                    e("option", { value: "fail" }, "Fail only")
                   )
+                ),
+                e(
+                  "label",
+                  { className: "toolbar-field grow" },
+                  e("span", null, "Search"),
+                  e("input", {
+                    type: "search",
+                    placeholder: "scheme or family…",
+                    value: sweepQuery,
+                    onChange: function (ev) {
+                      setSweepQuery(ev.target.value);
+                    },
+                  })
+                ),
+                e(
+                  "span",
+                  { className: "toolbar-count" },
+                  sweepRows.length,
+                  " rows shown"
+                )
+              ),
+              e(
+                "div",
+                { className: "table-wrap data-table-wrap scroll-y" },
+                e(
+                  "table",
+                  { className: "metrics data-table sticky-head" },
+                  e(
+                    "thead",
+                    null,
+                    e(
+                      "tr",
+                      null,
+                      thSortable("τ", "time_scale", sweepSort, setSweepSort),
+                      thSortable("Scheme", "scheme", sweepSort, setSweepSort),
+                      thSortable("Family", "family", sweepSort, setSweepSort),
+                      thSortable("OK", "success", sweepSort, setSweepSort),
+                      thSortable("RMSE [m]", "rmse_position_m", sweepSort, setSweepSort),
+                      thSortable("max |e| [m]", "max_position_error_m", sweepSort, setSweepSort),
+                      thSortable("Tilt [°]", "peak_tilt_deg", sweepSort, setSweepSort),
+                      thSortable("v [m/s]", "peak_speed_m_s", sweepSort, setSweepSort)
+                    )
+                  ),
+                  e(
+                    "tbody",
+                    null,
+                    sweepRows.length
+                      ? sweepRows.map(function (p, i) {
+                          return e(
+                            "tr",
+                            {
+                              key: p.law + "-" + p.time_scale + "-" + i,
+                              className: p.success ? "" : "row-fail",
+                            },
+                            e("td", { className: "num" }, fmtMaybe(p.time_scale, 2)),
+                            e("td", null, p.scheme),
+                            e("td", null, p.family),
+                            e(
+                              "td",
+                              null,
+                              e(
+                                "span",
+                                { className: p.success ? "pill ok" : "pill fail" },
+                                p.success ? "pass" : "fail"
+                              )
+                            ),
+                            e("td", { className: "num" }, fmtMaybe(p.rmse_position_m, 4)),
+                            e("td", { className: "num" }, fmtMaybe(p.max_position_error_m, 3)),
+                            e("td", { className: "num" }, fmtMaybe(p.peak_tilt_deg, 1)),
+                            e("td", { className: "num" }, fmtMaybe(p.peak_speed_m_s, 2))
+                          );
+                        })
+                      : e(
+                          "tr",
+                          null,
+                          e(
+                            "td",
+                            { colSpan: 8, style: { color: "var(--muted)" } },
+                            "No rows match filters."
+                          )
+                        )
+                  )
+                )
+              )
             )
-          )
-        )
+          : null
       )
     );
   }
@@ -3204,6 +3413,7 @@
     const [tab, setTab] = useState("overview");
     const [runId, setRunId] = useState(null);
     const [missionId, setMissionId] = useState(null);
+    const [aboutOpen, setAboutOpen] = useState(false);
 
     useEffect(() => {
       fetch("./data/showcase.json")
@@ -3235,6 +3445,27 @@
       if (runs.length) setRunId(runs[0].id);
     }
 
+    function openHeroFlight() {
+      if (!doc) return;
+      const edge = (doc.missions || []).find(function (m) {
+        return m.id === "envelope_edge";
+      });
+      if (edge) {
+        setMissionId(edge.id);
+        setRunId(edge.default_run || "edge_figure_eight_lqr");
+      } else {
+        const hero =
+          (doc.runs || []).find(function (r) {
+            return r.id === "edge_figure_eight_lqr";
+          }) ||
+          (doc.runs || []).find(function (r) {
+            return r.id === "figure_eight_lqr";
+          });
+        if (hero) setRunId(hero.id);
+      }
+      setTab("flight");
+    }
+
     const run = useMemo(() => {
       if (!doc || !runId) return null;
       return (doc.runs || []).find((r) => r.id === runId) || doc.runs[0];
@@ -3254,42 +3485,53 @@
         e(
           "p",
           { style: { color: "var(--muted)" } },
-          "Generate with: ",
+          "Rebuild the gallery data, then refresh this page."
+        ),
+        e("p", { style: { color: "var(--muted)", fontSize: "0.85rem" } },
           e("code", null, "uv run uavsim gallery --base-case")
         )
       );
     }
     if (!doc || !run) return e("p", { className: "loading" }, "Loading showcase…");
 
+    // Story-first order; Metrics last (power / detail)
     const tabs = [
       ["overview", "Overview"],
-      ["estimation", "Estimation"],
       ["flight", "Flight 3D"],
-      ["metrics", "Metrics"],
-      ["monte_carlo", "Monte Carlo"],
+      ["estimation", "Estimation"],
       ["envelope", "Envelope"],
+      ["monte_carlo", "Monte Carlo"],
       ["compare", "Compare"],
+      ["metrics", "Run metrics"],
     ];
 
     const runOptions = missionRuns.length ? missionRuns : doc.runs;
+    const displayTitle =
+      (doc.ui && doc.ui.display_title) || doc.title || DEFAULT_TITLE;
+    const valueProp = (doc.ui && doc.ui.value_prop) || VALUE_PROP;
 
     let body;
     if (tab === "overview")
       body = e(Overview, {
-        doc,
-        missionId,
-        onMissionChange: selectMission,
-        onSelect: (id) => {
+        doc: doc,
+        missionId: missionId,
+        onSelect: function (id) {
           setRunId(id);
           setTab("flight");
+        },
+        onOpenHeroFlight: openHeroFlight,
+        onGoEstimation: function () {
+          setTab("estimation");
+        },
+        onGoEnvelope: function () {
+          setTab("envelope");
         },
       });
     else if (tab === "estimation")
       body = e(EstimationTab, {
-        doc,
-        missionId,
-        onMissionChange: selectMission,
-        onSelectRun: (id) => {
+        doc: doc,
+        missionId: missionId,
+        onSelectRun: function (id) {
           setRunId(id);
           setTab("flight");
         },
@@ -3300,20 +3542,37 @@
         null,
         e(
           "div",
-          { className: "row" },
-          e(MissionSelector, {
-            doc: doc,
-            missionId: missionId,
-            onChange: selectMission,
-          }),
-          e("label", null, "Run "),
+          { className: "row tab-toolbar" },
+          e(ActiveMissionChip, { doc: doc, missionId: missionId }),
+          e("label", { className: "run-pick" },
+            e("span", null, "Run"),
+            e(
+              "select",
+              {
+                value: run.id,
+                onChange: function (ev) {
+                  setRunId(ev.target.value);
+                },
+                "aria-label": "Select run",
+              },
+              runOptions.map(function (r) {
+                return e("option", { key: r.id, value: r.id }, r.label);
+              })
+            )
+          ),
           e(
-            "select",
-            { value: run.id, onChange: (ev) => setRunId(ev.target.value) },
-            runOptions.map((r) => e("option", { key: r.id, value: r.id }, r.label))
+            "button",
+            {
+              type: "button",
+              className: "btn-ghost btn-sm",
+              onClick: function () {
+                setTab("metrics");
+              },
+            },
+            "Full metrics →"
           )
         ),
-        e(FlightTab, { run })
+        e(FlightTab, { run: run })
       );
     else if (tab === "metrics")
       body = e(
@@ -3321,19 +3580,44 @@
         null,
         e(
           "div",
-          { className: "row" },
-          e(MissionSelector, {
-            doc: doc,
-            missionId: missionId,
-            onChange: selectMission,
-          }),
+          { className: "card", style: { marginBottom: "0.75rem" } },
+          e("h2", { style: { marginTop: 0 } }, "Run metrics"),
           e(
-            "select",
-            { value: run.id, onChange: (ev) => setRunId(ev.target.value) },
-            runOptions.map((r) => e("option", { key: r.id, value: r.id }, r.label))
+            "p",
+            { className: "matrix-lead", style: { marginBottom: "0.65rem" } },
+            "Detail panel for the selected run — linked from Flight. Prefer Overview / Estimation for the teaching story."
+          ),
+          e(
+            "div",
+            { className: "row tab-toolbar", style: { marginBottom: 0 } },
+            e(ActiveMissionChip, { doc: doc, missionId: missionId }),
+            e(
+              "select",
+              {
+                value: run.id,
+                onChange: function (ev) {
+                  setRunId(ev.target.value);
+                },
+                "aria-label": "Select run for metrics",
+              },
+              runOptions.map(function (r) {
+                return e("option", { key: r.id, value: r.id }, r.label);
+              })
+            ),
+            e(
+              "button",
+              {
+                type: "button",
+                className: "btn-ghost btn-sm",
+                onClick: function () {
+                  setTab("flight");
+                },
+              },
+              "← Back to Flight"
+            )
           )
         ),
-        e(MetricsTab, { run })
+        e(MetricsTab, { run: run })
       );
     else if (tab === "monte_carlo") {
       const mission = getMission(doc, missionId);
@@ -3355,72 +3639,130 @@
         null,
         e(
           "div",
-          { className: "row" },
-          e(MissionSelector, {
-            doc: doc,
-            missionId: missionId,
-            onChange: selectMission,
-          })
+          { className: "row tab-toolbar" },
+          e(ActiveMissionChip, { doc: doc, missionId: missionId })
         ),
         e(McTab, { run: mcPreferred })
       );
-    } else if (tab === "envelope") body = e(EnvelopeTab, { doc });
+    } else if (tab === "envelope") body = e(EnvelopeTab, { doc: doc });
     else if (tab === "compare")
       body = e(CompareTab, {
-        doc,
-        missionId,
-        onMissionChange: selectMission,
+        doc: doc,
+        missionId: missionId,
       });
 
     return e(
       "div",
-      null,
+      { className: "app-shell" },
       e(
         "header",
-        { className: "app-header" },
-        e("h1", null, doc.title || "uavsim · flight results"),
-        e("p", { className: "tagline" }, doc.description || ""),
+        { className: "app-header sticky-header" },
         e(
           "div",
-          { className: "header-controls" },
-          e(MissionSelector, {
-            doc: doc,
-            missionId: missionId,
-            onChange: selectMission,
-            className: "header-mission",
-          }),
+          { className: "header-top" },
+          e("div", { className: "header-brand" },
+            e("h1", null, displayTitle),
+            e("p", { className: "value-prop" }, valueProp),
+            e(
+              "button",
+              {
+                type: "button",
+                className: "about-toggle",
+                "aria-expanded": aboutOpen ? "true" : "false",
+                onClick: function () {
+                  setAboutOpen(!aboutOpen);
+                },
+              },
+              aboutOpen ? "Hide study details" : "About this study"
+            ),
+            aboutOpen
+              ? e(
+                  "div",
+                  { className: "about-panel" },
+                  e("p", null, HONESTY_LINE),
+                  e("p", { className: "muted" }, doc.description || ""),
+                  e(
+                    "p",
+                    { className: "desktop-note" },
+                    "Best viewed on desktop — matrix and envelope tables are dense by design."
+                  )
+                )
+              : null
+          ),
           e(
             "div",
-            { className: "meta" },
-            "v",
-            doc.uavsim_version || "?",
-            doc.generated_at
-              ? " · " + String(doc.generated_at).slice(0, 10)
-              : ""
+            { className: "header-controls" },
+            e(MissionSelector, {
+              doc: doc,
+              missionId: missionId,
+              onChange: selectMission,
+              className: "header-mission",
+              showHint: true,
+            }),
+            e(
+              "div",
+              { className: "meta" },
+              "v",
+              doc.uavsim_version || "?",
+              doc.generated_at ? " · " + String(doc.generated_at).slice(0, 10) : "",
+              " · SIL"
+            )
           )
-        )
+        ),
+        e(StoryStrip, {
+          activeTab: tab,
+          onNavigate: function (id) {
+            setTab(id);
+          },
+        })
       ),
       e(
         "nav",
-        { className: "tabs" },
-        tabs.map(([id, label]) =>
-          e(
+        {
+          className: "tabs",
+          role: "tablist",
+          "aria-label": "Showcase sections",
+        },
+        tabs.map(function (pair) {
+          const id = pair[0];
+          const label = pair[1];
+          const selected = tab === id;
+          return e(
             "button",
             {
               key: id,
-              className: tab === id ? "active" : "",
-              onClick: () => setTab(id),
+              type: "button",
+              role: "tab",
+              id: "tab-" + id,
+              "aria-selected": selected ? "true" : "false",
+              "aria-controls": "panel-" + id,
+              className: selected ? "active" : "",
+              onClick: function () {
+                setTab(id);
+              },
             },
             label
-          )
-        )
+          );
+        })
       ),
-      e("main", null, body),
+      e(
+        "main",
+        {
+          id: "panel-" + tab,
+          role: "tabpanel",
+          "aria-labelledby": "tab-" + tab,
+        },
+        body
+      ),
       e(
         "footer",
         { className: "footer" },
         "Simulation only — not flight software. Source: ",
-        e("a", { href: "https://github.com/trey-copeland/uavsim" }, "github.com/trey-copeland/uavsim")
+        e(
+          "a",
+          { href: "https://github.com/trey-copeland/uavsim" },
+          "github.com/trey-copeland/uavsim"
+        )
       )
     );
   }

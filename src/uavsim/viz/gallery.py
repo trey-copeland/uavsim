@@ -583,9 +583,10 @@ def build_gallery_document(
             scenarios.append(row)
         est["scenarios"] = scenarios
 
-    tabs = ["overview", "estimation", "flight", "metrics", "monte_carlo", "compare"]
-    if envelope is not None:
-        tabs.append("envelope")
+    # Story-first order (matches showcase SPA guided path)
+    tabs = ["overview", "flight", "estimation", "envelope", "monte_carlo", "compare", "metrics"]
+    if envelope is None:
+        tabs = [t for t in tabs if t != "envelope"]
 
     mission_list = list(missions or [])
     default_mid = default_mission
@@ -837,7 +838,7 @@ def generate_base_case_gallery(
 
     doc = build_gallery_document(
         entries,
-        title="uavsim · flight results",
+        title="uavsim · controller × sensor flight study",
         description=(
             "Figure-eight SIL with dual missions: baseline (constant yaw) and "
             "near-envelope (τ★ + scheduled yaw). Full controller × sensor matrix "
@@ -852,6 +853,19 @@ def generate_base_case_gallery(
         missions=missions,
         default_mission=MISSION_BASELINE,
     )
+    # Portfolio UX copy (guided report shell)
+    doc.setdefault("ui", {})
+    doc["ui"]["display_title"] = "uavsim · controller × sensor flight study"
+    doc["ui"]["value_prop"] = "Where hover LQR and estimators hold — and where they don’t."
+    doc["ui"]["tabs"] = [
+        "overview",
+        "flight",
+        "estimation",
+        "envelope",
+        "monte_carlo",
+        "compare",
+        "metrics",
+    ]
     write_gallery(doc, out, copy_app=True, template_dir=root / "docs" / "showcase")
     meta = {
         "schema_version": GALLERY_SCHEMA,
