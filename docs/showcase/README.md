@@ -2,9 +2,9 @@
 
 Single-page React app for the portfolio base case: a **guided technical report** with a **controller × sensor** matrix (LQR/LQG and PID) on **two missions** (baseline figure-eight and near-envelope + scheduled yaw), Flight 3D, Monte Carlo, and a **tracking envelope**.
 
-**Story path (header strip):** Matrix → Flight → Filter win → Envelope.  
+**Walkthrough (header strip):** Matrix → Flight → Laws (LQR vs PID) → Envelope.  
 **Mission** is a segmented control in the sticky header (rebinds all tabs).  
-**Hero CTA** opens Flight on the envelope-edge mission.
+**Suggested first look** opens Flight on the envelope-edge mission.
 
 ## Base-case studies
 

@@ -856,7 +856,9 @@ def generate_base_case_gallery(
     # Portfolio UX copy (guided report shell)
     doc.setdefault("ui", {})
     doc["ui"]["display_title"] = "uavsim · controller × sensor flight study"
-    doc["ui"]["value_prop"] = "Where hover LQR and estimators hold — and where they don’t."
+    doc["ui"]["value_prop"] = (
+        "SIL comparison of hover LQR and cascade PID under the same sensor suites."
+    )
     doc["ui"]["tabs"] = [
         "overview",
         "flight",

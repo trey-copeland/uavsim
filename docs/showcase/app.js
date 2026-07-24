@@ -141,18 +141,18 @@
     );
   }
 
-  /** Guided 4-step story for portfolio reviewers. */
+  /** 4-step walkthrough for first-time readers. */
   function StoryStrip({ activeTab, onNavigate }) {
     const steps = [
-      { id: "overview", n: "1", label: "Matrix", blurb: "Compare stacks" },
-      { id: "flight", n: "2", label: "Flight", blurb: "Scrub the path" },
-      { id: "estimation", n: "3", label: "Filter win", blurb: "LQR vs PID" },
-      { id: "envelope", n: "4", label: "Envelope", blurb: "Where they break" },
+      { id: "overview", n: "1", label: "Matrix", blurb: "12 stacks" },
+      { id: "flight", n: "2", label: "Flight", blurb: "scrub trajectory" },
+      { id: "estimation", n: "3", label: "Laws", blurb: "LQR vs PID" },
+      { id: "envelope", n: "4", label: "Envelope", blurb: "vs time scale τ" },
     ];
     return e(
       "nav",
-      { className: "story-strip", "aria-label": "Suggested reading path" },
-      e("span", { className: "story-strip-label" }, "Story"),
+      { className: "story-strip", "aria-label": "Suggested walkthrough" },
+      e("span", { className: "story-strip-label" }, "Walkthrough"),
       steps.map(function (s, i) {
         const on = activeTab === s.id;
         return e(
@@ -181,13 +181,58 @@
   }
 
   const VALUE_PROP =
-    "Where hover LQR and estimators hold — and where they don’t.";
+    "SIL comparison of hover LQR and cascade PID under the same sensor suites.";
   const DEFAULT_TITLE = "uavsim · controller × sensor flight study";
-  const HONESTY_LINE =
-    "Same mission, twelve stacks — from ideal LQR to IMU-only — so the demo fails on purpose where physics and observability demand it.";
+  const STUDY_SUMMARY =
+    "Twelve controller×sensor stacks on one figure-eight. Ideal full-state is the upper bound; " +
+    "partial_raw and IMU-only cases are expected to fail position bounds — that is the point.";
 
-  /** Teaching pair scenario ids (GPS+IMU naive vs filtered). */
+  /** GPS+IMU naive vs KF columns (same bus; shows value of a state estimate). */
   const TEACHING_PAIR_COLUMNS = { gps_imu_naive: true, gps_imu_filter: true };
+
+  function sortToggle(cur, key) {
+    if (cur.key === key) return { key: key, dir: cur.dir === "asc" ? "desc" : "asc" };
+    return { key: key, dir: key === "scheme" || key === "family" || key === "label" || key === "sensors" || key === "method" || key === "lesson" || key === "law" ? "asc" : "desc" };
+  }
+
+  function thSortable(label, key, sortState, setSort) {
+    const active = sortState.key === key;
+    const arrow = active ? (sortState.dir === "asc" ? " ▲" : " ▼") : "";
+    return e(
+      "th",
+      {
+        key: key,
+        className: "sortable" + (active ? " sorted" : ""),
+        onClick: function () {
+          setSort(sortToggle(sortState, key));
+        },
+        title: "Sort by " + label,
+      },
+      label + arrow
+    );
+  }
+
+  function fmtMaybe(v, digits) {
+    if (v == null || !Number.isFinite(+v)) return "—";
+    const x = +v;
+    if (Math.abs(x) >= 1000) return x.toExponential(1);
+    if (Math.abs(x) >= 100) return x.toFixed(0);
+    return fmt(x, digits);
+  }
+
+  function cmpTableVal(a, c, key) {
+    let va = a[key];
+    let vc = c[key];
+    if (key === "success") {
+      va = a.success ? 1 : 0;
+      vc = c.success ? 1 : 0;
+    }
+    if (va == null && vc == null) return 0;
+    if (va == null) return 1;
+    if (vc == null) return -1;
+    if (typeof va === "string") return String(va).localeCompare(String(vc));
+    return va - vc;
+  }
 
   /**
    * Fit a viewing box to path geometry (meters, plot frame N/E/up).
@@ -1103,19 +1148,20 @@
             e(
               "p",
               { className: "matrix-lead" },
-              "Decision grid: click a cell to open Flight 3D. Compare ",
+              "Position RMSE for each controller×sensor cell. Click a cell to open Flight 3D. ",
+              "Read ",
               e("strong", null, "down a column"),
-              " (same sensors) or ",
+              " (same sensors, different law) or ",
               e("strong", null, "across a row"),
-              " (harder sensing)."
+              " (same law, fewer measurements)."
             ),
             e(
               "div",
               { className: "matrix-legend" },
-              e("span", { className: "legend-item" }, e("span", { className: "lg pass" }), " pass"),
-              e("span", { className: "legend-item" }, e("span", { className: "lg fail" }), " fail (honesty)"),
-              e("span", { className: "legend-item" }, e("span", { className: "lg teach" }), " teaching pair"),
-              e("span", { className: "legend-item muted" }, "click cell → Flight"),
+              e("span", { className: "legend-item" }, e("span", { className: "lg pass" }), " within bound"),
+              e("span", { className: "legend-item" }, e("span", { className: "lg fail" }), " exceeds bound"),
+              e("span", { className: "legend-item" }, e("span", { className: "lg teach" }), " GPS+IMU naive vs KF"),
+              e("span", { className: "legend-item muted" }, "click → Flight"),
               e(
                 "label",
                 { className: "legend-toggle" },
@@ -1202,13 +1248,13 @@
         "div",
         { className: "card hero-cta", style: { gridColumn: "1 / -1" } },
         e("div", { className: "hero-cta-body" },
-          e("div", { className: "hero-cta-kicker" }, "Hero path · 90 seconds"),
-          e("h2", { className: "hero-cta-title" }, "Scrub the near-envelope figure-eight"),
+          e("div", { className: "hero-cta-kicker" }, "Suggested first look"),
+          e("h2", { className: "hero-cta-title" }, "Flight 3D on the near-envelope mission"),
           e(
             "p",
             { className: "hero-cta-copy" },
-            HONESTY_LINE,
-            " Start in Flight 3D on the edge mission (τ★ + scheduled yaw) so attitude actually moves."
+            STUDY_SUMMARY,
+            " The envelope-edge mission (τ★≈0.28 + scheduled yaw) has visible tilt and heading change under ideal LQR."
           ),
           e(
             "div",
@@ -1233,7 +1279,7 @@
                   if (onGoEstimation) onGoEstimation();
                 },
               },
-              "See filter win"
+              "LQR vs PID by sensors"
             ),
             e(
               "button",
@@ -1244,7 +1290,7 @@
                   if (onGoEnvelope) onGoEnvelope();
                 },
               },
-              "Where stacks break"
+              "Tracking vs time scale τ"
             )
           )
         )
@@ -2175,14 +2221,13 @@
           "p",
           { className: "compare-caption" },
           e("strong", null, "Default pair: "),
-          "GPS+IMU naive vs GPS+IMU LQG — the ",
-          e("em", null, "filter benefit"),
-          " teaching win. Metrics are B − A. Path overlay needs timeseries on both."
+          "GPS+IMU naive → LQR vs GPS+IMU LQG (same measurements; KF reconstructs state). ",
+          "Table values are B − A. Path overlay requires timeseries on both runs."
         ),
         e(
           "p",
           { style: { color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 } },
-          "Power tool: pick any two runs for the active mission."
+          "Select any two runs for the active mission."
         ),
         e(
           "div",
@@ -2315,7 +2360,7 @@
       return e(
         "div",
         { className: "card" },
-        e("h2", null, "Estimation / LQG"),
+        e("h2", null, "LQR vs PID by sensors"),
         e("p", { style: { color: "var(--muted)" } }, "No estimation matrix in this gallery.")
       );
     }
@@ -2326,7 +2371,10 @@
       byId[r.id] = r;
     });
     const mission = getMission(doc, missionId);
-    // Grouped bar chart: x = sensor column, series = controller family
+    const [rowSuccess, setRowSuccess] = useState("all");
+    const [rowQuery, setRowQuery] = useState("");
+    const [rowSort, setRowSort] = useState({ key: "rmse_position_m", dir: "asc" });
+
     const ctrlOrder = ["lqr", "pid"];
     const ctrlColors = { lqr: "#5b9fd4", pid: "#e6a05c" };
     const colIds = columns.length
@@ -2348,7 +2396,6 @@
       const s = scenarios.find(function (sc) {
         if (sc.column && sc.controller)
           return sc.column === colId && sc.controller === controller;
-        // legacy single-row matrix
         return sc.id === colId;
       });
       if (!s) return null;
@@ -2385,6 +2432,40 @@
       margin: { t: 48, r: 20, b: 80, l: 56 },
     };
 
+    const tableRows = scenarios
+      .map(function (s) {
+        const rid = scenarioRunId(s, missionId);
+        const m = scenarioMetrics(s, missionId, byId);
+        return {
+          id: s.id,
+          run_id: rid,
+          label: s.label || s.id,
+          law: s.controller === "pid" ? "PID" : s.controller === "lqr" ? "LQR" : "—",
+          family: s.controller || "—",
+          sensors: s.sensors || "—",
+          method: s.method || "—",
+          rmse_position_m: m.rmse_position_m,
+          max_position_error_m: m.max_position_error_m,
+          success: m.success,
+          time_in_bounds_frac: m.time_in_bounds_frac,
+          lesson: s.lesson || "",
+        };
+      })
+      .filter(function (r) {
+        if (rowSuccess === "ok" && !r.success) return false;
+        if (rowSuccess === "fail" && r.success) return false;
+        if (rowQuery) {
+          const q = rowQuery.toLowerCase();
+          const blob = [r.label, r.law, r.sensors, r.method, r.lesson].join(" ").toLowerCase();
+          if (blob.indexOf(q) < 0) return false;
+        }
+        return true;
+      })
+      .sort(function (a, c) {
+        const dir = rowSort.dir === "asc" ? 1 : -1;
+        return dir * cmpTableVal(a, c, rowSort.key);
+      });
+
     return e(
       "div",
       null,
@@ -2394,25 +2475,19 @@
         e(
           "div",
           { className: "row matrix-mission-row" },
-          e("h2", { style: { margin: 0, flex: "1 1 auto" } }, "Filter win · LQR/LQG vs PID"),
+          e("h2", { style: { margin: 0, flex: "1 1 auto" } }, "LQR vs PID by sensor suite"),
           e(ActiveMissionChip, { doc: doc, missionId: missionId })
         ),
         e(
           "p",
           { className: "matrix-lead" },
-          "Same cells as the Overview matrix — deeper view. ",
-          e("strong", null, "Teaching move: "),
-          "GPS+IMU naive vs GPS+IMU + KF under either law. ",
-          "Display RMSE capped at 5 m; click a row to open Flight 3D."
-        ),
-        mission
-          ? e(
-              "p",
-              { style: { color: "var(--muted)", fontSize: "0.85rem" } },
-              mission.short_label || mission.label,
-              mission.description ? " — " + mission.description : ""
-            )
-          : null
+          "Same cells as Overview, plotted as grouped bars. ",
+          "Compare laws under identical measurements; compare ",
+          e("strong", null, "GPS+IMU naive"),
+          " (partial bus) to ",
+          e("strong", null, "GPS+IMU + linear KF"),
+          " on that bus. Bar display is capped at 5 m RMSE."
+        )
       ),
       e(
         "div",
@@ -2426,7 +2501,7 @@
             height: 360,
             title: {
               text:
-                "Position RMSE: LQR/LQG vs PID by sensors" +
+                "Position RMSE by sensor column" +
                 (mission ? " · " + (mission.short_label || mission.label) : ""),
               font: { size: 13 },
             },
@@ -2441,70 +2516,126 @@
         { className: "card" },
         e("h3", null, "Scenario table"),
         e(
+          "p",
+          { style: { color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 } },
+          "Click a row to open Flight 3D. Sort headers · filter by pass/fail · search."
+        ),
+        e(
           "div",
-          { className: "table-wrap" },
+          { className: "row data-table-toolbar" },
+          e(
+            "label",
+            { className: "toolbar-field" },
+            e("span", null, "Bound"),
+            e(
+              "select",
+              {
+                value: rowSuccess,
+                onChange: function (ev) {
+                  setRowSuccess(ev.target.value);
+                },
+              },
+              e("option", { value: "all" }, "All"),
+              e("option", { value: "ok" }, "Within bound"),
+              e("option", { value: "fail" }, "Exceeds bound")
+            )
+          ),
+          e(
+            "label",
+            { className: "toolbar-field grow" },
+            e("span", null, "Search"),
+            e("input", {
+              type: "search",
+              placeholder: "scenario, sensors, method…",
+              value: rowQuery,
+              onChange: function (ev) {
+                setRowQuery(ev.target.value);
+              },
+            })
+          ),
+          e(
+            "span",
+            { className: "toolbar-count" },
+            tableRows.length,
+            " / ",
+            scenarios.length,
+            " rows"
+          )
+        ),
+        e(
+          "div",
+          { className: "table-wrap data-table-wrap scroll-y" },
           e(
             "table",
-            { className: "metrics" },
+            { className: "metrics data-table sticky-head" },
             e(
               "thead",
               null,
               e(
                 "tr",
                 null,
-                ["Scenario", "Law", "Sensors", "Method", "RMSE [m]", "max |e| [m]", "ok", "Lesson"].map(
-                  function (h) {
-                    return e("th", { key: h }, h);
-                  }
-                )
+                thSortable("Scenario", "label", rowSort, setRowSort),
+                thSortable("Law", "law", rowSort, setRowSort),
+                thSortable("Sensors", "sensors", rowSort, setRowSort),
+                thSortable("Method", "method", rowSort, setRowSort),
+                thSortable("RMSE [m]", "rmse_position_m", rowSort, setRowSort),
+                thSortable("max |e| [m]", "max_position_error_m", rowSort, setRowSort),
+                thSortable("OK", "success", rowSort, setRowSort),
+                thSortable("Notes", "lesson", rowSort, setRowSort)
               )
             ),
             e(
               "tbody",
               null,
-              scenarios.map(function (s, i) {
-                const rid = scenarioRunId(s, missionId);
-                const m = scenarioMetrics(s, missionId, byId);
-                const ok = m.success;
-                return e(
-                  "tr",
-                  {
-                    key: (s.id || i) + ":" + (missionId || ""),
-                    style: {
-                      cursor: rid ? "pointer" : "default",
-                      color: ok === false ? "#e07070" : undefined,
-                    },
-                    onClick: function () {
-                      if (rid && onSelectRun) onSelectRun(rid);
-                    },
-                  },
-                  e("td", null, s.label),
-                  e("td", null, s.controller === "pid" ? "PID" : s.controller === "lqr" ? "LQR" : "—"),
-                  e("td", null, s.sensors),
-                  e("td", null, s.method),
-                  e("td", null, fmt(m.rmse_position_m, 4)),
-                  e("td", null, fmt(m.max_position_error_m, 3)),
-                  e(
-                    "td",
-                    null,
-                    ok === true
-                      ? "yes"
-                      : ok === false
-                        ? "no"
-                        : "—",
-                    m.time_in_bounds_frac != null
-                      ? e(
+              tableRows.length
+                ? tableRows.map(function (r) {
+                    return e(
+                      "tr",
+                      {
+                        key: r.id + ":" + (missionId || ""),
+                        className: (r.success === false ? "row-fail" : "") + (r.run_id ? " row-click" : ""),
+                        style: { cursor: r.run_id ? "pointer" : "default" },
+                        onClick: function () {
+                          if (r.run_id && onSelectRun) onSelectRun(r.run_id);
+                        },
+                        title: r.run_id ? "Open Flight 3D" : "",
+                      },
+                      e("td", null, r.label),
+                      e("td", null, r.law),
+                      e("td", null, r.sensors),
+                      e("td", null, r.method),
+                      e("td", { className: "num" }, fmtMaybe(r.rmse_position_m, 4)),
+                      e("td", { className: "num" }, fmtMaybe(r.max_position_error_m, 3)),
+                      e(
+                        "td",
+                        null,
+                        e(
                           "span",
-                          { style: { color: "var(--muted)", fontSize: "0.8rem" } },
-                          " (",
-                          fmt(100 * m.time_in_bounds_frac, 0),
-                          "% tib)"
-                        )
-                      : null
-                  ),
-                  e("td", { style: { maxWidth: "22rem", fontSize: "0.85rem" } }, s.lesson || "")
-                );
-              })
+                          { className: r.success ? "pill ok" : "pill fail" },
+                          r.success === true ? "pass" : r.success === false ? "fail" : "—"
+                        ),
+                        r.time_in_bounds_frac != null
+                          ? e(
+                              "span",
+                              { className: "table-sub" },
+                              " ",
+                              fmt(100 * r.time_in_bounds_frac, 0),
+                              "% tib"
+                            )
+                          : null
+                      ),
+                      e(
+                        "td",
+                        { className: "td-notes", title: r.lesson },
+                        r.lesson || "—"
+                      )
+                    );
+                  })
+                : e(
+                    "tr",
+                    null,
+                    e("td", { colSpan: 8, style: { color: "var(--muted)" } }, "No rows match filters.")
+                  )
             )
           )
         )
@@ -2515,37 +2646,36 @@
         e("h3", null, "How to read this"),
         e(
           "ul",
-          { style: { color: "var(--muted)", lineHeight: 1.5 } },
+          { className: "readout-list" },
           e(
             "li",
             null,
-            e("strong", null, "Filter benefit (either law): "),
-            "GPS+IMU + KF ≪ naive partial on the same sensors."
+            e("strong", null, "Naive vs KF (same GPS+IMU bus): "),
+            "partial_raw leaves zeros for unmeasured states; linear KF reconstructs a full x̂ for the law."
           ),
           e(
             "li",
             null,
-            e("strong", null, "Law comparison: "),
-            "Ideal / filtered columns show whether PID or hover LQR tracks better under the same information."
+            e("strong", null, "LQR vs PID: "),
+            "same sensors and (when used) the same KF — only the control law changes."
           ),
           e(
             "li",
             null,
-            e("strong", null, "GPS-denied: "),
-            "Flow+alt (body velocity + height + gyro) is the practical win; ",
-            "AHRS (att+ω) stays finite but weaker; IMU-only (ω) cannot observe position."
+            e("strong", null, "GPS-denied columns: "),
+            "flow+alt (body_vel + alt + ω) is navigable; AHRS (att+ω) stays finite but drifts in position; IMU-only (ω) does not observe position."
           ),
           e(
             "li",
             null,
             e("strong", null, "Naming: "),
-            "LQG = linear KF + LQR. PID+KF is the cascade law on x_hat, not classical LQG."
+            "LQG here means linear KF + hover LQR. PID+KF is cascade PID on x̂, not classical LQG design."
           ),
           e(
             "li",
             null,
             e("strong", null, "Envelope tab: "),
-            "same matrix cells swept over time-scale τ — plant aggression, not a different sensor story."
+            "same stacks swept over mission time scale τ (plant aggression), not a new sensor set."
           )
         )
       )
@@ -2974,11 +3104,6 @@
     }
 
     // —— Boundary summary rows (all active schemes) ——
-    function sortToggle(cur, key) {
-      if (cur.key === key) return { key: key, dir: cur.dir === "asc" ? "desc" : "asc" };
-      return { key: key, dir: key === "scheme" || key === "family" ? "asc" : "desc" };
-    }
-
     const boundaryRows = lawIds
       .filter(function (id) {
         return activeSet[id] && b[id];
@@ -2996,15 +3121,8 @@
         };
       })
       .sort(function (a, c) {
-        const k = boundSort.key;
         const dir = boundSort.dir === "asc" ? 1 : -1;
-        let va = a[k];
-        let vc = c[k];
-        if (va == null && vc == null) return 0;
-        if (va == null) return 1;
-        if (vc == null) return -1;
-        if (typeof va === "string") return dir * String(va).localeCompare(String(vc));
-        return dir * (va - vc);
+        return dir * cmpTableVal(a, c, boundSort.key);
       });
 
     // —— Sweep table: filter + sort ——
@@ -3037,46 +3155,9 @@
         };
       })
       .sort(function (a, c) {
-        const k = sweepSort.key;
         const dir = sweepSort.dir === "asc" ? 1 : -1;
-        let va = a[k];
-        let vc = c[k];
-        if (k === "success") {
-          va = a.success ? 1 : 0;
-          vc = c.success ? 1 : 0;
-        }
-        if (va == null && vc == null) return 0;
-        if (va == null) return 1;
-        if (vc == null) return -1;
-        if (typeof va === "string") return dir * String(va).localeCompare(String(vc));
-        return dir * (va - vc);
+        return dir * cmpTableVal(a, c, sweepSort.key);
       });
-
-    function thSortable(label, key, sortState, setSort) {
-      const active = sortState.key === key;
-      const arrow = active ? (sortState.dir === "asc" ? " ▲" : " ▼") : "";
-      return e(
-        "th",
-        {
-          key: key,
-          className: "sortable" + (active ? " sorted" : ""),
-          onClick: function () {
-            setSort(sortToggle(sortState, key));
-          },
-          title: "Sort by " + label,
-        },
-        label + arrow
-      );
-    }
-
-    function fmtMaybe(v, digits) {
-      if (v == null || !Number.isFinite(+v)) return "—";
-      const x = +v;
-      // Compact large failures
-      if (Math.abs(x) >= 1000) return x.toExponential(1);
-      if (Math.abs(x) >= 100) return x.toFixed(0);
-      return fmt(x, digits);
-    }
 
     return e(
       "div",
@@ -3089,9 +3170,9 @@
         e(
           "p",
           { style: { color: "var(--muted)", fontSize: "0.9rem" } },
-          "Solid = LQR family · dashed = PID cascade. × = fail under shared bound (",
+          "Solid lines = LQR family · dashed = PID. × markers fail the shared position bound (",
           env.position_bound_m != null ? fmt(env.position_bound_m, 2) + " m" : "see studies",
-          "). Plots clip extreme fly-aways so the interesting regime stays readable."
+          "). Extreme fly-aways are clipped on the plot axes; hover for true values."
         ),
         e(
           "div",
@@ -3585,7 +3666,7 @@
           e(
             "p",
             { className: "matrix-lead", style: { marginBottom: "0.65rem" } },
-            "Detail panel for the selected run — linked from Flight. Prefer Overview / Estimation for the teaching story."
+            "Numeric summary for the selected run (also linked from Flight). Use Overview and Estimation for cross-stack comparison."
           ),
           e(
             "div",
@@ -3679,12 +3760,12 @@
               ? e(
                   "div",
                   { className: "about-panel" },
-                  e("p", null, HONESTY_LINE),
+                  e("p", null, STUDY_SUMMARY),
                   e("p", { className: "muted" }, doc.description || ""),
                   e(
                     "p",
                     { className: "desktop-note" },
-                    "Best viewed on desktop — matrix and envelope tables are dense by design."
+                    "Best viewed on a wide screen — the matrix and envelope tables are dense by design."
                   )
                 )
               : null

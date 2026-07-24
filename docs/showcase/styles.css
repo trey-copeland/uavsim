@@ -896,7 +896,7 @@ header .value-prop {
   color: var(--muted);
 }
 
-/* Hero CTA */
+/* Suggested-first-look CTA */
 .hero-cta {
   background:
     linear-gradient(120deg, rgba(91, 159, 212, 0.12) 0%, transparent 48%),
@@ -1012,6 +1012,33 @@ header .value-prop {
 }
 .collapse-body {
   margin-top: 0.75rem;
+}
+table.data-table td.td-notes {
+  max-width: 18rem;
+  white-space: normal;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+table.data-table tr.row-click:hover {
+  background: rgba(91, 159, 212, 0.1);
+}
+.table-sub {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 400;
+}
+.readout-list {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+  padding-left: 1.15rem;
+}
+.readout-list li {
+  margin-bottom: 0.4rem;
+}
+.readout-list strong {
+  color: var(--text);
 }
 
 nav.tabs button[aria-selected="true"] {
