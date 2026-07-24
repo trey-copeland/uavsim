@@ -78,6 +78,7 @@ No framework refactor was required: new channels and noise keys plug into the ex
 
 Metrics may include `observer_id`, `rmse_estimate_position_m`, `rmse_estimate_attitude_rad`, `peak_tilt_rad`,
 `time_in_bounds_frac`, `success_pos_limit_m`.
+`rmse_estimate_attitude_rad` is the RMS **SO(3) geodesic** angle between \(\hat x\) and truth (not Euler subtraction).
 
 **`success` (tracking):** peak position error ≤ **3×** `metrics.position_bound_m` and peak attitude
 error &lt; 45°. This is intentionally tighter than an older 5×/1 m floor that marked multi-meter

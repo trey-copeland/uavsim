@@ -79,7 +79,7 @@ Round-trip: `controller_from_artifact` rebuilds an in-process LQR controller.
 ### Caveats
 
 - Linearization is **hover / small-angle** — aggressive figure-eights stress validity (use feasibility + MC).
-- Gains designed on **nominal** vehicle; MC default is **plant perturbed, K fixed** (`monte_carlo.redesign_controller: false`).
+- Gains designed on **nominal** vehicle; MC default is **plant perturbed, K fixed** (`monte_carlo.redesign_controller: false`). The **observer** is also built on the **nominal** vehicle (fixed filter model under plant scatter).
 
 Example studies: `configs/studies/hover_nominal.yaml`, `gentle_square.yaml`, `hover_from_offset.yaml`.
 

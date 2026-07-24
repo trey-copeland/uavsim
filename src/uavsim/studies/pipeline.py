@@ -125,7 +125,9 @@ def run_closed_loop_trial(
         plant=getattr(cfg.sim, "plant", "wrench"),
     )
     adapter = InProcessControllerAdapter(ctrl, prepared.reference)
-    observer, meas_model = build_observer(cfg.sim.observer, plant_vehicle)
+    # Observer on *nominal* vehicle (same story as redesign_controller=false):
+    # fixed filter model, plant may be mass/inertia-perturbed in MC.
+    observer, meas_model = build_observer(cfg.sim.observer, prepared.vehicle_nominal)
     sim_result = simulate_closed_loop(
         plant,
         adapter,
@@ -150,13 +152,17 @@ def run_closed_loop_trial(
     metrics["observer_id"] = sim_result.observer_id
     metrics["sim_attitude"] = sim_result.attitude
     if sim_result.x_hat is not None and sim_result.x is not None:
-        e_est = sim_result.x_hat - sim_result.x
-        metrics["rmse_estimate_position_m"] = float(
-            np.sqrt(np.mean(np.sum(e_est[:, 0:3] ** 2, axis=1)))
+        from uavsim.dynamics.attitude_error import geodesic_attitude_error_rad
+
+        e_pos = sim_result.x_hat[:, 0:3] - sim_result.x[:, 0:3]
+        metrics["rmse_estimate_position_m"] = float(np.sqrt(np.mean(np.sum(e_pos**2, axis=1))))
+        att_err = np.array(
+            [
+                geodesic_attitude_error_rad(sim_result.x_hat[i, 3:6], sim_result.x[i, 3:6])
+                for i in range(sim_result.x.shape[0])
+            ]
         )
-        metrics["rmse_estimate_attitude_rad"] = float(
-            np.sqrt(np.mean(np.sum(e_est[:, 3:6] ** 2, axis=1)))
-        )
+        metrics["rmse_estimate_attitude_rad"] = float(np.sqrt(np.mean(att_err**2)))
     return sim_result, metrics
 
 

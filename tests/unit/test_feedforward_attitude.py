@@ -18,16 +18,17 @@ def test_feedforward_signs_match_plant() -> None:
         np.array([0.0, 2.0, 0.0]),
         np.array([1.5, -1.0, 0.0]),
         np.array([-1.0, 0.5, 0.0]),
+        np.array([2.5, 2.5, 0.0]),
     ]
     for a_des in cases:
         phi, theta = feedforward_roll_pitch(a_des, g=g)
         x = np.zeros(12)
-        x[3] = float(phi[0] if np.ndim(phi) else phi)
-        x[4] = float(theta[0] if np.ndim(theta) else theta)
+        x[3] = float(np.asarray(phi).reshape(-1)[0])
+        x[4] = float(np.asarray(theta).reshape(-1)[0])
         a_plant = state_derivative(x, vehicle.u_hover(), vehicle)[6:9]
-        # Horizontal components: same sign and roughly same magnitude
-        np.testing.assert_allclose(a_plant[0], a_des[0], atol=0.15)
-        np.testing.assert_allclose(a_plant[1], a_des[1], atol=0.15)
+        # Exact hover-thrust inversion → machine-precision match (unclipped)
+        np.testing.assert_allclose(a_plant[0], a_des[0], atol=1e-10)
+        np.testing.assert_allclose(a_plant[1], a_des[1], atol=1e-10)
 
 
 def test_feedforward_matches_small_angle_linearization() -> None:

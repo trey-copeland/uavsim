@@ -64,8 +64,7 @@ class EulerMotorDynamics:
     def project(self, x: np.ndarray) -> np.ndarray:
         x = np.asarray(x, dtype=float).reshape(STATE_DIM_EULER_MOTORS).copy()
         x[:STATE_DIM] = self._rb.project(x[:STATE_DIM])
-        prop = None  # clip motors if we had vehicle — leave unbounded in project
-        _ = prop
+        # Motor speeds are not clipped here (no vehicle bounds on the protocol).
         return x
 
     def to_euler_state(self, x: np.ndarray) -> np.ndarray:

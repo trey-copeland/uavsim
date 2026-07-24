@@ -55,7 +55,7 @@ Peak position error ≤ **3×** study `position_bound_m` and peak attitude error
 | Topic | Limitation |
 |-------|------------|
 | **Linearization** | Hover / small-angle \(A,B\) for LQR design and linear KF. Aggressive flight is outside the design model (envelope tab explores that). |
-| **Attitude feedforward** | Trajectory roll/pitch from desired NED accel assumes level-yaw / hover-thrust mapping matched to the plant (\( \ddot N \approx -g\sin\theta\), \(\ddot E \approx +g\sin\phi\)). Not full differential flatness / geometric tracking. |
+| **Attitude feedforward** | Hover-thrust inversion at ψ=0: \(\phi=\mathrm{asin}(a_y/g)\), \(\theta=-\mathrm{asin}(a_x/(g\cos\phi))\). Not full differential flatness / geometric tracking (yaw coupling, variable thrust). |
 | **PID cascade** | Underactuated small-angle outer loop + attitude PD — comparison baseline, not a geometric controller. |
 | **Motors plant** | First-order \(\omega\) lag + X-quad mixer \(f=c_T\omega^2\). No battery, ESC, or inflow dynamics. |
 | **Mixer** | Allocation matches FRD \(r \times [0,0,-f]\) for the documented motor map; reaction yaw via \(c_Q/c_T\). Self-consistent SIL; not a drop-in for every airframe mixer. |
@@ -74,7 +74,7 @@ Peak position error ≤ **3×** study `position_bound_m` and peak attitude error
 | **AHRS columns** | Assume an external attitude source (`att` channel); not a full AHRS algorithm. |
 | **IMU-only** | Rates alone **do not** observe position — expect drift / failure. Honesty demo, not a bug. |
 | **`partial_raw`** | Unmeasured states set to **0** — deliberate bad baseline. |
-| **`mekf`** | Error-state / multiplicative attitude path for demos; not as deeply unit-tested against the full nonlinear plant as LQR hover design. Accel-aided / true IMU physics is backlog (**EST-8**). |
+| **`mekf`** | Error-state / multiplicative attitude path for demos. The discrete error-state \(F\) is **simplified**: position–velocity coupling and attitude kinematics are present, but the **thrust-tilt block** \(\delta\dot v \leftarrow -R[0,0,-F/m]\times\delta\theta\) is omitted (hover-teaching filter, not full multiplicative EKF). Accel-aided / true IMU physics is backlog (**EST-8**). |
 | **Min-snap guidance** | Mellinger-style per-axis QP in code; not independently re-derived against an external reference solver in CI. |
 
 ---
@@ -84,7 +84,9 @@ Peak position error ≤ **3×** study `position_bound_m` and peak attitude error
 | Topic | Limitation |
 |-------|------------|
 | **RMSE / success** | Relative to the **reference trajectory** and the **plant as modeled**. Cross-run comparisons need the same mission, vehicle, and code revision. |
+| **Estimate attitude RMSE** | SO(3) geodesic angle between \(\hat x\) and truth (not raw Euler subtraction). |
 | **Monte Carlo** | Parameter scatter (mass / inertia / arm, etc.) as configured — not a full uncertainty budget. |
+| **MC observer model** | With default `redesign_controller: false`, the **controller and the observer** are built on the **nominal** vehicle; only the **plant** is perturbed. That matches “fixed law + fixed filter model, uncertain plant.” If the observer were redesigned on the trial vehicle, LQG MC would understate model mismatch. |
 | **Showcase JSON** | Built by `uavsim gallery` from study configs. **Can lag code** after plant/control fixes; rebuild before external demos. |
 | **Docker MC** | Image must match the tree under test (stale images produce misleading “extra” failures). |
 

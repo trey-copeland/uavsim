@@ -101,9 +101,15 @@ class PidCascadeController:
 
         # Horizontal accel → tilt (matches plant: +θ → −ẍ, +φ → +ÿ at hover thrust)
         ax, ay = float(a_cmd[0]), float(a_cmd[1])
-        smax = float(np.sin(self.max_tilt_rad))
-        theta_des = float(np.clip(-ax / g, -smax, smax))
-        phi_des = float(np.clip(ay / g, -smax, smax))
+        # Clip command accel then map; angles limited in radians (not sin-domain)
+        a_max = g * float(np.sin(self.max_tilt_rad))
+        horiz = float(np.hypot(ax, ay))
+        if horiz > a_max > 0.0:
+            scale = a_max / horiz
+            ax *= scale
+            ay *= scale
+        theta_des = float(np.clip(-ax / g, -self.max_tilt_rad, self.max_tilt_rad))
+        phi_des = float(np.clip(ay / g, -self.max_tilt_rad, self.max_tilt_rad))
         # Prefer trajectory feedforward attitude when present (waypoint refs)
         if np.linalg.norm(euler_ref_traj[0:2]) > 1e-6:
             phi_des = 0.5 * phi_des + 0.5 * float(euler_ref_traj[0])

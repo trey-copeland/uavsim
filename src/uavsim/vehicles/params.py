@@ -113,8 +113,9 @@ class VehicleParams(BaseModel):
 
     @field_validator("limits")
     @classmethod
-    def thrust_max_covers_hover(cls, limits: ActuatorLimits, info: Any) -> ActuatorLimits:
-        # Validated after full model via model_validator if needed; keep simple.
+    def _pass_through_limits(cls, limits: ActuatorLimits, info: Any) -> ActuatorLimits:
+        # Hover-vs-thrust_max cross-field check is backlog (V-5); pass through only.
+        _ = info
         return limits
 
 

@@ -14,12 +14,17 @@ def feedforward_roll_pitch(
     """
     Approximate roll/pitch for a desired inertial acceleration at constant yaw=0.
 
-    Must match the plant (NED, thrust along −body-z). At hover thrust:
+    Must match the plant (NED, thrust along −body-z). At hover thrust and ψ=0:
 
-      ẍ ≈ −g sin θ  ⇒  θ ≈ −asin(a_x / g)
-      ÿ ≈ +g sin φ  ⇒  φ ≈ +asin(a_y / (g cos θ))
+      a_x = −g sin θ cos φ
+      a_y = +g sin φ
 
-    (Same signs as ``hover_linearization`` and the PID outer loop.)
+    Exact sequential inversion (φ first, then θ with cos-φ compensation):
+
+      φ = asin(clip(a_y / g))
+      θ = −asin(clip(a_x / (g cos φ)))
+
+    (Matches ``hover_linearization`` signs; small-angle: θ≈−a_x/g, φ≈a_y/g.)
 
     Returns (roll, pitch) arrays matching the first axis of ``accel_ned``.
     """
@@ -38,14 +43,13 @@ def feedforward_roll_pitch(
     ax = ax * scale
     ay = ay * scale
 
-    # Plant: a_x = -g sin θ  →  sin θ = -a_x / g
-    sin_theta = np.clip(-ax / g, -1.0, 1.0)
-    theta = np.arcsin(sin_theta)
-    cos_theta = np.cos(theta)
-    # Avoid divide-by-zero at extreme pitch; plant: a_y = g sin φ (level yaw)
-    denom = np.maximum(g * np.maximum(np.abs(cos_theta), 1e-6), 1e-6)
-    sin_phi = np.clip(ay / denom, -1.0, 1.0)
+    # Exact hover-thrust inversion: φ from a_y, then θ from a_x / cos φ
+    sin_phi = np.clip(ay / g, -1.0, 1.0)
     phi = np.arcsin(sin_phi)
+    cos_phi = np.cos(phi)
+    denom = np.maximum(g * np.maximum(np.abs(cos_phi), 1e-6), 1e-6)
+    sin_theta = np.clip(-ax / denom, -1.0, 1.0)
+    theta = np.arcsin(sin_theta)
     return phi, theta
 
 

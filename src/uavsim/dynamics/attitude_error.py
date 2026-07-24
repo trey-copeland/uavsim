@@ -33,7 +33,7 @@ def rotation_error_vector_from_dcm(r: np.ndarray, r_ref: np.ndarray) -> np.ndarr
 
 
 def _vee_log_so3(r_err: np.ndarray) -> np.ndarray:
-    """Axis-angle vector from rotation matrix (principal branch)."""
+    """Axis-angle vector from rotation matrix (principal branch, |θ| ≤ π)."""
     tr = float(np.trace(r_err))
     cos_th = 0.5 * (tr - 1.0)
     cos_th = float(np.clip(cos_th, -1.0, 1.0))
@@ -48,9 +48,9 @@ def _vee_log_so3(r_err: np.ndarray) -> np.ndarray:
             ]
         )
     if theta > np.pi - 1e-6:
-        # Near 180°: more careful extraction from diagonal
-        # Fall back to skew-symmetric formula with sin
-        pass
+        # Near π: sin θ → 0 so skew formula is 0/0. At θ=π, R = 2 n n^T − I;
+        # extract axis from the largest diagonal of (R+I)/2.
+        return _axis_angle_near_pi(r_err, theta)
     w = np.array(
         [
             r_err[2, 1] - r_err[1, 2],
@@ -59,6 +59,40 @@ def _vee_log_so3(r_err: np.ndarray) -> np.ndarray:
         ]
     )
     return (theta / (2.0 * np.sin(theta))) * w
+
+
+def _axis_angle_near_pi(r: np.ndarray, theta: float) -> np.ndarray:
+    """Rotation vector when angle is near π (diagonal-based axis)."""
+    # n_i² = (R_ii + 1)/2; off-diagonals fix relative signs
+    xx = 0.5 * (float(r[0, 0]) + 1.0)
+    yy = 0.5 * (float(r[1, 1]) + 1.0)
+    zz = 0.5 * (float(r[2, 2]) + 1.0)
+    xy = 0.25 * (float(r[0, 1]) + float(r[1, 0]))
+    xz = 0.25 * (float(r[0, 2]) + float(r[2, 0]))
+    yz = 0.25 * (float(r[1, 2]) + float(r[2, 1]))
+    if xx >= yy and xx >= zz:
+        x = float(np.sqrt(max(xx, 0.0)))
+        if x < 1e-12:
+            return np.array([theta, 0.0, 0.0])
+        y = xy / x
+        z = xz / x
+    elif yy >= zz:
+        y = float(np.sqrt(max(yy, 0.0)))
+        if y < 1e-12:
+            return np.array([0.0, theta, 0.0])
+        x = xy / y
+        z = yz / y
+    else:
+        z = float(np.sqrt(max(zz, 0.0)))
+        if z < 1e-12:
+            return np.array([0.0, 0.0, theta])
+        x = xz / z
+        y = yz / z
+    axis = np.array([x, y, z], dtype=float)
+    n = float(np.linalg.norm(axis))
+    if n < 1e-15:
+        return np.array([theta, 0.0, 0.0])
+    return (theta / n) * axis
 
 
 def rotation_error_vector_from_euler(euler: np.ndarray, euler_ref: np.ndarray) -> np.ndarray:

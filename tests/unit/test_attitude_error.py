@@ -6,11 +6,12 @@ import numpy as np
 
 from uavsim.dynamics.attitude_error import (
     geodesic_attitude_error_rad,
+    rotation_error_vector_from_dcm,
     rotation_error_vector_from_euler,
     rotation_error_vector_from_quat,
     tracking_error_state,
 )
-from uavsim.dynamics.rotations import euler_to_quat
+from uavsim.dynamics.rotations import euler_to_quat, quat_to_euler, rotation_body_to_inertial_quat
 
 
 def test_identity_error_is_zero() -> None:
@@ -35,6 +36,37 @@ def test_yaw_wrap_not_2pi() -> None:
     assert naive > 6.0
     ang = geodesic_attitude_error_rad(e, e_ref)
     assert ang < 0.15
+
+
+def test_near_180_deg_agrees_with_quat_log() -> None:
+    """DCM log near π must match quat path (skew formula is 0/0 at exactly π)."""
+    e_ref = np.zeros(3)
+    q_id = euler_to_quat(0.0, 0.0, 0.0)
+    q_flip = np.array([0.0, 1.0, 0.0, 0.0])  # 180° about body x
+    d_q = rotation_error_vector_from_quat(q_flip, q_id)
+    e_flip = quat_to_euler(q_flip)
+    d_e = rotation_error_vector_from_euler(e_flip, e_ref)
+    assert abs(float(np.linalg.norm(d_e)) - np.pi) < 1e-5
+    assert abs(float(np.linalg.norm(d_q)) - np.pi) < 1e-5
+    cos_align = float(np.dot(d_e, d_q) / (np.linalg.norm(d_e) * np.linalg.norm(d_q) + 1e-15))
+    assert abs(abs(cos_align) - 1.0) < 1e-4
+    assert abs(d_e[0]) > abs(d_e[1]) and abs(d_e[0]) > abs(d_e[2])
+
+
+def test_near_180_generic_axis() -> None:
+    """Off-axis 180°: DCM and quat logs agree within a tight tolerance."""
+    axis = np.array([1.0, -2.0, 0.5])
+    axis = axis / np.linalg.norm(axis)
+    # q = [cos(π/2), sin(π/2) n] = [0, n]
+    q = np.array([0.0, axis[0], axis[1], axis[2]])
+    q_ref = np.array([1.0, 0.0, 0.0, 0.0])
+    d_q = rotation_error_vector_from_quat(q, q_ref)
+    r = rotation_body_to_inertial_quat(q)
+    r_ref = rotation_body_to_inertial_quat(q_ref)
+    d_r = rotation_error_vector_from_dcm(r, r_ref)
+    np.testing.assert_allclose(np.linalg.norm(d_r), np.pi, atol=1e-5)
+    align = abs(float(np.dot(d_r / np.linalg.norm(d_r), d_q / np.linalg.norm(d_q))))
+    assert align > 0.999
 
 
 def test_quat_and_euler_error_agree() -> None:

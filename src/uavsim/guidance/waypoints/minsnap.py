@@ -37,8 +37,9 @@ def snap_hessian(duration: float) -> np.ndarray:
         for j in range(4, 8):
             ci = _factorial(i) / _factorial(i - 4)
             cj = _factorial(j) / _factorial(j - 4)
+            # i,j ≥ 4 ⇒ power = i+j-8 ≥ 0 (log branch unreachable for order-7 snap)
             power = i + j - 8
-            integral = math.log(max(t, 1e-12)) if power == -1 else t ** (power + 1) / (power + 1)
+            integral = t ** (power + 1) / (power + 1)
             h[i, j] = ci * cj * integral
     return h
 
