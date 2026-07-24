@@ -40,7 +40,7 @@ def test_run_to_gallery_and_write(tmp_path: Path) -> None:
 
 
 def test_generate_base_case_gallery_smoke(tmp_path: Path) -> None:
-    """Smoke: full portfolio matrix configs run; metrics honesty for AHRS vs flow."""
+    """Smoke: dual-mission portfolio matrix; metrics honesty for AHRS vs flow."""
     path = generate_base_case_gallery(
         repo_root=ROOT,
         out_dir=tmp_path / "showcase",
@@ -48,6 +48,7 @@ def test_generate_base_case_gallery_smoke(tmp_path: Path) -> None:
         max_points=40,
         n_mc_trials=2,
         skip_envelope=True,
+        skip_edge_mission=False,
     )
     doc = json.loads(path.read_text(encoding="utf-8"))
     ids = {r["id"] for r in doc["runs"]}
@@ -55,6 +56,13 @@ def test_generate_base_case_gallery_smoke(tmp_path: Path) -> None:
     assert "flow_alt_lqg" in ids
     assert "gps_imu_lqg" in ids
     assert "gps_imu_lqg_mc" in ids
+    assert "edge_figure_eight_lqr" in ids
+    assert "edge_gps_imu_lqg" in ids
+    assert "edge_gps_imu_lqg_mc" in ids
+    missions = {m["id"]: m for m in doc.get("missions") or []}
+    assert "baseline" in missions
+    assert "envelope_edge" in missions
+    assert missions["envelope_edge"]["default_run"] == "edge_figure_eight_lqr"
     assert doc.get("estimation_matrix") is not None
     by_id = {s["id"]: s for s in doc["estimation_matrix"]["scenarios"]}
     assert by_id["flow_alt_lqg"]["metrics"]["success"] is True
@@ -62,3 +70,7 @@ def test_generate_base_case_gallery_smoke(tmp_path: Path) -> None:
     # Multi-meter AHRS path must not report success after 3× bound rule
     assert by_id["ahrs_lqg"]["metrics"]["success"] is False
     assert "time_in_bounds_frac" in by_id["flow_alt_lqg"]["metrics"]
+    # Dual-mission rebinding
+    assert "run_id_by_mission" in by_id["flow_alt_lqg"]
+    assert by_id["flow_alt_lqg"]["run_id_by_mission"]["envelope_edge"] == "edge_flow_alt_lqg"
+    assert "envelope_edge" in by_id["flow_alt_lqg"]["metrics_by_mission"]

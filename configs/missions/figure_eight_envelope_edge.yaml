@@ -1,0 +1,26 @@
+# Near-envelope elevated figure-eight for dual-mission showcase.
+#
+# Geometry matches configs/missions/figure_eight.yaml; waypoint times are
+# scaled by τ★ = 0.28 (chosen from a densified ideal-LQR time-scale sweep:
+# last "healthy" regime with scheduled yaw before tracking degrades hard).
+# Peak plant tilt under ideal hover LQR is ~25–30° — past classic small-angle
+# linearization — with explicit from_waypoints yaw (±~0.9 rad) so Flight 3D
+# shows heading change without path-tangent auto-yaw (known LOE case).
+#
+# Use guidance.yaw_mode: from_waypoints with this file.
+schema_version: 1
+name: figure_eight_envelope_edge
+description: >
+  Near-envelope figure-eight (τ★=0.28 vs baseline timing) with scheduled
+  yaw for controller × sensor comparison at the edge of hover-LQR validity.
+frame: NED
+waypoints:
+  - {label: start_rest, time: 0.0, x: 0.0, y: 0.0, z: 1.5, yaw: 0.0}
+  - {label: right_begin, time: 1.12, x: 1.0, y: 0.5, z: 1.7, yaw: 0.45}
+  - {label: right_peak, time: 2.24, x: 2.0, y: 0.0, z: 2.0, yaw: 0.9}
+  - {label: right_bottom, time: 3.36, x: 1.0, y: -0.5, z: 1.7, yaw: 0.45}
+  - {label: center_cross, time: 4.48, x: 0.0, y: 0.0, z: 1.5, yaw: 0.0}
+  - {label: left_bottom, time: 5.6, x: -1.0, y: -0.5, z: 1.3, yaw: -0.45}
+  - {label: left_peak, time: 6.72, x: -2.0, y: 0.0, z: 1.0, yaw: -0.9}
+  - {label: left_top, time: 7.84, x: -1.0, y: 0.5, z: 1.3, yaw: -0.45}
+  - {label: end_rest, time: 8.96, x: 0.0, y: 0.0, z: 1.5, yaw: 0.0}

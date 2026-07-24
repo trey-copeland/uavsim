@@ -1,6 +1,6 @@
 # uavsim flight results (React)
 
-Single-page React app for the portfolio base case: a **controller × sensor** matrix (LQR/LQG and PID), Monte Carlo, and a **hover-linearization envelope**.
+Single-page React app for the portfolio base case: a **controller × sensor** matrix (LQR/LQG and PID) on **two missions** (baseline figure-eight and near-envelope + scheduled yaw), Monte Carlo, and a **tracking envelope** that sweeps **every matrix cell** over time-scale τ. Use the **Mission** selector in the header (and on Overview / Estimation / Flight) to rebind every matrix cell.
 
 ## Base-case studies
 
@@ -48,11 +48,30 @@ uv run uavsim gallery --base-case
 # writes docs/showcase/data/showcase.json (+ SPA files)
 ```
 
-Smoke (fewer MC trials, skip envelope):
+Smoke (fewer MC trials, skip envelope and/or edge mission):
 
 ```bash
 uv run uavsim gallery --base-case --n-mc-trials 8 --skip-envelope
+uv run uavsim gallery --base-case --n-mc-trials 2 --skip-envelope --skip-edge-mission
 ```
+
+### Dual missions
+
+| Mission | Path | Yaw | Role |
+|---------|------|-----|------|
+| **Baseline** | `configs/missions/figure_eight.yaml` | constant | Calm matrix teaching |
+| **Envelope edge** | `configs/missions/figure_eight_envelope_edge.yaml` (τ★≈0.28) | `from_waypoints` scheduled ±~50° | Near hover-LQR linearization edge; full matrix twin |
+
+UI: global **Mission** selector rebinds Overview matrix, Estimation bars/table, Flight/Metrics run list, MC, and Compare defaults.
+
+### Envelope tab (τ sweep)
+
+Sweeps **all 12 matrix schemes** (not only ideal LQR) over time-scale τ on the constant-yaw figure-eight:
+
+- LQR row: ideal, GPS+IMU naive, GPS+IMU LQG, AHRS, flow+alt, IMU-only  
+- PID row: same sensor stacks with cascade PID  
+
+Shared position bound for comparable success. UI filters: All / LQR family / PID only + per-scheme toggles. Solid lines = LQR family, dashed = PID.
 
 Local preview:
 

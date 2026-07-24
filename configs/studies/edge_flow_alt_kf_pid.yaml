@@ -1,0 +1,55 @@
+# Edge-of-envelope portfolio twin of configs/studies/figure_eight_flow_alt_kf_pid.yaml.
+# Mission: configs/missions/figure_eight_envelope_edge.yaml (τ★=0.28 + scheduled yaw).
+# yaw_mode: from_waypoints — do not switch to path_tangent without checking feasibility.
+schema_version: 1
+study_id: edge_flow_alt_kf_pid
+seed: 7
+vehicle: configs/vehicles/default_quadrotor.yaml
+controller:
+  type: pid_cascade
+  kp_pos:
+  - 2.5
+  - 2.5
+  - 6.0
+  kd_pos:
+  - 2.0
+  - 2.0
+  - 3.5
+  kp_att:
+  - 8.0
+  - 8.0
+  - 2.0
+  kd_rate:
+  - 0.8
+  - 0.8
+  - 0.4
+  max_tilt_rad: 0.436
+guidance:
+  type: waypoints
+  mission_file: configs/missions/figure_eight_envelope_edge.yaml
+  method: auto
+  yaw_mode: from_waypoints
+  sample_dt_s: 0.01
+  fail_on_infeasible: false
+sim:
+  dt_s: 0.01
+  method: rk45
+  rtol: 1.0e-05
+  atol: 1.0e-07
+  attitude: euler
+  observer:
+    type: linear_kf
+    seed: 7
+    pos_sigma_m: 0.05
+    vel_sigma_m_s: 0.08
+    att_sigma_rad: 0.03
+    omega_sigma_rad_s: 0.04
+    process_sigma: 0.03
+    alt_sigma_m: 0.04
+    body_vel_sigma_m_s: 0.08
+    channels:
+    - body_vel
+    - alt
+    - omega
+metrics:
+  position_bound_m: 1.0

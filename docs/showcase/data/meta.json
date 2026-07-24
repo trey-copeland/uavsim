@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-22T02:46:33.490226+00:00",
+  "generated_at": "2026-07-24T04:28:59.049017+00:00",
   "uavsim_version": "0.1.0",
   "runs": [
     "figure_eight_lqr",
@@ -15,7 +15,24 @@
     "ahrs_kf_pid",
     "flow_alt_kf_pid",
     "imu_only_kf_pid",
-    "gps_imu_lqg_mc"
+    "gps_imu_lqg_mc",
+    "edge_figure_eight_lqr",
+    "edge_gps_imu_naive",
+    "edge_gps_imu_lqg",
+    "edge_ahrs_lqg",
+    "edge_flow_alt_lqg",
+    "edge_imu_only_lqg",
+    "edge_figure_eight_pid",
+    "edge_gps_imu_naive_pid",
+    "edge_gps_imu_kf_pid",
+    "edge_ahrs_kf_pid",
+    "edge_flow_alt_kf_pid",
+    "edge_imu_only_kf_pid",
+    "edge_gps_imu_lqg_mc"
+  ],
+  "missions": [
+    "baseline",
+    "envelope_edge"
   ],
   "has_envelope": true,
   "command": "uavsim gallery --base-case"

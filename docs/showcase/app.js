@@ -38,6 +38,89 @@
     return String(x);
   }
 
+  /** Resolve mission catalog entry (dual-mission showcase). */
+  function getMission(doc, missionId) {
+    const missions = (doc && doc.missions) || [];
+    if (!missions.length) return null;
+    return (
+      missions.find(function (m) {
+        return m.id === missionId;
+      }) || missions[0]
+    );
+  }
+
+  /** Runs belonging to the selected mission (legacy docs: all runs). */
+  function runsForMission(doc, missionId) {
+    const runs = (doc && doc.runs) || [];
+    const mission = getMission(doc, missionId);
+    if (!mission) return runs;
+    if (mission.run_ids && mission.run_ids.length) {
+      const allow = {};
+      mission.run_ids.forEach(function (id) {
+        allow[id] = true;
+      });
+      const filtered = runs.filter(function (r) {
+        return allow[r.id];
+      });
+      if (filtered.length) return filtered;
+    }
+    const mid = mission.id;
+    const byMid = runs.filter(function (r) {
+      return r.mission_id === mid;
+    });
+    return byMid.length ? byMid : runs;
+  }
+
+  /** Scenario run_id for the active mission. */
+  function scenarioRunId(sc, missionId) {
+    if (!sc) return null;
+    const map = sc.run_id_by_mission;
+    if (map && missionId && map[missionId]) return map[missionId];
+    return sc.run_id || null;
+  }
+
+  /** Scenario metrics for the active mission. */
+  function scenarioMetrics(sc, missionId, byId) {
+    if (!sc) return {};
+    const map = sc.metrics_by_mission;
+    if (map && missionId && map[missionId]) return map[missionId];
+    const rid = scenarioRunId(sc, missionId);
+    if (rid && byId && byId[rid] && byId[rid].metrics) return byId[rid].metrics;
+    return sc.metrics || {};
+  }
+
+  function MissionSelector({ doc, missionId, onChange, className }) {
+    const missions = (doc && doc.missions) || [];
+    if (!missions.length) return null;
+    return e(
+      "div",
+      { className: "mission-selector " + (className || "") },
+      e("label", { className: "mission-label" }, "Mission"),
+      e(
+        "select",
+        {
+          value: missionId || missions[0].id,
+          onChange: function (ev) {
+            onChange(ev.target.value);
+          },
+          "aria-label": "Mission",
+        },
+        missions.map(function (m) {
+          return e(
+            "option",
+            { key: m.id, value: m.id },
+            m.short_label || m.label || m.id
+          );
+        })
+      ),
+      (function () {
+        const m = getMission(doc, missionId);
+        if (!m || !m.description) return null;
+        return e("span", { className: "mission-hint", title: m.description }, m.description);
+      })()
+    );
+  }
+
   /**
    * Fit a viewing box to path geometry (meters, plot frame N/E/up).
    *
@@ -845,10 +928,11 @@
     );
   }
 
-  function Overview({ doc, onSelect }) {
-    const runs = doc.runs || [];
+  function Overview({ doc, onSelect, missionId, onMissionChange }) {
+    const mission = getMission(doc, missionId);
+    const runs = runsForMission(doc, missionId);
     const byId = {};
-    runs.forEach(function (r) {
+    (doc.runs || []).forEach(function (r) {
       byId[r.id] = r;
     });
     const matrix = doc.estimation_matrix;
@@ -876,8 +960,9 @@
       if (!sc) {
         return e("div", { className: "matrix-cell empty", key: "empty" }, "—");
       }
-      const run = sc.run_id ? byId[sc.run_id] : null;
-      const m = (sc.metrics || (run && run.metrics)) || {};
+      const rid = scenarioRunId(sc, missionId);
+      const run = rid ? byId[rid] : null;
+      const m = scenarioMetrics(sc, missionId, byId);
       const ok = m.success;
       const tib = m.time_in_bounds_frac;
       const tibStr =
@@ -885,11 +970,11 @@
       return e(
         "div",
         {
-          key: sc.id || sc.run_id,
+          key: (sc.id || rid) + ":" + (missionId || ""),
           className: "matrix-cell card" + (ok === false ? " cell-fail" : ""),
-          style: { cursor: sc.run_id ? "pointer" : "default" },
+          style: { cursor: rid ? "pointer" : "default" },
           onClick: function () {
-            if (sc.run_id && onSelect) onSelect(sc.run_id);
+            if (rid && onSelect) onSelect(rid);
           },
           title: sc.lesson || sc.label || "",
         },
@@ -917,10 +1002,11 @@
       );
     }
 
-    // Extra runs not in the matrix (e.g. Monte Carlo)
+    // Extra runs not in the matrix (e.g. Monte Carlo) for this mission
     const matrixRunIds = {};
     scenarios.forEach(function (s) {
-      if (s.run_id) matrixRunIds[s.run_id] = true;
+      const rid = scenarioRunId(s, missionId);
+      if (rid) matrixRunIds[rid] = true;
     });
     const extra = runs.filter(function (r) {
       return !matrixRunIds[r.id];
@@ -931,10 +1017,22 @@
         ? e(
             "div",
             { className: "card matrix-wrap", style: { gridColumn: "1 / -1" } },
-            e("h2", null, matrix.title || "Controller × sensor matrix"),
+            e(
+              "div",
+              { className: "row matrix-mission-row" },
+              e("h2", { style: { margin: 0, flex: "1 1 auto" } }, matrix.title || "Controller × sensor matrix"),
+              e(MissionSelector, {
+                doc: doc,
+                missionId: missionId,
+                onChange: onMissionChange,
+              })
+            ),
             e(
               "p",
               { style: { color: "var(--muted)", fontSize: "0.9rem", marginTop: 0 } },
+              mission && mission.description
+                ? mission.description + " "
+                : "",
               "Click a cell to open Flight 3D. Compare down a column (same sensors, different law) ",
               "or across a row (same law, harder sensors)."
             ),
@@ -1767,26 +1865,30 @@
     return rows;
   }
 
-  function CompareTab({ doc }) {
-    const runs = doc.runs || [];
+  function CompareTab({ doc, missionId, onMissionChange }) {
+    const mission = getMission(doc, missionId);
+    const runs = runsForMission(doc, missionId);
     // Prefer runs with metrics; timeseries optional for path overlay
     const candidates = runs.filter(function (r) {
       return r && r.metrics;
     });
     const defaults = doc.compare || {};
+    const missionCompare = (mission && mission.compare_ids) || null;
+    const preferredA = (missionCompare && missionCompare[0]) || defaults.a;
+    const preferredB = (missionCompare && missionCompare[1]) || defaults.b;
     const defaultA =
-      (defaults.a && candidates.some(function (r) {
-        return r.id === defaults.a;
+      (preferredA && candidates.some(function (r) {
+        return r.id === preferredA;
       })
-        ? defaults.a
+        ? preferredA
         : null) ||
       (candidates[0] && candidates[0].id) ||
       "";
     const defaultB =
-      (defaults.b && candidates.some(function (r) {
-        return r.id === defaults.b;
+      (preferredB && candidates.some(function (r) {
+        return r.id === preferredB;
       })
-        ? defaults.b
+        ? preferredB
         : null) ||
       (candidates[1] && candidates[1].id) ||
       (candidates[0] && candidates[0].id) ||
@@ -1795,13 +1897,13 @@
     const [idA, setIdA] = useState(defaultA);
     const [idB, setIdB] = useState(defaultB);
 
-    // If gallery data reloads with new defaults and state is empty
+    // Mission change rebinds A/B to that mission's teaching pair
     useEffect(
       function () {
-        if (!idA && defaultA) setIdA(defaultA);
-        if (!idB && defaultB) setIdB(defaultB);
+        if (defaultA) setIdA(defaultA);
+        if (defaultB) setIdB(defaultB);
       },
-      [defaultA, defaultB]
+      [missionId, defaultA, defaultB]
     );
 
     if (!candidates.length) {
@@ -1921,11 +2023,20 @@
       e(
         "div",
         { className: "card", style: { gridColumn: "1 / -1" } },
-        e("h2", null, "Compare runs"),
+        e(
+          "div",
+          { className: "row matrix-mission-row" },
+          e("h2", { style: { margin: 0, flex: "1 1 auto" } }, "Compare runs"),
+          e(MissionSelector, {
+            doc: doc,
+            missionId: missionId,
+            onChange: onMissionChange,
+          })
+        ),
         e(
           "p",
           { style: { color: "var(--muted)", fontSize: "0.9rem", marginTop: 0 } },
-          "Pick any two gallery runs. Metrics are B − A. Path overlay needs timeseries on both."
+          "Pick any two gallery runs (filtered by mission). Metrics are B − A. Path overlay needs timeseries on both."
         ),
         e(
           "div",
@@ -2052,7 +2163,7 @@
     );
   }
 
-  function EstimationTab({ doc, onSelectRun }) {
+  function EstimationTab({ doc, onSelectRun, missionId, onMissionChange }) {
     const matrix = doc.estimation_matrix;
     if (!matrix || !matrix.scenarios || !matrix.scenarios.length) {
       return e(
@@ -2064,6 +2175,11 @@
     }
     const scenarios = matrix.scenarios;
     const columns = matrix.columns || [];
+    const byId = {};
+    (doc.runs || []).forEach(function (r) {
+      byId[r.id] = r;
+    });
+    const mission = getMission(doc, missionId);
     // Grouped bar chart: x = sensor column, series = controller family
     const ctrlOrder = ["lqr", "pid"];
     const ctrlColors = { lqr: "#5b9fd4", pid: "#e6a05c" };
@@ -2089,8 +2205,9 @@
         // legacy single-row matrix
         return sc.id === colId;
       });
-      if (!s || !s.metrics) return null;
-      const v = s.metrics.rmse_position_m;
+      if (!s) return null;
+      const m = scenarioMetrics(s, missionId, byId);
+      const v = m.rmse_position_m;
       return v != null && Number.isFinite(+v) ? +v : null;
     }
 
@@ -2128,8 +2245,27 @@
       e(
         "div",
         { className: "card" },
-        e("h2", null, matrix.title || "Controller × sensor matrix"),
+        e(
+          "div",
+          { className: "row matrix-mission-row" },
+          e("h2", { style: { margin: 0, flex: "1 1 auto" } }, matrix.title || "Controller × sensor matrix"),
+          e(MissionSelector, {
+            doc: doc,
+            missionId: missionId,
+            onChange: onMissionChange,
+          })
+        ),
         e("p", null, matrix.description || ""),
+        mission && mission.description
+          ? e(
+              "p",
+              { style: { color: "var(--accent)", fontSize: "0.9rem" } },
+              "Active mission: ",
+              e("strong", null, mission.label || mission.id),
+              " — ",
+              mission.description
+            )
+          : null,
         e(
           "p",
           { style: { color: "var(--muted)", fontSize: "0.9rem" } },
@@ -2141,14 +2277,16 @@
         "div",
         { className: "card" },
         e(PlotDiv, {
-          id: "est-rmse-bars",
+          id: "est-rmse-bars-" + (missionId || "default"),
           data: barTraces,
           layout: {
             ...plotTheme,
             barmode: "group",
             height: 360,
             title: {
-              text: "Position RMSE: LQR/LQG vs PID by sensors",
+              text:
+                "Position RMSE: LQR/LQG vs PID by sensors" +
+                (mission ? " · " + (mission.short_label || mission.label) : ""),
               font: { size: 13 },
             },
             yaxis: { title: "RMSE position [m] (display cap 5)", gridcolor: "#2a2f36" },
@@ -2184,18 +2322,19 @@
               "tbody",
               null,
               scenarios.map(function (s, i) {
-                const m = s.metrics || {};
+                const rid = scenarioRunId(s, missionId);
+                const m = scenarioMetrics(s, missionId, byId);
                 const ok = m.success;
                 return e(
                   "tr",
                   {
-                    key: s.id || i,
+                    key: (s.id || i) + ":" + (missionId || ""),
                     style: {
-                      cursor: s.run_id ? "pointer" : "default",
+                      cursor: rid ? "pointer" : "default",
                       color: ok === false ? "#e07070" : undefined,
                     },
                     onClick: function () {
-                      if (s.run_id && onSelectRun) onSelectRun(s.run_id);
+                      if (rid && onSelectRun) onSelectRun(rid);
                     },
                   },
                   e("td", null, s.label),
@@ -2265,12 +2404,36 @@
             "li",
             null,
             e("strong", null, "Envelope tab: "),
-            "limits of idealized full-state LQR when the path leaves the hover linearization — different question."
+            "same matrix cells swept over time-scale τ — plant aggression, not a different sensor story."
           )
         )
       )
     );
   }
+
+  /** Stable colors for envelope scheme series (matrix cells). */
+  const ENVELOPE_SCHEME_COLORS = {
+    ideal_lqr: "#5b9fd4",
+    gps_imu_naive_lqr: "#e07070",
+    gps_imu_lqg: "#3ecf8e",
+    ahrs_lqg: "#c9a227",
+    flow_alt_lqg: "#7c6cf0",
+    imu_only_lqg: "#9aa0a6",
+    ideal_pid: "#5bc0de",
+    gps_imu_naive_pid: "#f0a0a0",
+    gps_imu_kf_pid: "#6edc9a",
+    ahrs_kf_pid: "#e6b450",
+    flow_alt_kf_pid: "#a89cf5",
+    imu_only_kf_pid: "#b0b5ba",
+    lqr: "#5b9fd4",
+    lqg: "#c9a227",
+    pid: "#5bc0de",
+  };
+
+  // Plot windows: fly-away schemes (naive/IMU) otherwise stretch axes to 10⁴° / km RMSE
+  const ENV_PLOT_TILT_MAX_DEG = 75;
+  const ENV_PLOT_RMSE_MAX_M = 5;
+  const ENV_PLOT_RMSE_MIN_M = 1e-4;
 
   function EnvelopeTab({ doc }) {
     const env = doc.envelope;
@@ -2291,21 +2454,93 @@
       );
     }
 
-    const laws = ["lqr", "lqg"];
-    const colors = { lqr: "#5b9fd4", lqg: "#c9a227" };
     const points = env.points;
+    const schemeMeta = env.schemes || env.laws || [];
+    const lawIds = [];
+    const seen = {};
+    (schemeMeta.length ? schemeMeta : points).forEach(function (s) {
+      const id = s.id || s.law;
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      lawIds.push(id);
+    });
+    points.forEach(function (p) {
+      if (p.law && !seen[p.law]) {
+        seen[p.law] = true;
+        lawIds.push(p.law);
+      }
+    });
+
+    const labelOf = {};
+    const familyOf = {};
+    schemeMeta.forEach(function (s) {
+      const id = s.id || s.law;
+      if (!id) return;
+      labelOf[id] = s.label || id;
+      familyOf[id] = s.family || (String(id).indexOf("pid") >= 0 ? "pid" : "lqr");
+    });
+    points.forEach(function (p) {
+      if (p.law && p.label) labelOf[p.law] = p.label;
+      if (p.law && p.family) familyOf[p.law] = p.family;
+    });
+
+    const [familyFilter, setFamilyFilter] = useState("all");
+    const [visible, setVisible] = useState(function () {
+      const init = {};
+      lawIds.forEach(function (id) {
+        init[id] = true;
+      });
+      return init;
+    });
+    // Sweep table state
+    const [sweepSuccess, setSweepSuccess] = useState("all"); // all | ok | fail
+    const [sweepQuery, setSweepQuery] = useState("");
+    const [sweepSort, setSweepSort] = useState({ key: "time_scale", dir: "desc" });
+    // Boundary summary sort
+    const [boundSort, setBoundSort] = useState({ key: "last_ok", dir: "desc" });
+
+    const activeLaws = lawIds.filter(function (id) {
+      if (!visible[id]) return false;
+      if (familyFilter === "all") return true;
+      return (familyOf[id] || "lqr") === familyFilter;
+    });
+
+    const activeSet = {};
+    activeLaws.forEach(function (id) {
+      activeSet[id] = true;
+    });
+
     const plotTheme = {
       paper_bgcolor: "#0c1018",
       plot_bgcolor: "#0c1018",
       font: { color: "#e7ecf3", size: 11 },
-      margin: { t: 36, r: 12, b: 40, l: 48 },
     };
 
-    function seriesFor(law, xKey, yKey, yScale) {
+    function hoverText(name, p, clippedNote) {
+      return (
+        name +
+        "<br>τ=" +
+        p.time_scale +
+        "<br>peak tilt " +
+        fmt(p.peak_tilt_deg, 1) +
+        "°" +
+        "<br>rmse " +
+        fmt(p.rmse_position_m, 3) +
+        " m" +
+        "<br>" +
+        (p.success ? "success" : "FAIL") +
+        (clippedNote || "")
+      );
+    }
+
+    /** Series for τ plot — clamp RMSE for display so fly-aways don't dominate. */
+    function seriesRmseVsTau(law) {
+      const name = labelOf[law] || law;
       const xs = [];
       const ys = [];
       const texts = [];
       const symbols = [];
+      const sizes = [];
       points
         .filter(function (p) {
           return p.law === law;
@@ -2314,37 +2549,33 @@
           return (a.time_scale || 0) - (b.time_scale || 0);
         })
         .forEach(function (p) {
-          const x = p[xKey];
-          const y = p[yKey];
+          const x = p.time_scale;
+          const y = p.rmse_position_m;
           if (x == null || y == null) return;
-          if (!Number.isFinite(+x) || !Number.isFinite(+y)) return;
+          if (!Number.isFinite(+x) || !Number.isFinite(+y) || +y <= 0) return;
+          const yPlot = Math.min(Math.max(+y, ENV_PLOT_RMSE_MIN_M), ENV_PLOT_RMSE_MAX_M);
+          const clipped = +y > ENV_PLOT_RMSE_MAX_M;
           xs.push(+x);
-          ys.push(+y * (yScale || 1));
-          texts.push(
-            law.toUpperCase() +
-              " τ=" +
-              p.time_scale +
-              "<br>peak tilt " +
-              fmt(p.peak_tilt_deg, 1) +
-              "°" +
-              "<br>rmse " +
-              fmt(p.rmse_position_m, 3) +
-              " m" +
-              "<br>" +
-              (p.success ? "success" : "FAIL")
-          );
+          ys.push(yPlot);
+          texts.push(hoverText(name, p, clipped ? "<br>(RMSE clipped for scale)" : ""));
           symbols.push(p.success ? "circle" : "x");
+          sizes.push(clipped ? 10 : 8);
         });
+      const col = ENVELOPE_SCHEME_COLORS[law] || "#aaa";
       return {
         x: xs,
         y: ys,
         text: texts,
         mode: "lines+markers",
-        name: law.toUpperCase(),
-        line: { color: colors[law] || "#aaa", width: 2 },
+        name: name,
+        line: {
+          color: col,
+          width: 2,
+          dash: (familyOf[law] || "") === "pid" ? "dash" : "solid",
+        },
         marker: {
-          size: 10,
-          color: colors[law] || "#aaa",
+          size: sizes,
+          color: col,
           symbol: symbols,
           line: { width: 1, color: "#111" },
         },
@@ -2352,40 +2583,182 @@
       };
     }
 
+    /**
+     * Tilt plot: only plot points inside a sane attitude window.
+     * Wild tumbles (naive/IMU) sit on a right-edge "off-scale" marker instead of
+     * stretching the x-axis to 10⁴°.
+     */
+    function seriesRmseVsTilt(law) {
+      const name = labelOf[law] || law;
+      const xs = [];
+      const ys = [];
+      const texts = [];
+      const symbols = [];
+      const sizes = [];
+      const xOff = [];
+      const yOff = [];
+      const tOff = [];
+      points
+        .filter(function (p) {
+          return p.law === law;
+        })
+        .sort(function (a, b) {
+          return (a.peak_tilt_deg || 0) - (b.peak_tilt_deg || 0);
+        })
+        .forEach(function (p) {
+          const tilt = p.peak_tilt_deg;
+          const y = p.rmse_position_m;
+          if (tilt == null || y == null) return;
+          if (!Number.isFinite(+tilt) || !Number.isFinite(+y) || +y <= 0) return;
+          const yPlot = Math.min(Math.max(+y, ENV_PLOT_RMSE_MIN_M), ENV_PLOT_RMSE_MAX_M);
+          const yClip = +y > ENV_PLOT_RMSE_MAX_M;
+          if (+tilt <= ENV_PLOT_TILT_MAX_DEG) {
+            xs.push(+tilt);
+            ys.push(yPlot);
+            texts.push(hoverText(name, p, yClip ? "<br>(RMSE clipped for scale)" : ""));
+            symbols.push(p.success ? "circle" : "x");
+            sizes.push(8);
+          } else {
+            // Park off-scale points at the right edge
+            xOff.push(ENV_PLOT_TILT_MAX_DEG);
+            yOff.push(yPlot);
+            tOff.push(
+              hoverText(name, p, "<br>(tilt off-scale: " + fmt(tilt, 0) + "° → parked at " + ENV_PLOT_TILT_MAX_DEG + "°)")
+            );
+          }
+        });
+      const col = ENVELOPE_SCHEME_COLORS[law] || "#aaa";
+      const traces = [
+        {
+          x: xs,
+          y: ys,
+          text: texts,
+          mode: "lines+markers",
+          name: name,
+          legendgroup: law,
+          line: {
+            color: col,
+            width: 2,
+            dash: (familyOf[law] || "") === "pid" ? "dash" : "solid",
+          },
+          marker: {
+            size: sizes,
+            color: col,
+            symbol: symbols,
+            line: { width: 1, color: "#111" },
+          },
+          hovertemplate: "%{text}<extra></extra>",
+        },
+      ];
+      if (xOff.length) {
+        traces.push({
+          x: xOff,
+          y: yOff,
+          text: tOff,
+          mode: "markers",
+          name: name + " (off-scale tilt)",
+          legendgroup: law,
+          showlegend: false,
+          marker: {
+            size: 11,
+            color: col,
+            symbol: "triangle-right",
+            line: { width: 1, color: "#111" },
+          },
+          hovertemplate: "%{text}<extra></extra>",
+        });
+      }
+      return traces;
+    }
+
+    // Tight τ range from data (avoid empty padding)
+    const tauVals = [];
+    points.forEach(function (p) {
+      if (activeSet[p.law] && p.time_scale != null && Number.isFinite(+p.time_scale)) {
+        tauVals.push(+p.time_scale);
+      }
+    });
+    const tauMin = tauVals.length ? Math.min.apply(null, tauVals) : 0.12;
+    const tauMax = tauVals.length ? Math.max.apply(null, tauVals) : 1.0;
+    const tauPad = 0.03 * (tauMax - tauMin || 1);
+
     const plotRmseVsTau = {
-      data: laws.map(function (law) {
-        return seriesFor(law, "time_scale", "rmse_position_m", 1);
-      }),
+      data: activeLaws.map(seriesRmseVsTau),
       layout: {
         ...plotTheme,
-        height: 360,
-        title: { text: "Position RMSE vs time scale τ (1 = portfolio path)", font: { size: 13 } },
-        xaxis: {
-          title: "τ (smaller = faster / more aggressive)",
-          gridcolor: "#2a2f36",
-          autorange: "reversed",
+        height: 380,
+        title: {
+          text: "Position RMSE vs τ  ·  y capped at " + ENV_PLOT_RMSE_MAX_M + " m (hover for true RMSE)",
+          font: { size: 12 },
         },
-        yaxis: { title: "RMSE position [m]", gridcolor: "#2a2f36", type: "log" },
-        legend: { orientation: "h" },
-        margin: { t: 48, r: 20, b: 48, l: 56 },
+        xaxis: {
+          title: "τ (smaller = faster)",
+          gridcolor: "#2a2f36",
+          range: [tauMax + tauPad, tauMin - tauPad], // reversed: gentle left → aggressive right
+          dtick: 0.1,
+        },
+        yaxis: {
+          title: "RMSE position [m]",
+          gridcolor: "#2a2f36",
+          type: "log",
+          range: [Math.log10(ENV_PLOT_RMSE_MIN_M), Math.log10(ENV_PLOT_RMSE_MAX_M)],
+        },
+        legend: {
+          orientation: "v",
+          x: 1.02,
+          y: 1,
+          font: { size: 9 },
+          bgcolor: "rgba(12,16,24,0.85)",
+          bordercolor: "#2a2f36",
+          borderwidth: 1,
+        },
+        margin: { t: 48, r: 160, b: 48, l: 56 },
       },
     };
 
+    const tiltTraces = [];
+    activeLaws.forEach(function (law) {
+      seriesRmseVsTilt(law).forEach(function (tr) {
+        tiltTraces.push(tr);
+      });
+    });
+
     const plotRmseVsTilt = {
-      data: laws.map(function (law) {
-        return seriesFor(law, "peak_tilt_deg", "rmse_position_m", 1);
-      }),
+      data: tiltTraces,
       layout: {
         ...plotTheme,
-        height: 360,
+        height: 380,
         title: {
-          text: "Position RMSE vs peak plant tilt (linearization distance)",
-          font: { size: 13 },
+          text:
+            "RMSE vs peak tilt  ·  x ≤ " +
+            ENV_PLOT_TILT_MAX_DEG +
+            "° (▶ = off-scale tumble) · y capped at " +
+            ENV_PLOT_RMSE_MAX_M +
+            " m",
+          font: { size: 12 },
         },
-        xaxis: { title: "Peak |φ| or |θ| [deg]", gridcolor: "#2a2f36" },
-        yaxis: { title: "RMSE position [m]", gridcolor: "#2a2f36", type: "log" },
-        legend: { orientation: "h" },
-        margin: { t: 48, r: 20, b: 48, l: 56 },
+        xaxis: {
+          title: "Peak plant tilt [deg]",
+          gridcolor: "#2a2f36",
+          range: [0, ENV_PLOT_TILT_MAX_DEG + 2],
+          dtick: 15,
+        },
+        yaxis: {
+          title: "RMSE position [m]",
+          gridcolor: "#2a2f36",
+          type: "log",
+          range: [Math.log10(ENV_PLOT_RMSE_MIN_M), Math.log10(ENV_PLOT_RMSE_MAX_M)],
+        },
+        legend: {
+          orientation: "v",
+          x: 1.02,
+          y: 1,
+          font: { size: 9 },
+          bgcolor: "rgba(12,16,24,0.85)",
+          bordercolor: "#2a2f36",
+          borderwidth: 1,
+        },
+        margin: { t: 48, r: 160, b: 48, l: 56 },
         shapes: [
           {
             type: "line",
@@ -2394,7 +2767,7 @@
             y0: 0,
             y1: 1,
             yref: "paper",
-            line: { color: "rgba(200,120,80,0.7)", width: 1, dash: "dot" },
+            line: { color: "rgba(200,120,80,0.75)", width: 1.5, dash: "dot" },
           },
         ],
         annotations: [
@@ -2402,7 +2775,7 @@
             x: 15,
             y: 1,
             yref: "paper",
-            text: "~15° small-angle ref",
+            text: "~15° small-angle",
             showarrow: false,
             xanchor: "left",
             font: { size: 10, color: "#c87850" },
@@ -2412,12 +2785,138 @@
     };
 
     const b = env.boundary || {};
-    const rows = points
-      .slice()
-      .sort(function (a, c) {
-        if (a.time_scale !== c.time_scale) return c.time_scale - a.time_scale;
-        return String(a.law).localeCompare(String(c.law));
+
+    function setFamilyPreset(fam) {
+      setFamilyFilter(fam);
+      if (fam === "all") return;
+      const next = {};
+      lawIds.forEach(function (id) {
+        next[id] = (familyOf[id] || "lqr") === fam;
       });
+      setVisible(next);
+    }
+
+    function toggleLaw(id) {
+      setVisible(function (prev) {
+        const next = Object.assign({}, prev);
+        next[id] = !prev[id];
+        return next;
+      });
+    }
+
+    function showAll() {
+      setFamilyFilter("all");
+      const next = {};
+      lawIds.forEach(function (id) {
+        next[id] = true;
+      });
+      setVisible(next);
+    }
+
+    // —— Boundary summary rows (all active schemes) ——
+    function sortToggle(cur, key) {
+      if (cur.key === key) return { key: key, dir: cur.dir === "asc" ? "desc" : "asc" };
+      return { key: key, dir: key === "scheme" || key === "family" ? "asc" : "desc" };
+    }
+
+    const boundaryRows = lawIds
+      .filter(function (id) {
+        return activeSet[id] && b[id];
+      })
+      .map(function (id) {
+        const bb = b[id] || {};
+        return {
+          id: id,
+          scheme: bb.label || labelOf[id] || id,
+          family: bb.family || familyOf[id] || "—",
+          last_ok: bb.last_success_time_scale,
+          first_fail: bb.first_fail_time_scale,
+          fail_tilt: bb.first_fail_peak_tilt_deg,
+          last_tilt: bb.last_success_peak_tilt_deg,
+        };
+      })
+      .sort(function (a, c) {
+        const k = boundSort.key;
+        const dir = boundSort.dir === "asc" ? 1 : -1;
+        let va = a[k];
+        let vc = c[k];
+        if (va == null && vc == null) return 0;
+        if (va == null) return 1;
+        if (vc == null) return -1;
+        if (typeof va === "string") return dir * String(va).localeCompare(String(vc));
+        return dir * (va - vc);
+      });
+
+    // —— Sweep table: filter + sort ——
+    const sweepRows = points
+      .filter(function (p) {
+        if (!activeSet[p.law]) return false;
+        if (sweepSuccess === "ok" && !p.success) return false;
+        if (sweepSuccess === "fail" && p.success) return false;
+        if (sweepQuery) {
+          const q = sweepQuery.toLowerCase();
+          const lab = (p.label || labelOf[p.law] || p.law || "").toLowerCase();
+          const fam = (p.family || familyOf[p.law] || "").toLowerCase();
+          if (lab.indexOf(q) < 0 && fam.indexOf(q) < 0 && String(p.law).indexOf(q) < 0) {
+            return false;
+          }
+        }
+        return true;
+      })
+      .map(function (p) {
+        return {
+          time_scale: p.time_scale,
+          scheme: p.label || labelOf[p.law] || String(p.law),
+          law: p.law,
+          family: p.family || familyOf[p.law] || "—",
+          success: !!p.success,
+          rmse_position_m: p.rmse_position_m,
+          max_position_error_m: p.max_position_error_m,
+          peak_tilt_deg: p.peak_tilt_deg,
+          peak_speed_m_s: p.peak_speed_m_s,
+        };
+      })
+      .sort(function (a, c) {
+        const k = sweepSort.key;
+        const dir = sweepSort.dir === "asc" ? 1 : -1;
+        let va = a[k];
+        let vc = c[k];
+        if (k === "success") {
+          va = a.success ? 1 : 0;
+          vc = c.success ? 1 : 0;
+        }
+        if (va == null && vc == null) return 0;
+        if (va == null) return 1;
+        if (vc == null) return -1;
+        if (typeof va === "string") return dir * String(va).localeCompare(String(vc));
+        return dir * (va - vc);
+      });
+
+    function thSortable(label, key, sortState, setSort) {
+      const active = sortState.key === key;
+      const arrow = active ? (sortState.dir === "asc" ? " ▲" : " ▼") : "";
+      return e(
+        "th",
+        {
+          key: key,
+          className: "sortable" + (active ? " sorted" : ""),
+          onClick: function () {
+            setSort(sortToggle(sortState, key));
+          },
+          title: "Sort by " + label,
+        },
+        label + arrow
+      );
+    }
+
+    function fmtMaybe(v, digits) {
+      if (v == null || !Number.isFinite(+v)) return "—";
+      const x = +v;
+      // Compact large failures
+      if (Math.abs(x) >= 1000) return x.toExponential(1);
+      if (Math.abs(x) >= 100) return x.toFixed(0);
+      return fmt(x, digits);
+    }
 
     return e(
       "div",
@@ -2425,83 +2924,273 @@
       e(
         "div",
         { className: "card" },
-        e("h2", null, env.title || "Linearization envelope"),
+        e("h2", null, env.title || "Tracking envelope"),
         e("p", null, env.description || ""),
         e(
+          "p",
+          { style: { color: "var(--muted)", fontSize: "0.9rem" } },
+          "Solid = LQR family · dashed = PID cascade. × = fail under shared bound (",
+          env.position_bound_m != null ? fmt(env.position_bound_m, 2) + " m" : "see studies",
+          "). Plots clip extreme fly-aways so the interesting regime stays readable."
+        ),
+        e(
           "div",
-          { className: "metric-grid" },
-          laws.map(function (law) {
-            const bb = b[law] || {};
+          { className: "row env-filters" },
+          e(
+            "button",
+            {
+              type: "button",
+              className: familyFilter === "all" ? "env-chip active" : "env-chip",
+              onClick: showAll,
+            },
+            "All schemes"
+          ),
+          e(
+            "button",
+            {
+              type: "button",
+              className: familyFilter === "lqr" ? "env-chip active" : "env-chip",
+              onClick: function () {
+                setFamilyPreset("lqr");
+              },
+            },
+            "LQR / LQG only"
+          ),
+          e(
+            "button",
+            {
+              type: "button",
+              className: familyFilter === "pid" ? "env-chip active" : "env-chip",
+              onClick: function () {
+                setFamilyPreset("pid");
+              },
+            },
+            "PID only"
+          )
+        ),
+        e(
+          "div",
+          { className: "env-scheme-toggles" },
+          lawIds.map(function (id) {
             return e(
-              "div",
-              { key: law, className: "metric" },
-              e("div", { className: "k" }, law.toUpperCase() + " last success τ"),
-              e("div", { className: "v" }, fmt(bb.last_success_time_scale, 2)),
+              "label",
+              {
+                key: id,
+                className: "env-scheme-toggle" + (visible[id] ? " on" : ""),
+                style: { borderColor: ENVELOPE_SCHEME_COLORS[id] || "var(--border)" },
+              },
+              e("input", {
+                type: "checkbox",
+                checked: !!visible[id],
+                onChange: function () {
+                  toggleLaw(id);
+                },
+              }),
               e(
-                "div",
-                { className: "k", style: { marginTop: "0.35rem" } },
-                "first fail τ / peak tilt"
+                "span",
+                {
+                  className: "env-swatch",
+                  style: { background: ENVELOPE_SCHEME_COLORS[id] || "#aaa" },
+                }
               ),
-              e(
-                "div",
-                { className: "v" },
-                (bb.first_fail_time_scale != null ? fmt(bb.first_fail_time_scale, 2) : "—") +
-                  " / " +
-                  (bb.first_fail_peak_tilt_deg != null
-                    ? fmt(bb.first_fail_peak_tilt_deg, 1) + "°"
-                    : "—")
-              )
+              labelOf[id] || id
             );
           })
         ),
-        (env.notes || []).map(function (n, i) {
-          return e("p", { key: i, style: { color: "var(--muted)", fontSize: "0.9rem" } }, "• " + n);
+        (env.notes || []).slice(0, 3).map(function (n, i) {
+          return e("p", { key: i, style: { color: "var(--muted)", fontSize: "0.85rem", margin: "0.25rem 0" } }, "• " + n);
         })
       ),
-      e("div", { className: "card" }, e(PlotDiv, { id: "env-rmse-tau", ...plotRmseVsTau })),
-      e("div", { className: "card" }, e(PlotDiv, { id: "env-rmse-tilt", ...plotRmseVsTilt })),
+
+      // Boundary summary table
       e(
         "div",
         { className: "card" },
-        e("h3", null, "Sweep table"),
+        e("h3", null, "Breakdown by scheme"),
+        e(
+          "p",
+          { style: { color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 } },
+          "Last τ that still passes the shared bound, then first failing τ. Click column headers to sort. Follows the scheme filters above."
+        ),
         e(
           "div",
-          { className: "table-wrap" },
+          { className: "table-wrap data-table-wrap" },
           e(
             "table",
-            { className: "metrics" },
+            { className: "metrics data-table" },
             e(
               "thead",
               null,
               e(
                 "tr",
                 null,
-                ["τ", "law", "success", "RMSE pos [m]", "max pos [m]", "peak tilt [°]", "peak v [m/s]"].map(
-                  function (h) {
-                    return e("th", { key: h }, h);
-                  }
-                )
+                thSortable("Scheme", "scheme", boundSort, setBoundSort),
+                thSortable("Family", "family", boundSort, setBoundSort),
+                thSortable("Last ok τ", "last_ok", boundSort, setBoundSort),
+                thSortable("First fail τ", "first_fail", boundSort, setBoundSort),
+                thSortable("Tilt @ fail [°]", "fail_tilt", boundSort, setBoundSort),
+                thSortable("Tilt @ last ok [°]", "last_tilt", boundSort, setBoundSort)
               )
             ),
             e(
               "tbody",
               null,
-              rows.map(function (p, i) {
-                return e(
-                  "tr",
-                  {
-                    key: i,
-                    style: p.success ? undefined : { color: "#e07070" },
-                  },
-                  e("td", null, fmt(p.time_scale, 2)),
-                  e("td", null, String(p.law).toUpperCase()),
-                  e("td", null, p.success ? "yes" : "no"),
-                  e("td", null, fmt(p.rmse_position_m, 4)),
-                  e("td", null, fmt(p.max_position_error_m, 3)),
-                  e("td", null, fmt(p.peak_tilt_deg, 1)),
-                  e("td", null, fmt(p.peak_speed_m_s, 2))
-                );
-              })
+              boundaryRows.length
+                ? boundaryRows.map(function (r) {
+                    const neverOk = r.last_ok == null;
+                    return e(
+                      "tr",
+                      {
+                        key: r.id,
+                        className: neverOk ? "row-fail" : "",
+                      },
+                      e(
+                        "td",
+                        null,
+                        e("span", {
+                          className: "env-swatch inline",
+                          style: { background: ENVELOPE_SCHEME_COLORS[r.id] || "#aaa" },
+                        }),
+                        " ",
+                        r.scheme
+                      ),
+                      e("td", null, r.family),
+                      e("td", { className: "num" }, fmtMaybe(r.last_ok, 2)),
+                      e("td", { className: "num" }, fmtMaybe(r.first_fail, 2)),
+                      e("td", { className: "num" }, fmtMaybe(r.fail_tilt, 1)),
+                      e("td", { className: "num" }, fmtMaybe(r.last_tilt, 1))
+                    );
+                  })
+                : e("tr", null, e("td", { colSpan: 6 }, "No schemes selected."))
+            )
+          )
+        )
+      ),
+
+      e(
+        "div",
+        { className: "card plot-card" },
+        e(PlotDiv, {
+          id: "env-rmse-tau-" + activeLaws.join("_").slice(0, 48),
+          data: plotRmseVsTau.data,
+          layout: plotRmseVsTau.layout,
+        })
+      ),
+      e(
+        "div",
+        { className: "card plot-card" },
+        e(PlotDiv, {
+          id: "env-rmse-tilt-" + activeLaws.join("_").slice(0, 48),
+          data: plotRmseVsTilt.data,
+          layout: plotRmseVsTilt.layout,
+        })
+      ),
+
+      // Interactive sweep table
+      e(
+        "div",
+        { className: "card" },
+        e("h3", null, "Sweep table"),
+        e(
+          "div",
+          { className: "row data-table-toolbar" },
+          e(
+            "label",
+            { className: "toolbar-field" },
+            e("span", null, "Success"),
+            e(
+              "select",
+              {
+                value: sweepSuccess,
+                onChange: function (ev) {
+                  setSweepSuccess(ev.target.value);
+                },
+              },
+              e("option", { value: "all" }, "All"),
+              e("option", { value: "ok" }, "Pass only"),
+              e("option", { value: "fail" }, "Fail only")
+            )
+          ),
+          e(
+            "label",
+            { className: "toolbar-field grow" },
+            e("span", null, "Search"),
+            e("input", {
+              type: "search",
+              placeholder: "scheme or family…",
+              value: sweepQuery,
+              onChange: function (ev) {
+                setSweepQuery(ev.target.value);
+              },
+            })
+          ),
+          e(
+            "span",
+            { className: "toolbar-count" },
+            sweepRows.length,
+            " / ",
+            points.filter(function (p) {
+              return activeSet[p.law];
+            }).length,
+            " rows"
+          )
+        ),
+        e(
+          "div",
+          { className: "table-wrap data-table-wrap scroll-y" },
+          e(
+            "table",
+            { className: "metrics data-table sticky-head" },
+            e(
+              "thead",
+              null,
+              e(
+                "tr",
+                null,
+                thSortable("τ", "time_scale", sweepSort, setSweepSort),
+                thSortable("Scheme", "scheme", sweepSort, setSweepSort),
+                thSortable("Family", "family", sweepSort, setSweepSort),
+                thSortable("OK", "success", sweepSort, setSweepSort),
+                thSortable("RMSE [m]", "rmse_position_m", sweepSort, setSweepSort),
+                thSortable("max |e| [m]", "max_position_error_m", sweepSort, setSweepSort),
+                thSortable("Tilt [°]", "peak_tilt_deg", sweepSort, setSweepSort),
+                thSortable("v [m/s]", "peak_speed_m_s", sweepSort, setSweepSort)
+              )
+            ),
+            e(
+              "tbody",
+              null,
+              sweepRows.length
+                ? sweepRows.map(function (p, i) {
+                    return e(
+                      "tr",
+                      {
+                        key: p.law + "-" + p.time_scale + "-" + i,
+                        className: p.success ? "" : "row-fail",
+                      },
+                      e("td", { className: "num" }, fmtMaybe(p.time_scale, 2)),
+                      e("td", null, p.scheme),
+                      e("td", null, p.family),
+                      e(
+                        "td",
+                        null,
+                        e(
+                          "span",
+                          { className: p.success ? "pill ok" : "pill fail" },
+                          p.success ? "pass" : "fail"
+                        )
+                      ),
+                      e("td", { className: "num" }, fmtMaybe(p.rmse_position_m, 4)),
+                      e("td", { className: "num" }, fmtMaybe(p.max_position_error_m, 3)),
+                      e("td", { className: "num" }, fmtMaybe(p.peak_tilt_deg, 1)),
+                      e("td", { className: "num" }, fmtMaybe(p.peak_speed_m_s, 2))
+                    );
+                  })
+                : e(
+                    "tr",
+                    null,
+                    e("td", { colSpan: 8, style: { color: "var(--muted)" } }, "No rows match filters.")
+                  )
             )
           )
         )
@@ -2514,6 +3203,7 @@
     const [err, setErr] = useState(null);
     const [tab, setTab] = useState("overview");
     const [runId, setRunId] = useState(null);
+    const [missionId, setMissionId] = useState(null);
 
     useEffect(() => {
       fetch("./data/showcase.json")
@@ -2523,15 +3213,37 @@
         })
         .then((j) => {
           setDoc(j);
+          const mid =
+            (j.ui && j.ui.default_mission) ||
+            (j.missions && j.missions[0] && j.missions[0].id) ||
+            null;
+          setMissionId(mid);
           setRunId((j.ui && j.ui.default_run) || (j.runs && j.runs[0] && j.runs[0].id));
         })
         .catch((ex) => setErr(String(ex)));
     }, []);
 
+    function selectMission(nextMid) {
+      setMissionId(nextMid);
+      if (!doc) return;
+      const m = getMission(doc, nextMid);
+      if (m && m.default_run) {
+        setRunId(m.default_run);
+        return;
+      }
+      const runs = runsForMission(doc, nextMid);
+      if (runs.length) setRunId(runs[0].id);
+    }
+
     const run = useMemo(() => {
       if (!doc || !runId) return null;
       return (doc.runs || []).find((r) => r.id === runId) || doc.runs[0];
     }, [doc, runId]);
+
+    const missionRuns = useMemo(() => {
+      if (!doc) return [];
+      return runsForMission(doc, missionId);
+    }, [doc, missionId]);
 
     if (err) {
       return e(
@@ -2559,11 +3271,24 @@
       ["compare", "Compare"],
     ];
 
+    const runOptions = missionRuns.length ? missionRuns : doc.runs;
+
     let body;
-    if (tab === "overview") body = e(Overview, { doc, onSelect: (id) => { setRunId(id); setTab("flight"); } });
+    if (tab === "overview")
+      body = e(Overview, {
+        doc,
+        missionId,
+        onMissionChange: selectMission,
+        onSelect: (id) => {
+          setRunId(id);
+          setTab("flight");
+        },
+      });
     else if (tab === "estimation")
       body = e(EstimationTab, {
         doc,
+        missionId,
+        onMissionChange: selectMission,
         onSelectRun: (id) => {
           setRunId(id);
           setTab("flight");
@@ -2576,11 +3301,16 @@
         e(
           "div",
           { className: "row" },
+          e(MissionSelector, {
+            doc: doc,
+            missionId: missionId,
+            onChange: selectMission,
+          }),
           e("label", null, "Run "),
           e(
             "select",
             { value: run.id, onChange: (ev) => setRunId(ev.target.value) },
-            doc.runs.map((r) => e("option", { key: r.id, value: r.id }, r.label))
+            runOptions.map((r) => e("option", { key: r.id, value: r.id }, r.label))
           )
         ),
         e(FlightTab, { run })
@@ -2592,19 +3322,55 @@
         e(
           "div",
           { className: "row" },
+          e(MissionSelector, {
+            doc: doc,
+            missionId: missionId,
+            onChange: selectMission,
+          }),
           e(
             "select",
             { value: run.id, onChange: (ev) => setRunId(ev.target.value) },
-            doc.runs.map((r) => e("option", { key: r.id, value: r.id }, r.label))
+            runOptions.map((r) => e("option", { key: r.id, value: r.id }, r.label))
           )
         ),
         e(MetricsTab, { run })
       );
     else if (tab === "monte_carlo") {
-      const mcRun = doc.runs.find((r) => r.mc) || run;
-      body = e(McTab, { run: mcRun });
+      const mission = getMission(doc, missionId);
+      const mcPreferred =
+        (mission &&
+          mission.mc_run_id &&
+          doc.runs.find(function (r) {
+            return r.id === mission.mc_run_id && r.mc;
+          })) ||
+        runOptions.find(function (r) {
+          return r.mc;
+        }) ||
+        doc.runs.find(function (r) {
+          return r.mc;
+        }) ||
+        run;
+      body = e(
+        "div",
+        null,
+        e(
+          "div",
+          { className: "row" },
+          e(MissionSelector, {
+            doc: doc,
+            missionId: missionId,
+            onChange: selectMission,
+          })
+        ),
+        e(McTab, { run: mcPreferred })
+      );
     } else if (tab === "envelope") body = e(EnvelopeTab, { doc });
-    else if (tab === "compare") body = e(CompareTab, { doc });
+    else if (tab === "compare")
+      body = e(CompareTab, {
+        doc,
+        missionId,
+        onMissionChange: selectMission,
+      });
 
     return e(
       "div",
@@ -2616,12 +3382,22 @@
         e("p", { className: "tagline" }, doc.description || ""),
         e(
           "div",
-          { className: "meta" },
-          "v",
-          doc.uavsim_version || "?",
-          doc.generated_at
-            ? " · " + String(doc.generated_at).slice(0, 10)
-            : ""
+          { className: "header-controls" },
+          e(MissionSelector, {
+            doc: doc,
+            missionId: missionId,
+            onChange: selectMission,
+            className: "header-mission",
+          }),
+          e(
+            "div",
+            { className: "meta" },
+            "v",
+            doc.uavsim_version || "?",
+            doc.generated_at
+              ? " · " + String(doc.generated_at).slice(0, 10)
+              : ""
+          )
         )
       ),
       e(

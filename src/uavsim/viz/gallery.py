@@ -18,6 +18,7 @@ GALLERY_SCHEMA = 1
 
 # Portfolio base case — controller × sensor estimation matrix + MC
 # (relative study path, gallery id, role)
+# Roles are shared across missions so the teaching matrix can rebind run_ids.
 BASE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
     # LQR / LQG row
     ("configs/studies/figure_eight.yaml", "figure_eight_lqr", "ideal_lqr"),
@@ -80,6 +81,102 @@ BASE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
     ),
 )
 
+# Near-envelope twin matrix (τ★ + scheduled yaw) — same roles, edge_ run ids
+EDGE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
+    ("configs/studies/edge_figure_eight.yaml", "edge_figure_eight_lqr", "ideal_lqr"),
+    (
+        "configs/studies/edge_gps_imu_naive.yaml",
+        "edge_gps_imu_naive",
+        "est_gps_imu_naive",
+    ),
+    (
+        "configs/studies/edge_gps_imu_lqg.yaml",
+        "edge_gps_imu_lqg",
+        "est_gps_imu_lqg",
+    ),
+    ("configs/studies/edge_ahrs_lqg.yaml", "edge_ahrs_lqg", "est_ahrs_lqg"),
+    (
+        "configs/studies/edge_flow_alt_lqg.yaml",
+        "edge_flow_alt_lqg",
+        "est_flow_alt_lqg",
+    ),
+    (
+        "configs/studies/edge_imu_only_lqg.yaml",
+        "edge_imu_only_lqg",
+        "est_imu_only_lqg",
+    ),
+    (
+        "configs/studies/edge_figure_eight_pid.yaml",
+        "edge_figure_eight_pid",
+        "ideal_pid",
+    ),
+    (
+        "configs/studies/edge_gps_imu_naive_pid.yaml",
+        "edge_gps_imu_naive_pid",
+        "est_gps_imu_naive_pid",
+    ),
+    (
+        "configs/studies/edge_gps_imu_kf_pid.yaml",
+        "edge_gps_imu_kf_pid",
+        "est_gps_imu_kf_pid",
+    ),
+    (
+        "configs/studies/edge_ahrs_kf_pid.yaml",
+        "edge_ahrs_kf_pid",
+        "est_ahrs_kf_pid",
+    ),
+    (
+        "configs/studies/edge_flow_alt_kf_pid.yaml",
+        "edge_flow_alt_kf_pid",
+        "est_flow_alt_kf_pid",
+    ),
+    (
+        "configs/studies/edge_imu_only_kf_pid.yaml",
+        "edge_imu_only_kf_pid",
+        "est_imu_only_kf_pid",
+    ),
+    (
+        "configs/studies/edge_gps_imu_lqg_mc.yaml",
+        "edge_gps_imu_lqg_mc",
+        "monte_carlo",
+    ),
+)
+
+MISSION_BASELINE = "baseline"
+MISSION_ENVELOPE_EDGE = "envelope_edge"
+
+_BASELINE_LABELS: dict[str, str] = {
+    "figure_eight_lqr": "Ideal LQR (full state)",
+    "gps_imu_naive": "GPS+IMU naive → LQR",
+    "gps_imu_lqg": "GPS+IMU LQG",
+    "ahrs_lqg": "AHRS LQG",
+    "flow_alt_lqg": "Flow+alt LQG",
+    "imu_only_lqg": "IMU-only LQG",
+    "figure_eight_pid": "Ideal PID (full state)",
+    "gps_imu_naive_pid": "GPS+IMU naive → PID",
+    "gps_imu_kf_pid": "GPS+IMU KF → PID",
+    "ahrs_kf_pid": "AHRS KF → PID",
+    "flow_alt_kf_pid": "Flow+alt KF → PID",
+    "imu_only_kf_pid": "IMU-only KF → PID",
+    "gps_imu_lqg_mc": "GPS+IMU LQG Monte Carlo",
+}
+
+_EDGE_LABELS: dict[str, str] = {
+    "edge_figure_eight_lqr": "Ideal LQR · edge",
+    "edge_gps_imu_naive": "GPS+IMU naive → LQR · edge",
+    "edge_gps_imu_lqg": "GPS+IMU LQG · edge",
+    "edge_ahrs_lqg": "AHRS LQG · edge",
+    "edge_flow_alt_lqg": "Flow+alt LQG · edge",
+    "edge_imu_only_lqg": "IMU-only LQG · edge",
+    "edge_figure_eight_pid": "Ideal PID · edge",
+    "edge_gps_imu_naive_pid": "GPS+IMU naive → PID · edge",
+    "edge_gps_imu_kf_pid": "GPS+IMU KF → PID · edge",
+    "edge_ahrs_kf_pid": "AHRS KF → PID · edge",
+    "edge_flow_alt_kf_pid": "Flow+alt KF → PID · edge",
+    "edge_imu_only_kf_pid": "IMU-only KF → PID · edge",
+    "edge_gps_imu_lqg_mc": "GPS+IMU LQG MC · edge",
+}
+
 # Browser payload cap (full n_trials still reported in mc.n_trials / summary)
 MC_TRIALS_IN_GALLERY = 400
 
@@ -113,17 +210,53 @@ _EST_COLUMNS: list[dict[str, str]] = [
     },
 ]
 
-# Teaching matrix: same figure-eight; rows = control law family, cols = sensors
+
+def _scenario(
+    *,
+    sid: str,
+    column: str,
+    controller: str,
+    label: str,
+    sensors: str,
+    method: str,
+    role: str,
+    run_baseline: str,
+    run_edge: str,
+    lesson: str,
+) -> dict[str, Any]:
+    return {
+        "id": sid,
+        "column": column,
+        "controller": controller,
+        "label": label,
+        "sensors": sensors,
+        "method": method,
+        "role": role,
+        # Backward-compatible default (baseline); UI prefers run_id_by_mission
+        "run_id": run_baseline,
+        "run_id_by_mission": {
+            MISSION_BASELINE: run_baseline,
+            MISSION_ENVELOPE_EDGE: run_edge,
+        },
+        "lesson": lesson,
+    }
+
+
+# Teaching matrix: rows = control law family, cols = sensors.
+# Run ids rebind per mission (baseline vs envelope_edge).
 ESTIMATION_MATRIX: dict[str, Any] = {
     "title": "Controller × sensor teaching matrix",
     "description": (
-        "Same elevated figure-eight for every cell. "
+        "Same controller × sensor layout on every mission (see Mission selector). "
+        "Baseline: calm constant-yaw figure-eight. "
+        "Envelope edge: τ★≈0.28 time scale + scheduled yaw — plant stress near "
+        "hover-LQR linearization limits. "
         "Rows: hover LQR (with KF = classic LQG) vs PID cascade. "
         "Columns: full-state ideal, GPS+IMU naive, GPS+IMU + KF, AHRS-like (att+ω), "
         "optical-flow proxy + altitude + gyro (body_vel+alt+ω), IMU-only (ω). "
         "KF uses the hover linear model; it does not invent GPS. "
         "Flow+alt is the practical GPS-denied win over AHRS/IMU-only. "
-        "Compare laws down a column — not only ideal LQR vs PID."
+        "Compare laws down a column — and missions via the selector."
     ),
     "columns": _EST_COLUMNS,
     "rows": [
@@ -132,139 +265,181 @@ ESTIMATION_MATRIX: dict[str, Any] = {
     ],
     "scenarios": [
         # —— LQR row ——
-        {
-            "id": "ideal_lqr",
-            "column": "ideal",
-            "controller": "lqr",
-            "label": "Ideal LQR",
-            "sensors": "x_true (no noise)",
-            "method": "LQR",
-            "run_id": "figure_eight_lqr",
-            "lesson": "Upper bound when the plant is fully observed.",
-        },
-        {
-            "id": "gps_imu_naive_lqr",
-            "column": "gps_imu_naive",
-            "controller": "lqr",
-            "label": "GPS+IMU naive → LQR",
-            "sensors": "pos + omega (noisy)",
-            "method": "partial_raw → LQR",
-            "run_id": "gps_imu_naive",
-            "lesson": "Incomplete bus (zeros for att/vel) breaks hover LQR.",
-        },
-        {
-            "id": "gps_imu_lqg",
-            "column": "gps_imu_filter",
-            "controller": "lqr",
-            "label": "GPS+IMU LQG",
-            "sensors": "pos + omega (noisy)",
-            "method": "linear_kf → LQR",
-            "run_id": "gps_imu_lqg",
-            "lesson": "State reconstruction + noise rejection recovers tracking.",
-        },
-        {
-            "id": "ahrs_lqg",
-            "column": "ahrs",
-            "controller": "lqr",
-            "label": "AHRS LQG",
-            "sensors": "att + omega (noisy)",
-            "method": "linear_kf → LQR",
-            "run_id": "ahrs_lqg",
-            "lesson": (
+        _scenario(
+            sid="ideal_lqr",
+            column="ideal",
+            controller="lqr",
+            label="Ideal LQR",
+            sensors="x_true (no noise)",
+            method="LQR",
+            role="ideal_lqr",
+            run_baseline="figure_eight_lqr",
+            run_edge="edge_figure_eight_lqr",
+            lesson="Upper bound when the plant is fully observed.",
+        ),
+        _scenario(
+            sid="gps_imu_naive_lqr",
+            column="gps_imu_naive",
+            controller="lqr",
+            label="GPS+IMU naive → LQR",
+            sensors="pos + omega (noisy)",
+            method="partial_raw → LQR",
+            role="est_gps_imu_naive",
+            run_baseline="gps_imu_naive",
+            run_edge="edge_gps_imu_naive",
+            lesson="Incomplete bus (zeros for att/vel) breaks hover LQR.",
+        ),
+        _scenario(
+            sid="gps_imu_lqg",
+            column="gps_imu_filter",
+            controller="lqr",
+            label="GPS+IMU LQG",
+            sensors="pos + omega (noisy)",
+            method="linear_kf → LQR",
+            role="est_gps_imu_lqg",
+            run_baseline="gps_imu_lqg",
+            run_edge="edge_gps_imu_lqg",
+            lesson="State reconstruction + noise rejection recovers tracking.",
+        ),
+        _scenario(
+            sid="ahrs_lqg",
+            column="ahrs",
+            controller="lqr",
+            label="AHRS LQG",
+            sensors="att + omega (noisy)",
+            method="linear_kf → LQR",
+            role="est_ahrs_lqg",
+            run_baseline="ahrs_lqg",
+            run_edge="edge_ahrs_lqg",
+            lesson=(
                 "No GPS: attitude+rates keep the vehicle finite, but multi-meter path "
                 "error fails tracking success (3× bound). Not a navigable GPS-denied story."
             ),
-        },
-        {
-            "id": "flow_alt_lqg",
-            "column": "flow_alt",
-            "controller": "lqr",
-            "label": "Flow+alt LQG",
-            "sensors": "body_vel + alt + omega",
-            "method": "linear_kf → LQR",
-            "run_id": "flow_alt_lqg",
-            "lesson": (
+        ),
+        _scenario(
+            sid="flow_alt_lqg",
+            column="flow_alt",
+            controller="lqr",
+            label="Flow+alt LQG",
+            sensors="body_vel + alt + omega",
+            method="linear_kf → LQR",
+            role="est_flow_alt_lqg",
+            run_baseline="flow_alt_lqg",
+            run_edge="edge_flow_alt_lqg",
+            lesson=(
                 "Practical GPS-denied teaching stack: body-velocity proxy "
                 "(optical-flow stand-in; KF H is hover-linear) + altitude + gyro. "
                 "LQG here = linear KF + hover LQR on x_hat — not classical LQG design."
             ),
-        },
-        {
-            "id": "imu_only_lqg",
-            "column": "imu_only",
-            "controller": "lqr",
-            "label": "IMU-only LQG",
-            "sensors": "omega only (noisy)",
-            "method": "linear_kf → LQR",
-            "run_id": "imu_only_lqg",
-            "lesson": (
+        ),
+        _scenario(
+            sid="imu_only_lqg",
+            column="imu_only",
+            controller="lqr",
+            label="IMU-only LQG",
+            sensors="omega only (noisy)",
+            method="linear_kf → LQR",
+            role="est_imu_only_lqg",
+            run_baseline="imu_only_lqg",
+            run_edge="edge_imu_only_lqg",
+            lesson=(
                 "Honesty case: rates alone do not observe position; "
                 "filter cannot invent GPS — soft failure / drift."
             ),
-        },
+        ),
         # —— PID row ——
-        {
-            "id": "ideal_pid",
-            "column": "ideal",
-            "controller": "pid",
-            "label": "Ideal PID",
-            "sensors": "x_true (no noise)",
-            "method": "PID cascade",
-            "run_id": "figure_eight_pid",
-            "lesson": "Full-state PID on the same path (second controller baseline).",
-        },
-        {
-            "id": "gps_imu_naive_pid",
-            "column": "gps_imu_naive",
-            "controller": "pid",
-            "label": "GPS+IMU naive → PID",
-            "sensors": "pos + omega (noisy)",
-            "method": "partial_raw → PID",
-            "run_id": "gps_imu_naive_pid",
-            "lesson": "Same incomplete bus as LQR naive — cascade also suffers zeros.",
-        },
-        {
-            "id": "gps_imu_kf_pid",
-            "column": "gps_imu_filter",
-            "controller": "pid",
-            "label": "GPS+IMU KF → PID",
-            "sensors": "pos + omega (noisy)",
-            "method": "linear_kf → PID",
-            "run_id": "gps_imu_kf_pid",
-            "lesson": "KF feeds x_hat to PID (not LQG; law is cascade, not K).",
-        },
-        {
-            "id": "ahrs_kf_pid",
-            "column": "ahrs",
-            "controller": "pid",
-            "label": "AHRS KF → PID",
-            "sensors": "att + omega (noisy)",
-            "method": "linear_kf → PID",
-            "run_id": "ahrs_kf_pid",
-            "lesson": "GPS-denied with attitude reference; compare RMSE to AHRS LQG.",
-        },
-        {
-            "id": "flow_alt_kf_pid",
-            "column": "flow_alt",
-            "controller": "pid",
-            "label": "Flow+alt KF → PID",
-            "sensors": "body_vel + alt + omega",
-            "method": "linear_kf → PID",
-            "run_id": "flow_alt_kf_pid",
-            "lesson": "Same flow+alt sensors as LQG column; cascade on x_hat.",
-        },
-        {
-            "id": "imu_only_kf_pid",
-            "column": "imu_only",
-            "controller": "pid",
-            "label": "IMU-only KF → PID",
-            "sensors": "omega only (noisy)",
-            "method": "linear_kf → PID",
-            "run_id": "imu_only_kf_pid",
-            "lesson": "Same observability wall as LQG: rates alone cannot hold position.",
-        },
+        _scenario(
+            sid="ideal_pid",
+            column="ideal",
+            controller="pid",
+            label="Ideal PID",
+            sensors="x_true (no noise)",
+            method="PID cascade",
+            role="ideal_pid",
+            run_baseline="figure_eight_pid",
+            run_edge="edge_figure_eight_pid",
+            lesson="Full-state PID on the same path (second controller baseline).",
+        ),
+        _scenario(
+            sid="gps_imu_naive_pid",
+            column="gps_imu_naive",
+            controller="pid",
+            label="GPS+IMU naive → PID",
+            sensors="pos + omega (noisy)",
+            method="partial_raw → PID",
+            role="est_gps_imu_naive_pid",
+            run_baseline="gps_imu_naive_pid",
+            run_edge="edge_gps_imu_naive_pid",
+            lesson="Same incomplete bus as LQR naive — cascade also suffers zeros.",
+        ),
+        _scenario(
+            sid="gps_imu_kf_pid",
+            column="gps_imu_filter",
+            controller="pid",
+            label="GPS+IMU KF → PID",
+            sensors="pos + omega (noisy)",
+            method="linear_kf → PID",
+            role="est_gps_imu_kf_pid",
+            run_baseline="gps_imu_kf_pid",
+            run_edge="edge_gps_imu_kf_pid",
+            lesson="KF feeds x_hat to PID (not LQG; law is cascade, not K).",
+        ),
+        _scenario(
+            sid="ahrs_kf_pid",
+            column="ahrs",
+            controller="pid",
+            label="AHRS KF → PID",
+            sensors="att + omega (noisy)",
+            method="linear_kf → PID",
+            role="est_ahrs_kf_pid",
+            run_baseline="ahrs_kf_pid",
+            run_edge="edge_ahrs_kf_pid",
+            lesson="GPS-denied with attitude reference; compare RMSE to AHRS LQG.",
+        ),
+        _scenario(
+            sid="flow_alt_kf_pid",
+            column="flow_alt",
+            controller="pid",
+            label="Flow+alt KF → PID",
+            sensors="body_vel + alt + omega",
+            method="linear_kf → PID",
+            role="est_flow_alt_kf_pid",
+            run_baseline="flow_alt_kf_pid",
+            run_edge="edge_flow_alt_kf_pid",
+            lesson="Same flow+alt sensors as LQG column; cascade on x_hat.",
+        ),
+        _scenario(
+            sid="imu_only_kf_pid",
+            column="imu_only",
+            controller="pid",
+            label="IMU-only KF → PID",
+            sensors="omega only (noisy)",
+            method="linear_kf → PID",
+            role="est_imu_only_kf_pid",
+            run_baseline="imu_only_kf_pid",
+            run_edge="edge_imu_only_kf_pid",
+            lesson="Same observability wall as LQG: rates alone cannot hold position.",
+        ),
     ],
 }
+
+
+def _metrics_slice(m: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "rmse_position_m": m.get("rmse_position_m"),
+        "max_position_error_m": m.get("max_position_error_m"),
+        "time_in_bounds_frac": m.get("time_in_bounds_frac"),
+        "position_bound_m": m.get("position_bound_m"),
+        "success": m.get("success"),
+        "success_pos_limit_m": m.get("success_pos_limit_m"),
+        "observer_id": m.get("observer_id"),
+        "peak_tilt_deg": (
+            float(m["peak_tilt_rad"]) * 180.0 / 3.141592653589793
+            if m.get("peak_tilt_rad") is not None
+            else None
+        ),
+        "rmse_attitude_rad": m.get("rmse_attitude_rad"),
+    }
 
 
 def _downsample(n: int, max_points: int) -> np.ndarray:
@@ -279,6 +454,7 @@ def run_to_gallery_entry(
     gallery_id: str | None = None,
     label: str | None = None,
     role: str = "run",
+    mission_id: str | None = None,
     max_points: int = 160,
 ) -> dict[str, Any]:
     """Serialize one run dir to JSON-friendly dict (downsampled timeseries)."""
@@ -288,6 +464,7 @@ def run_to_gallery_entry(
         "id": gid,
         "label": label or art.study_id,
         "role": role,
+        "mission_id": mission_id,
         "study_id": art.study_id,
         "source_run": str(Path(run_dir).name),
         "metrics": art.metrics,
@@ -357,6 +534,8 @@ def build_gallery_document(
     compare_ids: tuple[str, str] | None = None,
     envelope: dict[str, Any] | None = None,
     estimation_matrix: dict[str, Any] | None = None,
+    missions: list[dict[str, Any]] | None = None,
+    default_mission: str | None = None,
 ) -> dict[str, Any]:
     """Assemble top-level showcase.json document."""
     by_id = {r["id"]: r for r in runs}
@@ -376,36 +555,50 @@ def build_gallery_document(
                 "deltas": deltas,
             }
 
-    # Attach metrics into estimation matrix rows when present
+    # Attach metrics into estimation matrix rows (baseline + per-mission map)
     est = None
     if estimation_matrix is not None:
         est = dict(estimation_matrix)
         scenarios = []
         for sc in estimation_matrix.get("scenarios") or []:
             row = dict(sc)
-            rid = row.get("run_id")
-            if rid and rid in by_id:
-                m = by_id[rid].get("metrics") or {}
-                row["metrics"] = {
-                    "rmse_position_m": m.get("rmse_position_m"),
-                    "max_position_error_m": m.get("max_position_error_m"),
-                    "time_in_bounds_frac": m.get("time_in_bounds_frac"),
-                    "position_bound_m": m.get("position_bound_m"),
-                    "success": m.get("success"),
-                    "success_pos_limit_m": m.get("success_pos_limit_m"),
-                    "observer_id": m.get("observer_id"),
-                    "peak_tilt_deg": (
-                        float(m["peak_tilt_rad"]) * 180.0 / 3.141592653589793
-                        if m.get("peak_tilt_rad") is not None
-                        else None
-                    ),
-                }
+            rid_map = dict(row.get("run_id_by_mission") or {})
+            if not rid_map and row.get("run_id"):
+                rid_map = {MISSION_BASELINE: row["run_id"]}
+            metrics_by_mission: dict[str, Any] = {}
+            for mid, rid in rid_map.items():
+                if rid and rid in by_id:
+                    metrics_by_mission[mid] = _metrics_slice(by_id[rid].get("metrics") or {})
+            row["run_id_by_mission"] = rid_map
+            row["metrics_by_mission"] = metrics_by_mission
+            # Default metrics = baseline (or first available) for older UI paths
+            default_rid = rid_map.get(MISSION_BASELINE) or row.get("run_id")
+            if default_rid and default_rid in by_id:
+                row["metrics"] = _metrics_slice(by_id[default_rid].get("metrics") or {})
+                row["run_id"] = default_rid
+            elif metrics_by_mission:
+                first_mid = next(iter(metrics_by_mission))
+                row["metrics"] = metrics_by_mission[first_mid]
+                row["run_id"] = rid_map.get(first_mid)
             scenarios.append(row)
         est["scenarios"] = scenarios
 
     tabs = ["overview", "estimation", "flight", "metrics", "monte_carlo", "compare"]
     if envelope is not None:
         tabs.append("envelope")
+
+    mission_list = list(missions or [])
+    default_mid = default_mission
+    if default_mid is None and mission_list:
+        default_mid = mission_list[0]["id"]
+    default_run = None
+    if mission_list and default_mid:
+        for m in mission_list:
+            if m.get("id") == default_mid:
+                default_run = m.get("default_run")
+                break
+    if default_run is None:
+        default_run = runs[0]["id"] if runs else None
 
     return {
         "schema_version": GALLERY_SCHEMA,
@@ -414,11 +607,13 @@ def build_gallery_document(
         "generated_at": datetime.now(UTC).isoformat(),
         "uavsim_version": __version__,
         "runs": runs,
+        "missions": mission_list,
         "compare": compare,
         "envelope": envelope,
         "estimation_matrix": est,
         "ui": {
-            "default_run": runs[0]["id"] if runs else None,
+            "default_run": default_run,
+            "default_mission": default_mid,
             "tabs": tabs,
         },
     }
@@ -480,54 +675,23 @@ def _ensure_showcase_app(out_dir: Path, *, template_dir: Path | str | None) -> N
     (out_dir / "styles.css").write_text(STYLES_CSS, encoding="utf-8")
 
 
-def generate_base_case_gallery(
+def _run_study_batch(
     *,
-    repo_root: str | Path | None = None,
-    out_dir: str | Path | None = None,
-    runs_tmp: str | Path | None = None,
-    max_points: int = 200,
-    n_mc_trials: int | None = None,
-    skip_envelope: bool = False,
-    envelope_time_scales: tuple[float, ...] | None = None,
-) -> Path:
-    """
-    Run the portfolio base-case studies and write ``docs/showcase``.
-
-    Base case:
-      LQR/LQG and PID rows × sensor columns (ideal, GPS+IMU naive, GPS+IMU KF,
-      AHRS, IMU-only), plus Monte Carlo on GPS+IMU LQG and the linearization
-      envelope (ideal LQR limits).
-
-    ``n_mc_trials`` overrides the study YAML when set (useful for smoke tests).
-    """
+    root: Path,
+    studies: tuple[tuple[str, str, str], ...],
+    labels: dict[str, str],
+    mission_id: str,
+    tmp: Path,
+    max_points: int,
+    n_mc_trials: int | None,
+) -> list[dict[str, Any]]:
     from uavsim.studies import run_nominal_study
-    from uavsim.studies.envelope import SHOWCASE_TIME_SCALES, run_linearization_envelope
-
-    root = Path(repo_root or Path.cwd()).resolve()
-    out = Path(out_dir or (root / "docs" / "showcase")).resolve()
-    tmp = Path(runs_tmp or (root / "runs" / "_showcase_build")).resolve()
-    tmp.mkdir(parents=True, exist_ok=True)
 
     entries: list[dict[str, Any]] = []
-    labels = {
-        "figure_eight_lqr": "Ideal LQR (full state)",
-        "gps_imu_naive": "GPS+IMU naive → LQR",
-        "gps_imu_lqg": "GPS+IMU LQG",
-        "ahrs_lqg": "AHRS LQG",
-        "flow_alt_lqg": "Flow+alt LQG",
-        "imu_only_lqg": "IMU-only LQG",
-        "figure_eight_pid": "Ideal PID (full state)",
-        "gps_imu_naive_pid": "GPS+IMU naive → PID",
-        "gps_imu_kf_pid": "GPS+IMU KF → PID",
-        "ahrs_kf_pid": "AHRS KF → PID",
-        "flow_alt_kf_pid": "Flow+alt KF → PID",
-        "imu_only_kf_pid": "IMU-only KF → PID",
-        "gps_imu_lqg_mc": "GPS+IMU LQG Monte Carlo",
-    }
-    for rel, gid, role in BASE_CASE_STUDIES:
+    for rel, gid, role in studies:
         study = root / rel
         if not study.is_file():
-            msg = f"Base-case study missing: {study}"
+            msg = f"Portfolio study missing: {study}"
             raise FileNotFoundError(msg)
         force_mc = role == "monte_carlo"
         n_override = n_mc_trials if force_mc and n_mc_trials is not None else None
@@ -543,7 +707,69 @@ def generate_base_case_gallery(
                 gallery_id=gid,
                 label=labels.get(gid, gid),
                 role=role,
+                mission_id=mission_id,
                 max_points=max_points,
+            )
+        )
+    return entries
+
+
+def generate_base_case_gallery(
+    *,
+    repo_root: str | Path | None = None,
+    out_dir: str | Path | None = None,
+    runs_tmp: str | Path | None = None,
+    max_points: int = 200,
+    n_mc_trials: int | None = None,
+    skip_envelope: bool = False,
+    envelope_time_scales: tuple[float, ...] | None = None,
+    skip_edge_mission: bool = False,
+) -> Path:
+    """
+    Run the portfolio base-case studies and write ``docs/showcase``.
+
+    Dual-mission portfolio:
+      * **baseline** — calm constant-yaw figure-eight controller × sensor matrix
+      * **envelope_edge** — τ★≈0.28 + scheduled yaw twin matrix (same cells)
+      Plus Monte Carlo (per mission) and the linearization envelope sweep.
+
+    ``n_mc_trials`` overrides the study YAML when set (useful for smoke tests).
+    ``skip_edge_mission`` runs only the baseline matrix (faster smoke builds).
+    """
+    from uavsim.studies.envelope import (
+        ENVELOPE_EDGE_TIME_SCALE,
+        MATRIX_SCHEMES,
+        SHOWCASE_TIME_SCALES,
+        run_linearization_envelope,
+    )
+
+    root = Path(repo_root or Path.cwd()).resolve()
+    out = Path(out_dir or (root / "docs" / "showcase")).resolve()
+    tmp = Path(runs_tmp or (root / "runs" / "_showcase_build")).resolve()
+    tmp.mkdir(parents=True, exist_ok=True)
+
+    entries: list[dict[str, Any]] = []
+    entries.extend(
+        _run_study_batch(
+            root=root,
+            studies=BASE_CASE_STUDIES,
+            labels=_BASELINE_LABELS,
+            mission_id=MISSION_BASELINE,
+            tmp=tmp,
+            max_points=max_points,
+            n_mc_trials=n_mc_trials,
+        )
+    )
+    if not skip_edge_mission:
+        entries.extend(
+            _run_study_batch(
+                root=root,
+                studies=EDGE_CASE_STUDIES,
+                labels=_EDGE_LABELS,
+                mission_id=MISSION_ENVELOPE_EDGE,
+                tmp=tmp,
+                max_points=max_points,
+                n_mc_trials=n_mc_trials,
             )
         )
 
@@ -555,31 +781,76 @@ def generate_base_case_gallery(
             repo_root=root,
             base_study_path=root / "configs" / "studies" / "figure_eight.yaml",
             time_scales=scales,
-            laws=(("lqr", "none"), ("lqg", "linear_kf")),
+            schemes=MATRIX_SCHEMES,
             output_root=tmp / "envelope",
         )
-        envelope_doc["title"] = "Limits of hover-linearized LQR (ideal full state)"
+        envelope_doc["title"] = "Controller × sensor tracking envelope"
         envelope_doc["description"] = (
-            "Time-scale τ on the figure-eight (τ=1 portfolio path). "
-            "Primary story: idealized full-state LQR designed on hover A,B — "
-            "where tracking fails as speed/tilt leave the linearization. "
-            "LQG (full-channel KF) is shown as a secondary overlay; "
-            "it is not the sensor-reconstruction teaching case (see Estimation tab)."
+            "Time-scale τ on the constant-yaw figure-eight (τ=1 portfolio baseline). "
+            "Every teaching-matrix cell is swept: cascade PID and hover LQR × ideal, "
+            "GPS+IMU naive, GPS+IMU KF, AHRS, flow+alt, and IMU-only. "
+            "Shared position bound makes success comparable across stacks. "
+            f"Portfolio envelope-edge mission (τ★≈{ENVELOPE_EDGE_TIME_SCALE:g} + scheduled yaw) "
+            "is a related operating point with extra yaw demand — see Mission selector."
+        )
+        envelope_doc["showcase_edge_time_scale"] = ENVELOPE_EDGE_TIME_SCALE
+
+    missions: list[dict[str, Any]] = [
+        {
+            "id": MISSION_BASELINE,
+            "label": "Baseline figure-eight",
+            "short_label": "Baseline",
+            "description": (
+                "Elevated figure-eight with constant yaw — calm enough that "
+                "controller × sensor differences dominate over plant stress."
+            ),
+            "mission_file": "configs/missions/figure_eight.yaml",
+            "yaw_mode": "constant",
+            "time_scale": 1.0,
+            "default_run": "figure_eight_lqr",
+            "compare_ids": ["gps_imu_naive", "gps_imu_lqg"],
+            "mc_run_id": "gps_imu_lqg_mc",
+            "run_ids": [gid for _, gid, _ in BASE_CASE_STUDIES],
+        },
+    ]
+    if not skip_edge_mission:
+        missions.append(
+            {
+                "id": MISSION_ENVELOPE_EDGE,
+                "label": "Near-envelope + scheduled yaw",
+                "short_label": "Envelope edge",
+                "description": (
+                    f"Same geometry time-scaled by τ★≈{ENVELOPE_EDGE_TIME_SCALE:g} "
+                    "(~25–30° peak tilt under ideal LQR) with from_waypoints scheduled "
+                    "yaw (±~50°) so attitude is visible. Stresses hover linearization "
+                    "while keeping the full controller × sensor matrix comparable."
+                ),
+                "mission_file": "configs/missions/figure_eight_envelope_edge.yaml",
+                "yaw_mode": "from_waypoints",
+                "time_scale": ENVELOPE_EDGE_TIME_SCALE,
+                "default_run": "edge_figure_eight_lqr",
+                "compare_ids": ["edge_gps_imu_naive", "edge_gps_imu_lqg"],
+                "mc_run_id": "edge_gps_imu_lqg_mc",
+                "run_ids": [gid for _, gid, _ in EDGE_CASE_STUDIES],
+            }
         )
 
     doc = build_gallery_document(
         entries,
         title="uavsim · flight results",
         description=(
-            "Figure-eight SIL: controller × sensor matrix (LQR/LQG and PID × "
-            "ideal, GPS+IMU naive/KF, AHRS, optical-flow+altitude, IMU-only), "
-            "Monte Carlo on GPS+IMU LQG, and a time-scale envelope for "
+            "Figure-eight SIL with dual missions: baseline (constant yaw) and "
+            "near-envelope (τ★ + scheduled yaw). Full controller × sensor matrix "
+            "on both (LQR/LQG and PID × ideal, GPS+IMU naive/KF, AHRS, flow+alt, "
+            "IMU-only), Monte Carlo, and a time-scale envelope for "
             "hover-linearization limits. Simulation only."
         ),
-        # Primary compare: naive vs LQG on same sensors (teaching win)
+        # Primary compare: naive vs LQG on baseline (teaching win)
         compare_ids=("gps_imu_naive", "gps_imu_lqg"),
         envelope=envelope_doc,
         estimation_matrix=ESTIMATION_MATRIX,
+        missions=missions,
+        default_mission=MISSION_BASELINE,
     )
     write_gallery(doc, out, copy_app=True, template_dir=root / "docs" / "showcase")
     meta = {
@@ -587,6 +858,7 @@ def generate_base_case_gallery(
         "generated_at": doc["generated_at"],
         "uavsim_version": __version__,
         "runs": [e["id"] for e in entries],
+        "missions": [m["id"] for m in missions],
         "has_envelope": envelope_doc is not None,
         "command": "uavsim gallery --base-case",
     }
