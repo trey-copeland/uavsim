@@ -17,7 +17,10 @@ python -m http.server 8765 --directory docs/showcase
 # Overview: controller × sensor matrix · Compare: pick A/B runs in the browser
 ```
 
-See also [`docs/showcase/README.md`](showcase/README.md) for GitHub Pages, matrix studies, and rebuild notes.
+See also:
+
+- [`docs/showcase/README.md`](showcase/README.md) — GitHub Pages, matrix studies, rebuild notes  
+- [`docs/showcase/UI_SPEC.md`](showcase/UI_SPEC.md) — as-built UI product specification (IA, screens, JSON contract)
 
 Dual-run:
 

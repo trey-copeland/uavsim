@@ -2,6 +2,8 @@
 
 Single-page React app for the portfolio base case: a **guided technical report** with a **controller × sensor** matrix (LQR/LQG and PID) on **two missions** (baseline figure-eight and near-envelope + scheduled yaw), Flight 3D, Monte Carlo, and a **tracking envelope**.
 
+**UI product spec (as-built):** [UI_SPEC.md](UI_SPEC.md) — IA, screens, data contract, copy slots, sync policy. Keep it updated when the SPA or `showcase.json` shape changes.
+
 **Walkthrough (header strip):** Matrix → Flight → Laws (LQR vs PID) → Envelope.  
 **Mission** is a segmented control in the sticky header (rebinds all tabs).  
 **Suggested first look** opens Flight on the envelope-edge mission.

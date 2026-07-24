@@ -480,7 +480,7 @@ Requirements use MoSCoW for prioritization within **systems-heavy core**.
 | S5b | Interactive 3D flight view (HTML): rotate scene, playback, vectors + absolute HUD (**§11A**) |
 | S6 | Second controller behind the same interface + comparison study example |
 | S7 | Controller-comparison study config (same mission, LQR vs alternate) |
-| S8 | Static results gallery (HTML) generated from a tagged release run |
+| S8 | Static results gallery (HTML) generated from a tagged release run; portfolio React SPA as-built UI: [docs/showcase/UI_SPEC.md](docs/showcase/UI_SPEC.md) |
 | S9 | **Controller export artifact** (versioned gains/trim/metadata) + round-trip load in SIL (US-D1) |
 | S10 | **`uavsim compare`** — overlay key time series + metric delta table for two run dirs (SIL↔SIL minimum) |
 | S11 | Plant step separable from in-process controller (SIL adapter pattern; enables future HIL without rewrite) |
