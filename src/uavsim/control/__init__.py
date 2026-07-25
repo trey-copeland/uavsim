@@ -13,7 +13,10 @@ from uavsim.control.ndi import (
     DEFAULT_NDI_GAINS,
     NdiCascadeController,
     NdiGains,
+    clip_virtual_accel_for_tilt,
+    commanded_tilt_rad_from_accel,
     design_ndi_cascade,
+    desired_rotation_from_thrust_and_yaw,
 )
 from uavsim.control.pid import DEFAULT_PID_GAINS, PidCascadeController, PidGains, design_pid_cascade
 
@@ -29,11 +32,14 @@ __all__ = [
     "PidCascadeController",
     "PidGains",
     "build_controller_from_mapping",
+    "clip_virtual_accel_for_tilt",
+    "commanded_tilt_rad_from_accel",
     "controller_artifact_for",
     "controller_from_artifact",
     "design_lqr_hover",
     "design_ndi_cascade",
     "design_pid_cascade",
+    "desired_rotation_from_thrust_and_yaw",
     "export_from_run_dir",
     "load_controller_artifact",
     "saturate",

@@ -2,6 +2,11 @@
 
 Inverts the vacuum rigid-body model to body wrench ``u = [F, τ]``.
 Plant frames: NED inertial, FRD body; thrust along **−body-z**.
+
+Design notes (v1):
+- Collective uses ``F = ‖f_des‖`` (not geometric-control ``−f_des · (R e₃)``).
+- ``a_r ≈ 0`` and ``ω_des ≈ 0`` (memoryless / RK45-safe; ``x_ref[9:12]`` unused).
+- Thrust direction is cone-clamped to ``max_tilt_rad`` about vertical (upper hemisphere).
 """
 
 from __future__ import annotations
@@ -42,6 +47,60 @@ DEFAULT_NDI_GAINS = NdiGains(
     k_R=np.array([12.0, 12.0, 3.0]),
     k_omega=np.array([1.2, 1.2, 0.5]),
 )
+
+
+def clip_virtual_accel_for_tilt(
+    a_des: np.ndarray,
+    g: float,
+    max_tilt_rad: float,
+    *,
+    z_eps_frac: float = 0.05,
+) -> np.ndarray:
+    """
+    Clip virtual NED accel so thrust direction stays upright within ``max_tilt_rad``.
+
+    Inertial thrust force is ``f = m (a − g e_z)`` with ``e_z = [0,0,1]``. Upright
+    flight needs ``f_z < 0`` (force against gravity) so ``b₃ = −f/‖f‖`` stays in
+    the upper hemisphere (``b₃ · e_z > 0``). Horizontal components are then
+    limited by the cone ``‖f_h‖ ≤ |f_z| tan(θ_max)``.
+
+    Without the vertical clamp, large positive ``a_z`` (demand to fall) flips
+    ``f_z`` and commands inverted ``R_des``.
+    """
+    a = np.asarray(a_des, dtype=float).reshape(3).copy()
+    g = float(g)
+    if g <= 0.0:
+        msg = f"gravity must be positive, got {g}"
+        raise ValueError(msg)
+    max_tilt = float(np.clip(max_tilt_rad, 1e-3, 0.5 * np.pi - 1e-3))
+    z_eps = float(np.clip(z_eps_frac, 1e-4, 0.5))
+
+    # f_z/m = a_z − g < −z_eps·g  ⇒  a_z < g (1 − z_eps)
+    a_z_max = g * (1.0 - z_eps)
+    if a[2] > a_z_max:
+        a[2] = a_z_max
+
+    # Cone about vertical: ‖[a_x, a_y]‖ ≤ |a_z − g| · tan(θ_max)
+    fz = a[2] - g  # < 0 after vertical clamp
+    fh = float(np.hypot(a[0], a[1]))
+    fh_max = abs(fz) * float(np.tan(max_tilt))
+    if fh > fh_max > 0.0:
+        scale = fh_max / fh
+        a[0] *= scale
+        a[1] *= scale
+    return a
+
+
+def commanded_tilt_rad_from_accel(a_des: np.ndarray, g: float) -> float:
+    """Angle between body-z-des and vertical for ``f ∝ a − g e_z`` (rad)."""
+    a = np.asarray(a_des, dtype=float).reshape(3)
+    f = a - np.array([0.0, 0.0, float(g)])
+    n = float(np.linalg.norm(f))
+    if n < 1e-15:
+        return 0.0
+    b3_z = float(-f[2] / n)  # b3 = -f/‖f‖
+    b3_z = float(np.clip(b3_z, -1.0, 1.0))
+    return float(np.arccos(b3_z))
 
 
 def desired_rotation_from_thrust_and_yaw(f_thrust_i: np.ndarray, yaw: float) -> np.ndarray:
@@ -143,16 +202,8 @@ class NdiCascadeController:
         e_vel = vel_ref - vel
         # Virtual control: desired inertial acceleration (NED). a_r ≈ 0 in v1.
         a_des = gains.kp_pos * e_pos + gains.kd_pos * e_vel
-
-        # Clamp horizontal accel so commanded tilt stays within max_tilt_rad
-        a_max = g * float(np.sin(self.max_tilt_rad))
-        ax, ay = float(a_des[0]), float(a_des[1])
-        horiz = float(np.hypot(ax, ay))
-        if horiz > a_max > 0.0:
-            scale = a_max / horiz
-            ax *= scale
-            ay *= scale
-        a_des = np.array([ax, ay, float(a_des[2])], dtype=float)
+        # Cone clamp: keep f_z < 0 and tilt(b3_des) ≤ max_tilt_rad (plan §2.4)
+        a_des = clip_virtual_accel_for_tilt(a_des, g, self.max_tilt_rad)
 
         # Plant: a = (R @ [0,0,-F] + m g e_z) / m
         # ⇒ f_thrust_i = R @ [0,0,-F] = m (a_des − g e_z)

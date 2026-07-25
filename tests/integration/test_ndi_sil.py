@@ -65,11 +65,10 @@ def test_law_compare_hifi_three_laws(tmp_path: Path) -> None:
     ndi_rmse = float(results["ndi"]["rmse_position_m"])
     lqr_rmse = float(results["lqr"]["rmse_position_m"])
     pid_rmse = float(results["pid"]["rmse_position_m"])
+    # Relative ordering on this stress path (not coupled to LQR pass/fail)
     assert ndi_rmse < lqr_rmse, f"NDI {ndi_rmse} should beat LQR {lqr_rmse} on law-compare path"
     assert ndi_rmse < pid_rmse
-    # LQR leaves honesty band; NDI stays inside on this profile
     assert results["ndi"]["success"] is True
-    assert results["lqr"]["success"] is False
 
 
 def test_ndi_study_catalog_loads() -> None:

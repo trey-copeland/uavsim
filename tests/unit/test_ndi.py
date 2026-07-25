@@ -1,4 +1,4 @@
-"""Cascade NDI unit tests (signs, hover, inversion, saturation)."""
+"""Cascade NDI unit tests (signs, hover, inversion, tilt safety, saturation)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,11 @@ import numpy as np
 
 from uavsim.control import design_ndi_cascade
 from uavsim.control.export import export_ndi_artifact
-from uavsim.control.ndi import desired_rotation_from_thrust_and_yaw
+from uavsim.control.ndi import (
+    clip_virtual_accel_for_tilt,
+    commanded_tilt_rad_from_accel,
+    desired_rotation_from_thrust_and_yaw,
+)
 from uavsim.dynamics.rotations import rotation_body_to_inertial
 from uavsim.interfaces import MeasurementBus
 from uavsim.reference import ReferenceSample
@@ -25,7 +29,7 @@ def test_ndi_hover_command_near_mg() -> None:
 
 
 def test_ndi_pushes_toward_reference_north() -> None:
-    """North of target → need south accel → −θ plant map → positive pitch torque path."""
+    """North of target → need −ẍ (south) → −θ plant map → +pitch torque initially."""
     vehicle = default_vehicle()
     ctrl = design_ndi_cascade(vehicle)
     x = np.zeros(12)
@@ -34,7 +38,7 @@ def test_ndi_pushes_toward_reference_north() -> None:
     bus = MeasurementBus(t=0.0, x=x)
     u = ctrl.compute(0.0, bus, ref).u
     assert np.isfinite(u).all()
-    # Desired b3 tilts for −ẍ ⇒ θ_des < 0 at hover; error drives +pitch torque initially
+    # a_des_x < 0 ⇒ f_x < 0 ⇒ b3_x > 0 ⇒ θ_des > 0 at hover; +pitch torque
     assert u[2] > 0.0
 
 
@@ -107,6 +111,52 @@ def test_ndi_thrust_floor_and_saturation() -> None:
     assert np.all(np.abs(u[1:4]) <= vehicle.limits.torque_max_nm + 1e-9)
 
 
+def test_clip_virtual_accel_prevents_inverted_thrust() -> None:
+    """Large positive a_z alone would flip f_z; clip keeps upright cone."""
+    g = 9.81
+    max_tilt = 0.7
+    a_raw = np.array([2.0, 0.0, 20.0])  # a_z ≫ g
+    a_clip = clip_virtual_accel_for_tilt(a_raw, g, max_tilt)
+    assert a_clip[2] < g
+    tilt = commanded_tilt_rad_from_accel(a_clip, g)
+    assert tilt <= max_tilt + 1e-9
+    # Combined horizontal + vertical demand that previously commanded ~172°
+    a_hard = np.array([-40.0, 0.0, 54.0])  # ~10 m north, ~6 m above at high gains
+    a_safe = clip_virtual_accel_for_tilt(a_hard, g, max_tilt)
+    assert commanded_tilt_rad_from_accel(a_safe, g) <= max_tilt + 1e-9
+
+
+def test_ndi_max_tilt_bounds_commanded_attitude() -> None:
+    """
+    Combined lateral + vertical error must not invert R_des.
+
+    Regression for Finding 1: horizontal-only clamp left a_z free and could
+    command ~170° tilt despite max_tilt_rad ≈ 0.7.
+    """
+    vehicle = default_vehicle()
+    max_tilt = 0.7
+    ctrl = design_ndi_cascade(vehicle, max_tilt_rad=max_tilt)
+    x = np.zeros(12)
+    x[0] = 10.0  # north of target
+    x[2] = -6.0  # above target (NED z+ down)
+    ref = ReferenceSample(t=0.0, x_ref=np.zeros(12))
+    # Reconstruct a_des the controller would use after clamp via gains
+    e_pos = -x[0:3]
+    a_des = ctrl.gains.kp_pos * e_pos  # vel error 0
+    a_clip = clip_virtual_accel_for_tilt(a_des, vehicle.gravity_m_s2, max_tilt)
+    tilt = commanded_tilt_rad_from_accel(a_clip, vehicle.gravity_m_s2)
+    assert tilt <= max_tilt + 1e-6, f"commanded tilt {tilt} > max {max_tilt}"
+
+    # Closed-loop command still finite and F ≥ floor
+    u = ctrl.compute(0.0, MeasurementBus(t=0.0, x=x), ref).u
+    assert np.isfinite(u).all()
+    f_i = vehicle.mass_kg * (a_clip - np.array([0.0, 0.0, vehicle.gravity_m_s2]))
+    r_des = desired_rotation_from_thrust_and_yaw(f_i, 0.0)
+    b3_z = float(r_des[2, 2])
+    assert b3_z >= float(np.cos(max_tilt)) - 1e-6
+    assert b3_z > 0.0  # upper hemisphere
+
+
 def test_desired_rotation_hover_and_north_accel() -> None:
     m, g = 0.5, 9.81
     # Hover force
@@ -121,6 +171,31 @@ def test_desired_rotation_hover_and_north_accel() -> None:
     assert r2[0, 2] < 0.0
     # R should be proper
     assert abs(np.linalg.det(r2) - 1.0) < 1e-9
+
+
+def test_desired_rotation_nonzero_yaw() -> None:
+    """Heading column follows yaw; R remains proper SO(3)."""
+    m, g = 0.5, 9.81
+    f = np.array([0.0, 0.0, -m * g])
+    yaw = np.deg2rad(35.0)
+    r = desired_rotation_from_thrust_and_yaw(f, yaw=yaw)
+    np.testing.assert_allclose(r[:, 2], [0.0, 0.0, 1.0], atol=1e-9)
+    # body-x projects onto horizontal heading
+    b1_h = r[0:2, 0]
+    b1_h = b1_h / (np.linalg.norm(b1_h) + 1e-15)
+    expect = np.array([np.cos(yaw), np.sin(yaw)])
+    np.testing.assert_allclose(b1_h, expect, atol=1e-9)
+    assert abs(np.linalg.det(r) - 1.0) < 1e-9
+    np.testing.assert_allclose(r.T @ r, np.eye(3), atol=1e-9)
+
+
+def test_desired_rotation_near_horizontal_heading_fallback() -> None:
+    """Degenerate branch when b3 nearly parallel to nominal heading vector."""
+    # Nearly horizontal b3 along +x (would make cross with b1_c ~0 at yaw=0)
+    f = np.array([-1.0, 0.0, -1e-9])  # b3 ≈ +x
+    r = desired_rotation_from_thrust_and_yaw(f, yaw=0.0)
+    assert abs(np.linalg.det(r) - 1.0) < 1e-6
+    np.testing.assert_allclose(r.T @ r, np.eye(3), atol=1e-6)
 
 
 def test_ndi_export_round_trip() -> None:
@@ -149,7 +224,7 @@ def test_ndi_factory_from_mapping() -> None:
     cfg = {
         "type": "ndi_cascade",
         "kp_pos": [4.0, 4.0, 9.0],
-        "kd_pos": [3.0, 3.0, 5.0],
+        "kd_pos": [3.0, 3.0, 5.5],
         "k_R": [12.0, 12.0, 3.0],
         "k_omega": [1.2, 1.2, 0.5],
         "max_tilt_rad": 0.7,

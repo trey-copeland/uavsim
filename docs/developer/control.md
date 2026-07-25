@@ -144,7 +144,9 @@ Nonlinear dynamic inversion: position PD → desired inertial accel → collecti
 
 **Frames:** NED / FRD, thrust along \(-\)body-\(z\), same as the plant and PID.
 
-Controller is **memoryless** (safe under SciPy RK45, which re-enters the law at intermediate times). \(\omega_\mathrm{des}\approx 0\); keep rate gains modest.
+**Tilt safety:** virtual accel is cone-clamped so \(f=m(a-g e_z)\) keeps \(f_z<0\) and \(\mathrm{tilt}(b_{3,\mathrm{des}})\le\) `max_tilt_rad` (no inverted attitude reference from large downward demands).
+
+Controller is **memoryless** (safe under SciPy RK45, which re-enters the law at intermediate times). \(\omega_\mathrm{des}\approx 0\) and \(a_r\approx 0\); keep rate gains modest. Collective uses \(F=\|f_\mathrm{des}\|\) (not the geometric projection \(-f\cdot(R e_3)\)).
 
 ### Study YAML
 
