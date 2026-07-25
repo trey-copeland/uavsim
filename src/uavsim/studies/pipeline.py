@@ -13,7 +13,7 @@ from uavsim.control.factory import build_controller_from_mapping, controller_art
 from uavsim.control.lqr import LqrHoverController
 from uavsim.control.ndi import NdiCascadeController
 from uavsim.control.pid import PidCascadeController
-from uavsim.guidance import HoldGuidance, WaypointsGuidance
+from uavsim.guidance import HoldGuidance, InterceptPursueGuidance, WaypointsGuidance
 from uavsim.metrics import compute_metrics
 from uavsim.monte_carlo import (
     partition_trials,
@@ -33,9 +33,10 @@ from uavsim.results import (
     write_yaml,
 )
 from uavsim.sim import InProcessControllerAdapter, SimPlant, simulate_closed_loop
-from uavsim.sim.closed_loop import ClosedLoopResult
+from uavsim.sim.closed_loop import ClosedLoopResult, GuidanceLoop
 from uavsim.studies.config import (
     HoldGuidanceConfig,
+    InterceptPursueGuidanceConfig,
     StudyConfig,
     WaypointsGuidanceConfig,
     guidance_mission_dict,
@@ -70,6 +71,8 @@ class PreparedStudy:
     feasibility: Any
     plan_diagnostics: dict[str, Any]
     x0: np.ndarray
+    guidance_backend: Any | None = None
+    guidance_mission: dict[str, Any] | None = None
 
 
 def _build_guidance(cfg: StudyConfig) -> Any:
@@ -83,6 +86,19 @@ def _build_guidance(cfg: StudyConfig) -> Any:
             sample_dt_s=g.sample_dt_s,
             fail_on_infeasible=g.fail_on_infeasible,
         )
+    if isinstance(g, InterceptPursueGuidanceConfig):
+        return InterceptPursueGuidance(
+            replan_period_s=g.replan_period_s,
+            replan_start_s=g.replan_start_s,
+            lead_time_s=g.lead_time_s,
+            capture_radius_m=g.capture_radius_m,
+            horizon_s=g.horizon_s,
+            sample_dt_s=g.sample_dt_s,
+            seed_method=g.seed_method,
+            yaw_mode=g.yaw_mode,
+            state_source=g.state_source,
+            fail_on_infeasible=g.fail_on_infeasible,
+        )
     msg = f"Unsupported guidance type: {type(g)}"
     raise TypeError(msg)
 
@@ -91,7 +107,8 @@ def prepare_study(cfg: StudyConfig, vehicle_path: Path, cfg_hash: str) -> Prepar
     vehicle = load_vehicle(vehicle_path)
     controller = build_controller_from_mapping(cfg.controller, vehicle)
     backend = _build_guidance(cfg)
-    plan = backend.plan(guidance_mission_dict(cfg), vehicle)
+    mission = guidance_mission_dict(cfg)
+    plan = backend.plan(mission, vehicle)
     reference = plan.reference
     if cfg.initial_state is not None:
         x0 = cfg.initial_state.to_array()
@@ -107,6 +124,8 @@ def prepare_study(cfg: StudyConfig, vehicle_path: Path, cfg_hash: str) -> Prepar
         feasibility=plan.feasibility,
         plan_diagnostics=plan.diagnostics,
         x0=x0,
+        guidance_backend=backend,
+        guidance_mission=mission,
     )
 
 
@@ -129,29 +148,52 @@ def run_closed_loop_trial(
     # Observer on *nominal* vehicle (same story as redesign_controller=false):
     # fixed filter model, plant may be mass/inertia-perturbed in MC.
     observer, meas_model = build_observer(cfg.sim.observer, prepared.vehicle_nominal)
+
+    guidance_loop: GuidanceLoop | None = None
+    if isinstance(cfg.guidance, InterceptPursueGuidanceConfig):
+        backend = _build_guidance(cfg)
+        mission = prepared.guidance_mission or guidance_mission_dict(cfg)
+        plan = backend.plan(mission, prepared.vehicle_nominal)
+        adapter.set_reference(plan.reference)
+        guidance_loop = GuidanceLoop(
+            backend=backend,
+            mission=mission,
+            vehicle=prepared.vehicle_nominal,
+            replan_period_s=float(cfg.guidance.replan_period_s),
+            state_source=str(cfg.guidance.state_source),
+        )
+
+    t0 = float(adapter.reference.t0)
+    tf = float(adapter.reference.tf)
+    if isinstance(cfg.guidance, InterceptPursueGuidanceConfig) and cfg.guidance.duration_s:
+        tf = max(tf, float(cfg.guidance.duration_s))
+
     sim_result = simulate_closed_loop(
         plant,
         adapter,
-        t0=prepared.reference.t0,
-        tf=prepared.reference.tf,
+        t0=t0,
+        tf=tf,
         x0=prepared.x0,
         max_step=cfg.sim.dt_s,
         rtol=cfg.sim.rtol,
         atol=cfg.sim.atol,
         observer=observer,
         measurement_model=meas_model,
+        guidance_loop=guidance_loop,
     )
     metrics = compute_metrics(
         sim_result.t,
         sim_result.x,
         sim_result.u,
-        prepared.reference,
+        adapter.reference,
         position_bound_m=cfg.metrics.position_bound_m,
     )
     metrics["sim_success"] = sim_result.success
     metrics["sim_message"] = sim_result.message
     metrics["observer_id"] = sim_result.observer_id
     metrics["sim_attitude"] = sim_result.attitude
+    if sim_result.replan_log is not None:
+        metrics["n_replans"] = len(sim_result.replan_log)
     _maybe_add_capture_metrics(metrics, sim_result.t, sim_result.x, cfg)
     from uavsim.vehicles.battery import battery_metrics, integrate_battery
 
@@ -225,11 +267,14 @@ def _maybe_add_capture_metrics(
 ) -> None:
     """If study metrics name a target mission, record min range / capture flag."""
     path = getattr(cfg.metrics, "capture_target_mission", None)
+    radius = float(getattr(cfg.metrics, "capture_radius_m", 1.0))
+    if not path and isinstance(cfg.guidance, InterceptPursueGuidanceConfig):
+        path = cfg.guidance.target_mission_file
+        radius = float(cfg.guidance.capture_radius_m)
     if not path:
         return
     from uavsim.guidance.waypoints.backend import WaypointsGuidance
 
-    radius = float(getattr(cfg.metrics, "capture_radius_m", 1.0))
     backend = WaypointsGuidance(method="interp", yaw_mode="from_waypoints", sample_dt_s=0.01)
     plan = backend.plan({"mission_file": str(path)}, prepared_vehicle_for_capture(cfg))
     p_t = np.vstack([plan.reference.evaluate(float(ti)).x_ref[0:3] for ti in t])
@@ -279,6 +324,7 @@ def _metric_row(metrics: dict[str, Any]) -> dict[str, Any]:
         "energy_depleted",
         "peak_power_w",
         "battery_enabled",
+        "n_replans",
     )
     return {k: metrics[k] for k in keys if k in metrics}
 

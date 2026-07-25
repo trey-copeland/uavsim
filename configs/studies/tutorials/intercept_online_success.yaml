@@ -1,0 +1,60 @@
+# L1–L2 hero: online intercept_pursue + NDI + MEKF GPS/IMU + battery + GE climb seed.
+schema_version: 1
+study_id: intercept_online_success
+seed: 0
+
+vehicle: configs/vehicles/tutorials/intercept_quadrotor.yaml
+
+controller:
+  type: ndi_cascade
+  kp_pos: [12.0, 12.0, 18.0]
+  kd_pos: [8.0, 8.0, 10.0]
+  k_R: [24.0, 24.0, 6.0]
+  k_omega: [2.0, 2.0, 0.8]
+  max_tilt_rad: 1.45
+  invert_model: vacuum_rigid_body
+  f_min_frac_hover: 0.05
+
+guidance:
+  type: intercept_pursue
+  seed_mission_file: configs/missions/tutorials/intercept_seed_climb.yaml
+  target_mission_file: configs/missions/tutorials/intercept_l0_target.yaml
+  replan_period_s: 0.2
+  replan_start_s: 2.5
+  lead_time_s: 1.2
+  capture_radius_m: 1.0
+  horizon_s: 3.0
+  sample_dt_s: 0.01
+  duration_s: 10.0
+  seed_method: minsnap
+  yaw_mode: from_waypoints
+  state_source: estimate
+  fail_on_infeasible: false
+
+sim:
+  dt_s: 0.01
+  method: rk45
+  rtol: 1.0e-5
+  atol: 1.0e-7
+  attitude: quat
+  plant: wrench
+  observer:
+    type: mekf
+    seed: 7
+    pos_sigma_m: 0.08
+    vel_sigma_m_s: 0.08
+    att_sigma_rad: 0.04
+    omega_sigma_rad_s: 0.05
+    process_sigma: 0.04
+    channels: [pos, omega]
+
+metrics:
+  position_bound_m: 1.0
+  capture_target_mission: configs/missions/tutorials/intercept_l0_target.yaml
+  capture_radius_m: 1.0
+
+initial_state:
+  position_ned_m: [0.0, 0.0, 3.05]
+  euler_rad: [0.0, 0.0, 0.0]
+  velocity_ned_m_s: [0.0, 0.0, 0.0]
+  omega_body_rad_s: [0.0, 0.0, 0.0]

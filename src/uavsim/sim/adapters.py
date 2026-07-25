@@ -20,6 +20,10 @@ class InProcessControllerAdapter:
         self.controller = controller
         self.reference = reference
 
+    def set_reference(self, reference: ReferenceTrajectory) -> None:
+        """Rebind trajectory after online guidance replan (G-6)."""
+        self.reference = reference
+
     def command(self, t: float, measurements: MeasurementBus) -> ActuatorCommand:
         ref: ReferenceSample = self.reference.evaluate(t)
         return self.controller.compute(t, measurements, ref)
