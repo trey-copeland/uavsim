@@ -148,6 +148,142 @@ EDGE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
 
 MISSION_BASELINE = "baseline"
 MISSION_ENVELOPE_EDGE = "envelope_edge"
+MISSION_PLANT_FIDELITY = "plant_fidelity"
+
+# Ideal-LQR plant variants (same control law; vary actuators / aero / attitude plant)
+PLANT_FIDELITY_STUDIES: tuple[tuple[str, str, str], ...] = (
+    ("configs/studies/figure_eight.yaml", "plant_nominal_lqr", "plant_nominal"),
+    ("configs/studies/figure_eight_motors.yaml", "plant_motors_lqr", "plant_motors"),
+    ("configs/studies/figure_eight_aero.yaml", "plant_aero_lqr", "plant_aero"),
+    ("configs/studies/figure_eight_ge.yaml", "plant_ge_lqr", "plant_ge"),
+    ("configs/studies/figure_eight_quat.yaml", "plant_quat_lqr", "plant_quat"),
+)
+
+_PLANT_LABELS: dict[str, str] = {
+    "plant_nominal_lqr": "Nominal vacuum wrench · LQR",
+    "plant_motors_lqr": "Mixer + motors · LQR",
+    "plant_aero_lqr": "Body drag + prop H · LQR",
+    "plant_ge_lqr": "Ground effect (low path) · LQR",
+    "plant_quat_lqr": "Quaternion plant · LQR",
+}
+
+_PLANT_COLUMNS: list[dict[str, str]] = [
+    {
+        "id": "nominal",
+        "label": "Vacuum wrench",
+        "sensors": "instantaneous body wrench; aero off",
+    },
+    {
+        "id": "motors",
+        "label": "Mixer + motors",
+        "sensors": "first-order ω lag + allocation",
+    },
+    {
+        "id": "aero",
+        "label": "Body drag + H",
+        "sensors": "parasite drag + prop H-force",
+    },
+    {
+        "id": "ge",
+        "label": "Ground effect",
+        "sensors": "Cheeseman–Bennett κ(h); low path",
+    },
+    {
+        "id": "quat",
+        "label": "Quaternion plant",
+        "sensors": "unit-quat integration; Euler control bus",
+    },
+]
+
+
+def _plant_scenario(
+    *,
+    sid: str,
+    column: str,
+    label: str,
+    method: str,
+    role: str,
+    run_id: str,
+    lesson: str,
+) -> dict[str, Any]:
+    return {
+        "id": sid,
+        "column": column,
+        "controller": "lqr",
+        "label": label,
+        "sensors": next(
+            (c["sensors"] for c in _PLANT_COLUMNS if c["id"] == column),
+            "",
+        ),
+        "method": method,
+        "role": role,
+        "run_id": run_id,
+        "run_id_by_mission": {MISSION_PLANT_FIDELITY: run_id},
+        "lesson": lesson,
+    }
+
+
+PLANT_MATRIX: dict[str, Any] = {
+    "title": "Plant fidelity matrix",
+    "description": (
+        "Same ideal hover LQR and (mostly) the same figure-eight path; only the "
+        "plant / actuator model changes. Nominal vacuum wrench is the portfolio "
+        "baseline cell. Motors add mixer lag; aero adds drag/prop H; ground effect "
+        "uses a low path + Cheeseman–Bennett κ(h); quaternion uses the 13-state plant "
+        "with the same Euler-bus controller. Click a cell → Flight / System diagram."
+    ),
+    "columns": _PLANT_COLUMNS,
+    "rows": [
+        {"id": "lqr", "label": "Ideal LQR (full state)", "controller": "lqr"},
+    ],
+    "scenarios": [
+        _plant_scenario(
+            sid="plant_nominal",
+            column="nominal",
+            label="Nominal vacuum wrench",
+            method="wrench plant",
+            role="plant_nominal",
+            run_id="plant_nominal_lqr",
+            lesson="Baseline SIL plant: instantaneous body wrench, aero off.",
+        ),
+        _plant_scenario(
+            sid="plant_motors",
+            column="motors",
+            label="Mixer + first-order motors",
+            method="plant: motors",
+            role="plant_motors",
+            run_id="plant_motors_lqr",
+            lesson="Allocation + motor lag between u_cmd and delivered wrench.",
+        ),
+        _plant_scenario(
+            sid="plant_aero",
+            column="aero",
+            label="Body drag + prop H",
+            method="aero vehicle",
+            role="plant_aero",
+            run_id="plant_aero_lqr",
+            lesson="LQR linearization omits quadratic/H terms; energy dissipates.",
+        ),
+        _plant_scenario(
+            sid="plant_ge",
+            column="ge",
+            label="Ground effect (low path)",
+            method="GE vehicle",
+            role="plant_ge",
+            run_id="plant_ge_lqr",
+            lesson="κ(h) boost near deck; vacuum hover LQR is untrimmed for GE.",
+        ),
+        _plant_scenario(
+            sid="plant_quat",
+            column="quat",
+            label="Quaternion plant",
+            method="sim.attitude: quat",
+            role="plant_quat",
+            run_id="plant_quat_lqr",
+            lesson="Native unit-quat kinematics; control/metrics stay Euler 12-state.",
+        ),
+    ],
+}
 
 _BASELINE_LABELS: dict[str, str] = {
     "figure_eight_lqr": "Ideal LQR (full state)",
@@ -537,6 +673,41 @@ def run_to_gallery_entry(
     return entry
 
 
+def _attach_matrix_metrics(
+    matrix: dict[str, Any] | None,
+    by_id: dict[str, Any],
+    *,
+    default_mission_key: str = MISSION_BASELINE,
+) -> dict[str, Any] | None:
+    """Copy a teaching matrix and fill metrics_by_mission / default metrics from runs."""
+    if matrix is None:
+        return None
+    out = dict(matrix)
+    scenarios = []
+    for sc in matrix.get("scenarios") or []:
+        row = dict(sc)
+        rid_map = dict(row.get("run_id_by_mission") or {})
+        if not rid_map and row.get("run_id"):
+            rid_map = {default_mission_key: row["run_id"]}
+        metrics_by_mission: dict[str, Any] = {}
+        for mid, rid in rid_map.items():
+            if rid and rid in by_id:
+                metrics_by_mission[mid] = _metrics_slice(by_id[rid].get("metrics") or {})
+        row["run_id_by_mission"] = rid_map
+        row["metrics_by_mission"] = metrics_by_mission
+        default_rid = rid_map.get(default_mission_key) or row.get("run_id")
+        if default_rid and default_rid in by_id:
+            row["metrics"] = _metrics_slice(by_id[default_rid].get("metrics") or {})
+            row["run_id"] = default_rid
+        elif metrics_by_mission:
+            first_mid = next(iter(metrics_by_mission))
+            row["metrics"] = metrics_by_mission[first_mid]
+            row["run_id"] = rid_map.get(first_mid)
+        scenarios.append(row)
+    out["scenarios"] = scenarios
+    return out
+
+
 def build_gallery_document(
     runs: list[dict[str, Any]],
     *,
@@ -545,6 +716,7 @@ def build_gallery_document(
     compare_ids: tuple[str, str] | None = None,
     envelope: dict[str, Any] | None = None,
     estimation_matrix: dict[str, Any] | None = None,
+    plant_matrix: dict[str, Any] | None = None,
     missions: list[dict[str, Any]] | None = None,
     default_mission: str | None = None,
 ) -> dict[str, Any]:
@@ -566,36 +738,20 @@ def build_gallery_document(
                 "deltas": deltas,
             }
 
-    # Attach metrics into estimation matrix rows (baseline + per-mission map)
-    est = None
-    if estimation_matrix is not None:
-        est = dict(estimation_matrix)
-        scenarios = []
-        for sc in estimation_matrix.get("scenarios") or []:
-            row = dict(sc)
-            rid_map = dict(row.get("run_id_by_mission") or {})
-            if not rid_map and row.get("run_id"):
-                rid_map = {MISSION_BASELINE: row["run_id"]}
-            metrics_by_mission: dict[str, Any] = {}
-            for mid, rid in rid_map.items():
-                if rid and rid in by_id:
-                    metrics_by_mission[mid] = _metrics_slice(by_id[rid].get("metrics") or {})
-            row["run_id_by_mission"] = rid_map
-            row["metrics_by_mission"] = metrics_by_mission
-            # Default metrics = baseline (or first available) for older UI paths
-            default_rid = rid_map.get(MISSION_BASELINE) or row.get("run_id")
-            if default_rid and default_rid in by_id:
-                row["metrics"] = _metrics_slice(by_id[default_rid].get("metrics") or {})
-                row["run_id"] = default_rid
-            elif metrics_by_mission:
-                first_mid = next(iter(metrics_by_mission))
-                row["metrics"] = metrics_by_mission[first_mid]
-                row["run_id"] = rid_map.get(first_mid)
-            scenarios.append(row)
-        est["scenarios"] = scenarios
+    est = _attach_matrix_metrics(estimation_matrix, by_id, default_mission_key=MISSION_BASELINE)
+    plant = _attach_matrix_metrics(plant_matrix, by_id, default_mission_key=MISSION_PLANT_FIDELITY)
 
     # Story-first order (matches showcase SPA guided path)
-    tabs = ["overview", "flight", "estimation", "envelope", "monte_carlo", "compare", "metrics"]
+    tabs = [
+        "overview",
+        "flight",
+        "stack",
+        "estimation",
+        "envelope",
+        "monte_carlo",
+        "compare",
+        "metrics",
+    ]
     if envelope is None:
         tabs = [t for t in tabs if t != "envelope"]
 
@@ -623,6 +779,7 @@ def build_gallery_document(
         "compare": compare,
         "envelope": envelope,
         "estimation_matrix": est,
+        "plant_matrix": plant,
         "ui": {
             "default_run": default_run,
             "default_mission": default_mid,
@@ -736,17 +893,19 @@ def generate_base_case_gallery(
     skip_envelope: bool = False,
     envelope_time_scales: tuple[float, ...] | None = None,
     skip_edge_mission: bool = False,
+    skip_plant_mission: bool = False,
 ) -> Path:
     """
     Run the portfolio base-case studies and write ``docs/showcase``.
 
-    Dual-mission portfolio:
+    Multi-mission portfolio:
       * **baseline** — calm constant-yaw figure-eight controller × sensor matrix
       * **envelope_edge** — τ★≈0.28 + scheduled yaw twin matrix (same cells)
-      Plus Monte Carlo (per mission) and the linearization envelope sweep.
+      * **plant_fidelity** — ideal LQR × plant/actuator variants (motors, aero, GE, quat)
+      Plus Monte Carlo (per estimation mission) and the linearization envelope sweep.
 
     ``n_mc_trials`` overrides the study YAML when set (useful for smoke tests).
-    ``skip_edge_mission`` runs only the baseline matrix (faster smoke builds).
+    ``skip_edge_mission`` / ``skip_plant_mission`` drop those missions (faster smoke).
     """
     from uavsim.studies.envelope import (
         ENVELOPE_EDGE_TIME_SCALE,
@@ -779,6 +938,18 @@ def generate_base_case_gallery(
                 studies=EDGE_CASE_STUDIES,
                 labels=_EDGE_LABELS,
                 mission_id=MISSION_ENVELOPE_EDGE,
+                tmp=tmp,
+                max_points=max_points,
+                n_mc_trials=n_mc_trials,
+            )
+        )
+    if not skip_plant_mission:
+        entries.extend(
+            _run_study_batch(
+                root=root,
+                studies=PLANT_FIDELITY_STUDIES,
+                labels=_PLANT_LABELS,
+                mission_id=MISSION_PLANT_FIDELITY,
                 tmp=tmp,
                 max_points=max_points,
                 n_mc_trials=n_mc_trials,
@@ -819,6 +990,7 @@ def generate_base_case_gallery(
             "mission_file": "configs/missions/figure_eight.yaml",
             "yaw_mode": "constant",
             "time_scale": 1.0,
+            "matrix_kind": "estimation",
             "default_run": "figure_eight_lqr",
             "compare_ids": ["gps_imu_naive", "gps_imu_lqg"],
             "mc_run_id": "gps_imu_lqg_mc",
@@ -840,12 +1012,37 @@ def generate_base_case_gallery(
                 "mission_file": "configs/missions/figure_eight_envelope_edge.yaml",
                 "yaw_mode": "from_waypoints",
                 "time_scale": ENVELOPE_EDGE_TIME_SCALE,
+                "matrix_kind": "estimation",
                 "default_run": "edge_figure_eight_lqr",
                 "compare_ids": ["edge_gps_imu_naive", "edge_gps_imu_lqg"],
                 "mc_run_id": "edge_gps_imu_lqg_mc",
                 "run_ids": [gid for _, gid, _ in EDGE_CASE_STUDIES],
             }
         )
+    if not skip_plant_mission:
+        missions.append(
+            {
+                "id": MISSION_PLANT_FIDELITY,
+                "label": "Plant fidelity (ideal LQR)",
+                "short_label": "Plant",
+                "description": (
+                    "Ideal full-state LQR with plant/actuator upgrades: vacuum wrench, "
+                    "mixer+motors, body drag/prop H, ground effect (low path), and "
+                    "unit-quaternion plant. Estimation matrix is not used here."
+                ),
+                "mission_file": "configs/missions/figure_eight.yaml",
+                "yaw_mode": "constant",
+                "time_scale": 1.0,
+                "matrix_kind": "plant",
+                "default_run": "plant_nominal_lqr",
+                "compare_ids": ["plant_nominal_lqr", "plant_motors_lqr"],
+                "mc_run_id": None,
+                "run_ids": [gid for _, gid, _ in PLANT_FIDELITY_STUDIES],
+            }
+        )
+    # Baseline mission catalog entry needs matrix_kind too
+    if missions:
+        missions[0].setdefault("matrix_kind", "estimation")
 
     about_paragraphs = [
         (
@@ -855,9 +1052,8 @@ def generate_base_case_gallery(
             "IMU-only)."
         ),
         (
-            "Two missions share that geometry. Baseline uses constant yaw and the "
-            "portfolio timing. Near-envelope compresses time (τ★≈0.28) and adds "
-            "scheduled yaw so tilt and heading demand are visible under ideal LQR."
+            "Missions: baseline (constant yaw), near-envelope (τ★≈0.28 + scheduled yaw), "
+            "and plant fidelity (ideal LQR × motors / aero / ground effect / quaternion)."
         ),
         (
             "Ideal full-state is the tracking upper bound. Stacks that do not observe "
@@ -865,8 +1061,9 @@ def generate_base_case_gallery(
             "position bound; those cases are included on purpose."
         ),
         (
-            "Also included: Monte Carlo on GPS+IMU LQG, and a time-scale envelope over "
-            "every matrix stack. Simulation only — not flight software."
+            "Also included: Monte Carlo on GPS+IMU LQG, a time-scale envelope over "
+            "every estimation matrix stack, and a System tab block diagram per run. "
+            "Simulation only — not flight software."
         ),
     ]
     doc = build_gallery_document(
@@ -877,6 +1074,7 @@ def generate_base_case_gallery(
         compare_ids=("gps_imu_naive", "gps_imu_lqg"),
         envelope=envelope_doc,
         estimation_matrix=ESTIMATION_MATRIX,
+        plant_matrix=None if skip_plant_mission else PLANT_MATRIX,
         missions=missions,
         default_mission=MISSION_BASELINE,
     )
@@ -884,18 +1082,10 @@ def generate_base_case_gallery(
     doc.setdefault("ui", {})
     doc["ui"]["display_title"] = "uavsim · controller × sensor flight study"
     doc["ui"]["value_prop"] = (
-        "SIL comparison of hover LQR and cascade PID under the same sensor suites."
+        "SIL comparison of hover LQR and cascade PID under the same sensor suites, "
+        "plus plant-fidelity variants."
     )
     doc["ui"]["about_paragraphs"] = about_paragraphs
-    doc["ui"]["tabs"] = [
-        "overview",
-        "flight",
-        "estimation",
-        "envelope",
-        "monte_carlo",
-        "compare",
-        "metrics",
-    ]
     write_gallery(doc, out, copy_app=True, template_dir=root / "docs" / "showcase")
     meta = {
         "schema_version": GALLERY_SCHEMA,

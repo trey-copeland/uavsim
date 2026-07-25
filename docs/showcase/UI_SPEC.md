@@ -57,12 +57,14 @@ Stack schema source of truth: [STACK_SPEC.md](STACK_SPEC.md).
 
 | Mission id | Short label | Default run | Role |
 |------------|-------------|-------------|------|
-| `baseline` | Baseline | `figure_eight_lqr` | Constant-yaw portfolio path |
-| `envelope_edge` | Envelope edge | `edge_figure_eight_lqr` | τ★≈0.28 + scheduled yaw |
+| `baseline` | Baseline | `figure_eight_lqr` | Constant-yaw portfolio path (`matrix_kind: estimation`) |
+| `envelope_edge` | Envelope edge | `edge_figure_eight_lqr` | τ★≈0.28 + scheduled yaw (`matrix_kind: estimation`) |
+| `plant_fidelity` | Plant | `plant_nominal_lqr` | Ideal LQR × plant variants (`matrix_kind: plant`) |
 
 - **Primary control:** segmented buttons in the sticky header only.
 - **In-tab:** `Active mission · …` chip (no second full selector).
 - Changing mission rebinds matrix metrics, run pickers, MC default, and Compare defaults via `missions[]` + `run_id_by_mission` / `metrics_by_mission`.
+- Overview matrix source: `estimation_matrix` vs `plant_matrix` from `mission.matrix_kind`.
 
 ---
 

@@ -1,0 +1,18 @@
+# Low figure-eight for ground-effect teaching (NED, z+ down).
+# Paired with default_quadrotor_ge (ground_z_ned_m=1.05, R≈0.12 m).
+# Path stays near the deck so κ(h) is material without requiring pure hover.
+schema_version: 1
+name: figure_eight_low_ge
+description: >
+  Compressed-altitude figure-eight near ground for GE plant demos.
+frame: NED
+waypoints:
+  - {label: start_rest, time: 0.0, x: 0.0, y: 0.0, z: 0.95, yaw: 0.0}
+  - {label: right_begin, time: 4.0, x: 1.0, y: 0.5, z: 0.90, yaw: 0.0}
+  - {label: right_peak, time: 8.0, x: 2.0, y: 0.0, z: 0.85, yaw: 0.0}
+  - {label: right_bottom, time: 12.0, x: 1.0, y: -0.5, z: 0.90, yaw: 0.0}
+  - {label: center_cross, time: 16.0, x: 0.0, y: 0.0, z: 0.95, yaw: 0.0}
+  - {label: left_bottom, time: 20.0, x: -1.0, y: -0.5, z: 1.00, yaw: 0.0}
+  - {label: left_peak, time: 24.0, x: -2.0, y: 0.0, z: 1.00, yaw: 0.0}
+  - {label: left_top, time: 28.0, x: -1.0, y: 0.5, z: 0.95, yaw: 0.0}
+  - {label: end_rest, time: 32.0, x: 0.0, y: 0.0, z: 0.95, yaw: 0.0}

@@ -151,6 +151,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip near-envelope (τ★ + scheduled yaw) twin matrix (faster smoke builds)",
     )
+    p_gallery.add_argument(
+        "--skip-plant-mission",
+        action="store_true",
+        help="Skip plant-fidelity (motors/aero/GE/quat) ideal-LQR matrix",
+    )
 
     p_report = sub.add_parser(
         "report",
@@ -387,6 +392,7 @@ def main(argv: list[str] | None = None) -> int:
                     n_mc_trials=args.n_mc_trials,
                     skip_envelope=bool(getattr(args, "skip_envelope", False)),
                     skip_edge_mission=bool(getattr(args, "skip_edge_mission", False)),
+                    skip_plant_mission=bool(getattr(args, "skip_plant_mission", False)),
                 )
                 print(f"[OK] base-case gallery → {path}")
                 print(f"  open {(args.out or Path('docs/showcase')) / 'index.html'}")

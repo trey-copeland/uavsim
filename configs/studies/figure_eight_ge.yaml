@@ -1,0 +1,33 @@
+# Low figure-eight under Cheeseman–Bennett ground effect.
+# Geometry matches figure_eight but held lower so AGL is small vs rotor radius
+# (vehicle ground_z_ned_m=1.05, path z≈0.85–1.0 → AGL ~0.05–0.2 m).
+# Vacuum hover LQR (no GE in A,B) — teaching: unmodeled κ(h) bias.
+schema_version: 1
+study_id: figure_eight_ge
+seed: 0
+
+vehicle: configs/vehicles/default_quadrotor_ge.yaml
+
+controller:
+  type: lqr_hover
+  Q_diag: [100, 100, 100, 10, 10, 1, 10, 10, 10, 1, 1, 0.1]
+  R_diag: [0.1, 1.0, 1.0, 1.0]
+
+guidance:
+  type: waypoints
+  mission_file: configs/missions/figure_eight_low_ge.yaml
+  method: auto
+  yaw_mode: constant
+  sample_dt_s: 0.01
+  fail_on_infeasible: false
+
+sim:
+  dt_s: 0.01
+  method: rk45
+  rtol: 1.0e-5
+  atol: 1.0e-7
+  attitude: euler
+  plant: wrench
+
+metrics:
+  position_bound_m: 0.75

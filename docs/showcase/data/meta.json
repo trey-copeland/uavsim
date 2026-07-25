@@ -28,12 +28,19 @@
     "edge_ahrs_kf_pid",
     "edge_flow_alt_kf_pid",
     "edge_imu_only_kf_pid",
-    "edge_gps_imu_lqg_mc"
+    "edge_gps_imu_lqg_mc",
+    "plant_nominal_lqr",
+    "plant_motors_lqr",
+    "plant_aero_lqr",
+    "plant_ge_lqr",
+    "plant_quat_lqr"
   ],
   "missions": [
     "baseline",
-    "envelope_edge"
+    "envelope_edge",
+    "plant_fidelity"
   ],
   "has_envelope": true,
-  "command": "uavsim gallery --base-case"
+  "command": "uavsim gallery --base-case",
+  "has_plant_matrix": true
 }

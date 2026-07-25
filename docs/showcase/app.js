@@ -7,6 +7,26 @@
     if (!role) return e("span", { className: "badge" }, "run");
     if (role.includes("monte_carlo") || role.includes("mc"))
       return e("span", { className: "badge mc" }, "MC");
+    // Plant-fidelity roles
+    if (role.startsWith("plant_")) {
+      const plantLabel = {
+        plant_nominal: "vacuum",
+        plant_motors: "motors",
+        plant_aero: "aero",
+        plant_ge: "GE",
+        plant_quat: "quat",
+      };
+      return e(
+        "span",
+        { className: "badge-row" },
+        e(
+          "span",
+          { className: "badge lqr" },
+          plantLabel[role] || role.replace("plant_", "")
+        ),
+        e("span", { className: "badge" }, "LQR")
+      );
+    }
     const parts = [];
     if (role.includes("naive"))
       parts.push(e("span", { key: "n", className: "badge naive" }, "naive"));
@@ -1059,10 +1079,16 @@
     (doc.runs || []).forEach(function (r) {
       byId[r.id] = r;
     });
-    const matrix = doc.estimation_matrix;
+    // Estimation missions use controller×sensor matrix; plant_fidelity uses plant matrix.
+    const matrixKind = (mission && mission.matrix_kind) || "estimation";
+    const matrix =
+      matrixKind === "plant"
+        ? doc.plant_matrix || null
+        : doc.estimation_matrix || null;
     const columns = (matrix && matrix.columns) || null;
     const rowDefs = (matrix && matrix.rows) || null;
     const scenarios = (matrix && matrix.scenarios) || [];
+    const isPlantMatrix = matrixKind === "plant";
     const [highlightPair, setHighlightPair] = useState(true);
 
     function fmtRmse(v) {
@@ -1092,7 +1118,10 @@
       const tibStr =
         tib != null && Number.isFinite(+tib) ? Math.round(100 * +tib) + "% in-bound" : null;
       const teach =
-        highlightPair && sc.column && TEACHING_PAIR_COLUMNS[sc.column];
+        !isPlantMatrix &&
+        highlightPair &&
+        sc.column &&
+        TEACHING_PAIR_COLUMNS[sc.column];
       return e(
         "div",
         {
@@ -1146,38 +1175,63 @@
             e(
               "div",
               { className: "row matrix-mission-row" },
-              e("h2", { style: { margin: 0, flex: "1 1 auto" } }, matrix.title || "Controller × sensor matrix"),
+              e(
+                "h2",
+                { style: { margin: 0, flex: "1 1 auto" } },
+                matrix.title ||
+                  (isPlantMatrix
+                    ? "Plant fidelity matrix"
+                    : "Controller × sensor matrix")
+              ),
               e(ActiveMissionChip, { doc: doc, missionId: missionId })
             ),
             e(
               "p",
               { className: "matrix-lead" },
-              "Position RMSE for each controller×sensor cell. Click a cell to open Flight 3D. ",
-              "Read ",
-              e("strong", null, "down a column"),
-              " (same sensors, different law) or ",
-              e("strong", null, "across a row"),
-              " (same law, fewer measurements)."
+              isPlantMatrix
+                ? "Position RMSE for each plant/actuator variant under ideal full-state LQR. Click a cell → Flight 3D; System tab shows the closed-loop diagram with plant badges."
+                : null,
+              !isPlantMatrix
+                ? e(
+                    React.Fragment,
+                    null,
+                    "Position RMSE for each controller×sensor cell. Click a cell to open Flight 3D. ",
+                    "Read ",
+                    e("strong", null, "down a column"),
+                    " (same sensors, different law) or ",
+                    e("strong", null, "across a row"),
+                    " (same law, fewer measurements)."
+                  )
+                : null
             ),
             e(
               "div",
               { className: "matrix-legend" },
               e("span", { className: "legend-item" }, e("span", { className: "lg pass" }), " within bound"),
               e("span", { className: "legend-item" }, e("span", { className: "lg fail" }), " exceeds bound"),
-              e("span", { className: "legend-item" }, e("span", { className: "lg teach" }), " GPS+IMU naive vs KF"),
+              !isPlantMatrix
+                ? e(
+                    "span",
+                    { className: "legend-item" },
+                    e("span", { className: "lg teach" }),
+                    " GPS+IMU naive vs KF"
+                  )
+                : null,
               e("span", { className: "legend-item muted" }, "click → Flight"),
-              e(
-                "label",
-                { className: "legend-toggle" },
-                e("input", {
-                  type: "checkbox",
-                  checked: highlightPair,
-                  onChange: function (ev) {
-                    setHighlightPair(ev.target.checked);
-                  },
-                }),
-                " Highlight GPS+IMU naive vs KF"
-              )
+              !isPlantMatrix
+                ? e(
+                    "label",
+                    { className: "legend-toggle" },
+                    e("input", {
+                      type: "checkbox",
+                      checked: highlightPair,
+                      onChange: function (ev) {
+                        setHighlightPair(ev.target.checked);
+                      },
+                    }),
+                    " Highlight GPS+IMU naive vs KF"
+                  )
+                : null
             ),
             e(
               "div",
@@ -1194,7 +1248,9 @@
                       key: c.id,
                       className:
                         "sensor" +
-                        (highlightPair && TEACHING_PAIR_COLUMNS[c.id] ? " col-teach" : ""),
+                        (!isPlantMatrix && highlightPair && TEACHING_PAIR_COLUMNS[c.id]
+                          ? " col-teach"
+                          : ""),
                     });
                   })
                 ),
@@ -1204,14 +1260,22 @@
                   e(
                     "tr",
                     null,
-                    e("th", { className: "corner" }, "Law \\ sensors"),
+                    e(
+                      "th",
+                      { className: "corner" },
+                      isPlantMatrix ? "Law \\ plant" : "Law \\ sensors"
+                    ),
                     columns.map(function (c) {
                       return e(
                         "th",
                         {
                           key: c.id,
                           className:
-                            highlightPair && TEACHING_PAIR_COLUMNS[c.id] ? "th-teach" : "",
+                            !isPlantMatrix &&
+                            highlightPair &&
+                            TEACHING_PAIR_COLUMNS[c.id]
+                              ? "th-teach"
+                              : "",
                         },
                         e("div", { className: "col-label" }, c.label),
                         e(
@@ -3120,6 +3184,22 @@
 
   function EstimationTab({ doc, onSelectRun, missionId }) {
     const matrix = doc.estimation_matrix;
+    const mission = getMission(doc, missionId);
+    if (mission && mission.matrix_kind === "plant") {
+      return e(
+        "div",
+        { className: "card" },
+        e("h2", { style: { marginTop: 0 } }, "Estimation matrix"),
+        e(
+          "p",
+          null,
+          "The active mission is ",
+          e("strong", null, "plant fidelity"),
+          " — plant/actuator variants under ideal LQR, not controller×sensor stacks. ",
+          "Use Overview for the plant matrix, or switch Mission to Baseline / Envelope edge for this tab."
+        )
+      );
+    }
     if (!matrix || !matrix.scenarios || !matrix.scenarios.length) {
       return e(
         "div",
@@ -3134,7 +3214,6 @@
     (doc.runs || []).forEach(function (r) {
       byId[r.id] = r;
     });
-    const mission = getMission(doc, missionId);
     const [rowSuccess, setRowSuccess] = useState("all");
     const [rowQuery, setRowQuery] = useState("");
     const [rowSort, setRowSort] = useState({ key: "rmse_position_m", dir: "asc" });

@@ -239,13 +239,23 @@ Styles: match existing dark theme (`styles.css`). Accessible: focusable blocks, 
 - Link from `docs/showcase/README.md`
 - This file is the schema source of truth for Phase 0–1
 
-## 7. Later (not this branch slice)
+## 7. Plant fidelity mission
 
-- Mission `plant_fidelity` matrix
+| Field | Value |
+|-------|--------|
+| Mission id | `plant_fidelity` |
+| `matrix_kind` | `plant` |
+| Matrix field | `plant_matrix` on `showcase.json` |
+| Studies | `PLANT_FIDELITY_STUDIES` in `gallery.py` (nominal / motors / aero / GE / quat) |
+
+Overview uses `plant_matrix` when the active mission has `matrix_kind: "plant"`. System tab works unchanged — plant/actuator badges differ per cell.
+
+## 8. Later
+
 - Export hover \(A,B\) into `details.plant.linearization`
 - Lazy `data/runs/<id>/stack.json` if payload grows
 - Per-rotor thrust Flight overlay
 
 ---
 
-**Last updated:** 2026-07-24 — Phase 0–1 contract for branch work.
+**Last updated:** 2026-07-24 — Phase 0–1 + plant_fidelity mission.
