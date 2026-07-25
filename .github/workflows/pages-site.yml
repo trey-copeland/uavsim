@@ -1,0 +1,180 @@
+# Publish static GitHub Pages site from gh-pages:
+#   /              → portfolio showcase (docs/showcase)
+#   /intercept/    → intercept L0 + MC demo (docs/demos/intercept)
+#
+# Why peaceiris + explicit Pages API (same as former pages-showcase.yml):
+#   - Pure "GitHub Actions" Pages 404s until a site exists.
+#   - Pushing to gh-pages alone does not always rebuild if Pages source was never set.
+#   - After deploy we create/update the Pages site (branch: gh-pages, path: /)
+#     and request a build so https://<user>.github.io/<repo>/ picks up new files.
+#
+# Combined publish_dir avoids force_orphan wiping one site when the other deploys.
+name: Pages site
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "docs/showcase/**"
+      - "docs/demos/intercept/**"
+      - ".github/workflows/pages-site.yml"
+      - ".github/workflows/pages-showcase.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: pages-site
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify showcase payload
+        run: |
+          set -euo pipefail
+          test -f docs/showcase/index.html
+          test -f docs/showcase/app.js
+          test -f docs/showcase/styles.css
+          test -f docs/showcase/data/showcase.json
+          python3 -c "import json; d=json.load(open('docs/showcase/data/showcase.json')); assert d.get('runs')"
+          echo "Showcase OK ($(wc -c < docs/showcase/data/showcase.json) bytes data)"
+
+      - name: Verify intercept demo payload
+        run: |
+          set -euo pipefail
+          test -f docs/demos/intercept/index.html
+          test -f docs/demos/intercept/app.js
+          test -f docs/demos/intercept/styles.css
+          test -f docs/demos/intercept/data/demo.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d = json.loads(Path("docs/demos/intercept/data/demo.json").read_text(encoding="utf-8"))
+          assert d.get("cases"), "demo.json missing cases"
+          assert "success" in d["cases"], "demo.json missing cases.success"
+          mc = d.get("mc") or {}
+          n = int(mc.get("n_trials") or 0)
+          print(f"Intercept OK cases={list(d['cases'])} n_trials={n} p_capture={((mc.get('summary') or {}).get('p_capture'))}")
+          PY
+          echo "Intercept demo data $(wc -c < docs/demos/intercept/data/demo.json) bytes"
+
+      - name: Assemble site + cache-bust asset URLs
+        run: |
+          set -euo pipefail
+          SHA="${GITHUB_SHA:0:7}"
+          rm -rf _site
+          mkdir -p _site
+          # Showcase at site root (preserves existing public URLs)
+          cp -a docs/showcase/. _site/
+          # Intercept demo under /intercept/
+          mkdir -p _site/intercept
+          cp -a docs/demos/intercept/index.html \
+                docs/demos/intercept/app.js \
+                docs/demos/intercept/styles.css \
+                _site/intercept/
+          mkdir -p _site/intercept/data
+          cp -a docs/demos/intercept/data/demo.json _site/intercept/data/
+          # Do not ship design/checklist md or exporter scripts on Pages
+          #
+          # Cache-bust (showcase)
+          sed -i "s|href=\"./styles.css\"|href=\"./styles.css?v=${SHA}\"|" _site/index.html
+          sed -i "s|src=\"./app.js\"|src=\"./app.js?v=${SHA}\"|" _site/index.html
+          sed -i "s|href=\"./styles.css?v=1\"|href=\"./styles.css?v=${SHA}\"|" _site/index.html || true
+          sed -i "s|src=\"./app.js?v=1\"|src=\"./app.js?v=${SHA}\"|" _site/index.html || true
+          sed -i "s|fetch(\"./data/showcase.json\")|fetch(\"./data/showcase.json?v=${SHA}\")|" _site/app.js
+          printf '%s\n' "${SHA}" > _site/data/BUILD_SHA
+          #
+          # Cache-bust (intercept)
+          python3 - <<PY
+          from pathlib import Path
+          import re
+          sha = "${SHA}"
+          idx = Path("_site/intercept/index.html")
+          t = idx.read_text(encoding="utf-8")
+          t = re.sub(r'href="\./styles\.css(?:\?v=[^"]*)?"', f'href="./styles.css?v={sha}"', t)
+          t = re.sub(r'src="\./app\.js(?:\?v=[^"]*)?"', f'src="./app.js?v={sha}"', t)
+          idx.write_text(t, encoding="utf-8")
+          app = Path("_site/intercept/app.js")
+          a = app.read_text(encoding="utf-8")
+          a = re.sub(
+              r'''(["'])\./data/demo\.json(?:\?v=[^"']*)?\1''',
+              rf'\1./data/demo.json?v={sha}\1',
+              a,
+              count=8,
+          )
+          # Default load path in boot()
+          a = a.replace(
+              'let url = "./data/demo.json";',
+              f'let url = "./data/demo.json?v={sha}";',
+          )
+          app.write_text(a, encoding="utf-8")
+          Path("_site/intercept/data/BUILD_SHA").write_text(sha + "\n", encoding="utf-8")
+          print(f"Cache-bust version={sha}")
+          PY
+          ls -la _site/ _site/intercept/ _site/intercept/data/
+          grep -E 'app\.js|demo\.json|showcase\.json' _site/index.html _site/intercept/index.html | head -20
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_site
+          force_orphan: true
+          user_name: "github-actions[bot]"
+          user_email: "github-actions[bot]@users.noreply.github.com"
+
+      - name: Point GitHub Pages at gh-pages and request build
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const source = { branch: "gh-pages", path: "/" };
+
+            async function ensurePages() {
+              try {
+                const { data } = await github.rest.repos.getPages({ owner, repo });
+                console.log("Pages exists:", JSON.stringify(data.source || data));
+                try {
+                  await github.rest.repos.updateInformationAboutPagesSite({
+                    owner,
+                    repo,
+                    build_type: "legacy",
+                    source,
+                  });
+                  console.log("Updated Pages source → gh-pages /");
+                } catch (upd) {
+                  console.log("updateInformationAboutPagesSite:", upd.status, upd.message);
+                }
+              } catch (err) {
+                if (err.status !== 404) throw err;
+                console.log("No Pages site yet; creating (legacy, gh-pages /)…");
+                await github.rest.repos.createPagesSite({
+                  owner,
+                  repo,
+                  build_type: "legacy",
+                  source,
+                });
+                console.log("Created Pages site");
+              }
+            }
+
+            await ensurePages();
+
+            try {
+              const build = await github.rest.repos.requestPagesBuild({ owner, repo });
+              console.log("Requested Pages build:", build.data.status, build.data.url);
+            } catch (bErr) {
+              console.log("requestPagesBuild failed:", bErr.status, bErr.message);
+              core.warning(
+                "Could not request a Pages build via API. " +
+                "In the repo: Settings → Pages → Source: Deploy from a branch → gh-pages / (root)."
+              );
+            }

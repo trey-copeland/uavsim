@@ -7,7 +7,20 @@ Thin single-mission dashboard for the L0 open-loop intercept + plant Monte Carlo
 - **Stack:** HTML + vanilla JS + Plotly CDN (no npm build)
 - **Data:** [`data/demo.json`](data/demo.json) (offline pack; never reads `runs/` in the browser)
 
-## Open the demo
+## Live (GitHub Pages)
+
+When `main` updates `docs/demos/intercept/**` (or the Pages workflow is dispatched), CI assembles the site and publishes:
+
+| URL | Content |
+|-----|---------|
+| […/uavsim/](https://trey-copeland.github.io/uavsim/) | Portfolio showcase (root) |
+| […/uavsim/intercept/](https://trey-copeland.github.io/uavsim/intercept/) | **This intercept demo** |
+
+Workflow: [`.github/workflows/pages-site.yml`](../../../.github/workflows/pages-site.yml) (showcase + intercept together so one does not wipe the other).
+
+Committed `data/demo.json` is what Pages serves — regenerate offline after MC runs, commit the pack, merge to `main`.
+
+## Open the demo locally
 
 Prefer a local static server (relative `fetch` of `data/demo.json` is blocked under many `file://` browsers):
 

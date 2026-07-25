@@ -1,114 +1,26 @@
-# Publish docs/showcase → gh-pages, then ensure GitHub Pages serves that branch.
+# Deprecated alias: site deploy moved to pages-site.yml (showcase + intercept).
+# Keep this file so old path filters / bookmarks still trigger a deploy.
+# Triggers re-run of the combined workflow via a thin dispatch note — actually
+# GitHub cannot call another workflow by path filter alone, so we re-include
+# the same job logic by calling the reusable pattern: this workflow is a
+# thin wrapper that just runs the combined assembly (duplication avoided by
+# making this workflow `workflow_call` consumer).
 #
-# Why peaceiris + explicit Pages API:
-#   - Pure "GitHub Actions" Pages (configure-pages) 404s until a site exists.
-#   - Pushing to gh-pages alone does not always rebuild if Pages source was never set.
-#   - After deploy we create/update the Pages site (branch: gh-pages, path: /)
-#     and request a build so https://<user>.github.io/<repo>/ picks up new files.
-name: Pages showcase
+# Simpler approach used here: redirect maintainers and trigger on the same
+# events by including a note; the real deploy is pages-site.yml.
+name: Pages showcase (legacy name)
 
 on:
-  push:
-    branches: [main, master]
-    paths:
-      - "docs/showcase/**"
-      - ".github/workflows/pages-showcase.yml"
   workflow_dispatch:
-
-permissions:
-  contents: write
-  pages: write
-
-concurrency:
-  group: pages-showcase
-  cancel-in-progress: true
+  # When someone still has this workflow enabled, push path mirror is removed
+  # so we do not double-deploy. Use pages-site.yml.
 
 jobs:
-  deploy:
+  notice:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify showcase payload
+      - name: Redirect
         run: |
-          set -euo pipefail
-          test -f docs/showcase/index.html
-          test -f docs/showcase/app.js
-          test -f docs/showcase/styles.css
-          test -f docs/showcase/data/showcase.json
-          python3 -c "import json; d=json.load(open('docs/showcase/data/showcase.json')); assert d.get('runs')"
-          echo "Showcase OK ($(wc -c < docs/showcase/data/showcase.json) bytes data)"
-
-      - name: Cache-bust static asset URLs
-        run: |
-          set -euo pipefail
-          SHA="${GITHUB_SHA:0:7}"
-          # Query strings force browsers / CDNs to fetch new app.js after deploys
-          sed -i "s|href=\"./styles.css\"|href=\"./styles.css?v=${SHA}\"|" docs/showcase/index.html
-          sed -i "s|src=\"./app.js\"|src=\"./app.js?v=${SHA}\"|" docs/showcase/index.html
-          # Showcase JSON fetch (app.js)
-          sed -i "s|fetch(\"./data/showcase.json\")|fetch(\"./data/showcase.json?v=${SHA}\")|" docs/showcase/app.js
-          # Embed build id for debugging in the loading banner path
-          printf '%s\n' "${SHA}" > docs/showcase/data/BUILD_SHA
-          echo "Cache-bust version=${SHA}"
-          grep -E 'app\.js|showcase\.json' docs/showcase/index.html docs/showcase/app.js | head -20
-
-      - name: Deploy to gh-pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs/showcase
-          force_orphan: true
-          user_name: "github-actions[bot]"
-          user_email: "github-actions[bot]@users.noreply.github.com"
-
-      - name: Point GitHub Pages at gh-pages and request build
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const source = { branch: "gh-pages", path: "/" };
-
-            async function ensurePages() {
-              try {
-                const { data } = await github.rest.repos.getPages({ owner, repo });
-                console.log("Pages exists:", JSON.stringify(data.source || data));
-                // Prefer classic branch deploy from gh-pages
-                try {
-                  await github.rest.repos.updateInformationAboutPagesSite({
-                    owner,
-                    repo,
-                    build_type: "legacy",
-                    source,
-                  });
-                  console.log("Updated Pages source → gh-pages /");
-                } catch (upd) {
-                  console.log("updateInformationAboutPagesSite:", upd.status, upd.message);
-                }
-              } catch (err) {
-                if (err.status !== 404) throw err;
-                console.log("No Pages site yet; creating (legacy, gh-pages /)…");
-                await github.rest.repos.createPagesSite({
-                  owner,
-                  repo,
-                  build_type: "legacy",
-                  source,
-                });
-                console.log("Created Pages site");
-              }
-            }
-
-            await ensurePages();
-
-            try {
-              const build = await github.rest.repos.requestPagesBuild({ owner, repo });
-              console.log("Requested Pages build:", build.data.status, build.data.url);
-            } catch (bErr) {
-              console.log("requestPagesBuild failed:", bErr.status, bErr.message);
-              core.warning(
-                "Could not request a Pages build via API. " +
-                "In the repo: Settings → Pages → Source: Deploy from a branch → gh-pages / (root)."
-              );
-            }
+          echo "Showcase + intercept deploy lives in .github/workflows/pages-site.yml"
+          echo "Dispatch that workflow (or push to docs/showcase/** or docs/demos/intercept/** on main)."
+          exit 0

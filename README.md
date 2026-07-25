@@ -9,6 +9,7 @@
 | | |
 |--|--|
 | **Live results showcase** | **[trey-copeland.github.io/uavsim](https://trey-copeland.github.io/uavsim/)** |
+| **Intercept L0 + MC demo** | **[…/uavsim/intercept/](https://trey-copeland.github.io/uavsim/intercept/)** |
 | **Install** | Python 3.11+ · [uv](https://docs.astral.sh/uv/) · `uv sync --extra dev` |
 | **Heritage** | Redesign of **[quad_uav](https://github.com/trey-copeland/quad_uav)** (ME590 MATLAB) — not a line-for-line port |
 | **License** | [MIT](LICENSE) |
@@ -120,21 +121,22 @@ uv run uavsim --help
 
 ---
 
-## Live showcase
+## Live showcase & demos
 
-Interactive React rollup of the portfolio studies (controller × sensor matrix, multi-mission stress, plant fidelity, **LQR / PID / NDI**, envelope, MC):
+Interactive React rollup of the portfolio studies (controller × sensor matrix, multi-mission stress, plant fidelity, **LQR / PID / NDI**, envelope, MC), plus a thin **intercept L0 + plant MC** demo.
 
-**→ [Open the live showcase](https://trey-copeland.github.io/uavsim/)**
+**→ [Open the live showcase](https://trey-copeland.github.io/uavsim/)** · **[Intercept demo](https://trey-copeland.github.io/uavsim/intercept/)**
 
-| | |
-|--|--|
-| **Live** | [trey-copeland.github.io/uavsim](https://trey-copeland.github.io/uavsim/) |
-| **Local** | `python -m http.server 8765 --directory docs/showcase` → http://127.0.0.1:8765/ |
-| **Regenerate** | `uv run uavsim gallery --base-case` · source in [`docs/showcase/`](docs/showcase/) |
+| | Showcase | Intercept L0 + plant MC |
+|--|----------|-------------------------|
+| **Live** | [trey-copeland.github.io/uavsim](https://trey-copeland.github.io/uavsim/) | […/intercept/](https://trey-copeland.github.io/uavsim/intercept/) |
+| **Local** | `python -m http.server 8765 --directory docs/showcase` | `python -m http.server 8765 --directory docs/demos/intercept` |
+| **Source** | [`docs/showcase/`](docs/showcase/) | [`docs/demos/intercept/`](docs/demos/intercept/) |
+| **Pages CI** | [`.github/workflows/pages-site.yml`](.github/workflows/pages-site.yml) publishes **both** | same |
 
-**Missions:** baseline · near-envelope (τ★) · hi-fi plant · law-compare (aggressive aero+quat).  
-**Tabs:** overview matrix · estimation · Flight 3D · System · metrics · MC · envelope · compare.  
-Details: [showcase README](docs/showcase/README.md).
+**Showcase missions:** baseline · near-envelope (τ★) · hi-fi plant · law-compare (aggressive aero+quat).  
+**Showcase tabs:** overview matrix · estimation · Flight 3D · System · metrics · MC · envelope · compare.  
+Details: [showcase README](docs/showcase/README.md) · [intercept README](docs/demos/intercept/README.md).
 
 ---
 
