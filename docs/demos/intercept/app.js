@@ -165,20 +165,22 @@
 
   /** Actuator limits for thrust scaling (from pack ui or defaults). */
   function attitudeLimits() {
-    const ui = DATA && DATA.ui ? DATA.ui : {};
+    const ui = (demo && demo.ui) || {};
+    const lim = ui.limits || {};
     return {
-      thrust_max_n: +(ui.thrust_max_n || 66.2),
-      torque_max_nm: +(ui.torque_max_nm || 4.0),
+      thrust_max_n: +(lim.thrust_max_n || ui.thrust_max_n || 66.2),
+      torque_max_nm: +(lim.torque_max_nm || ui.torque_max_nm || 4.0),
     };
   }
 
   function mixParams() {
-    const ui = DATA && DATA.ui ? DATA.ui : {};
+    const ui = (demo && demo.ui) || {};
+    const veh = ui.vehicle || {};
     return {
-      arm_length_m: +(ui.arm_length_m || 0.32),
-      ct_n_s2: +(ui.ct_n_s2 || 1.02e-5),
-      cq_nm_s2: +(ui.cq_nm_s2 || 1.6e-7),
-      mass_kg: +(ui.mass_kg || 1.5),
+      arm_length_m: +(veh.arm_length_m || ui.arm_length_m || 0.32),
+      ct_n_s2: +(veh.ct_n_s2 || ui.ct_n_s2 || 1.02e-5),
+      cq_nm_s2: +(veh.cq_nm_s2 || ui.cq_nm_s2 || 1.6e-7),
+      mass_kg: +(veh.mass_kg || ui.mass_kg || 1.5),
     };
   }
 
@@ -499,11 +501,19 @@
 
   function applyFrameViews() {
     updateReadouts();
-    drawTraj3d(false);
-    drawAttitude(false);
-    drawTraj2d();
-    drawRange();
-    drawBattery();
+    [
+      [() => drawTraj3d(false), "traj3d"],
+      [() => drawAttitude(false), "attitude"],
+      [drawTraj2d, "traj2d"],
+      [drawRange, "range"],
+      [drawBattery, "battery"],
+    ].forEach(function (pair) {
+      try {
+        pair[0]();
+      } catch (err) {
+        console.error("[intercept demo] frame " + pair[1] + " failed:", err);
+      }
+    });
   }
 
   function wireControls() {
@@ -1492,12 +1502,22 @@
   }
 
   function drawAll() {
-    drawTraj3d(true);
-    drawAttitude(true);
-    drawTraj2d();
-    drawRange();
-    drawBattery();
-    drawHist();
+    // Isolate pane failures so one bad plot cannot blank the rest.
+    const panes = [
+      ["traj3d", drawTraj3d],
+      ["attitude", drawAttitude],
+      ["traj2d", drawTraj2d],
+      ["range", drawRange],
+      ["battery", drawBattery],
+      ["hist", drawHist],
+    ];
+    panes.forEach(function (pair) {
+      try {
+        pair[1](true);
+      } catch (err) {
+        console.error("[intercept demo] draw " + pair[0] + " failed:", err);
+      }
+    });
   }
 
   /* ── Load ──────────────────────────────────────────── */
