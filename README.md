@@ -3,13 +3,25 @@
 **Software-in-the-loop (SIL) quadrotor GNC** — configure a vehicle and mission, close the loop with **LQR**, cascade **PID**, or cascade **NDI**, run Monte Carlo, estimate state with optional KF/MEKF, and compare runs. Portfolio-grade analysis report (GitHub Pages showcase). Not flight-critical software.
 
 <p align="center">
-  <img src="docs/uavsim.gif" alt="uavsim closed-loop figure-eight Flight 3D showcase" width="720" />
+  <a href="https://trey-copeland.github.io/uavsim/">
+    <img src="docs/uavsim.gif" alt="uavsim portfolio showcase — figure-eight Flight 3D (click for live showcase)" width="720" />
+  </a>
+  <br />
+  <sub><a href="https://trey-copeland.github.io/uavsim/"><strong>Live portfolio showcase</strong></a> — controller × sensor matrix, Flight 3D, MC, envelope</sub>
+</p>
+
+<p align="center">
+  <a href="https://trey-copeland.github.io/uavsim/intercept/">
+    <img src="docs/demo-intercept.gif" alt="uavsim intercept demo — pad climb, online pursue, MC cloud (click for live dashboard)" width="720" />
+  </a>
+  <br />
+  <sub><a href="https://trey-copeland.github.io/uavsim/intercept/"><strong>Live intercept dashboard</strong></a> — online G-6 pursue, MEKF, battery, plant MC · <a href="docs/tutorials/01_online_intercept.md">tutorial</a></sub>
 </p>
 
 | | |
 |--|--|
-| **Live results showcase** | **[trey-copeland.github.io/uavsim](https://trey-copeland.github.io/uavsim/)** |
-| **Intercept L0 + MC demo** | **[…/uavsim/intercept/](https://trey-copeland.github.io/uavsim/intercept/)** |
+| **Live portfolio showcase** | **[trey-copeland.github.io/uavsim](https://trey-copeland.github.io/uavsim/)** |
+| **Live intercept dashboard** | **[…/uavsim/intercept/](https://trey-copeland.github.io/uavsim/intercept/)** |
 | **Install** | Python 3.11+ · [uv](https://docs.astral.sh/uv/) · `uv sync --extra dev` |
 | **Heritage** | Redesign of **[quad_uav](https://github.com/trey-copeland/quad_uav)** (ME590 MATLAB) — not a line-for-line port |
 | **License** | [MIT](LICENSE) |
