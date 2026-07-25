@@ -383,9 +383,9 @@
             <button type="button" data-speed="1" class="${speed === 1 ? "active" : ""}">1×</button>
             <button type="button" data-speed="2" class="${speed === 2 ? "active" : ""}">2×</button>
           </div>
-          <label class="tool-label transport-bands" id="bands-label" title="${hasBands() ? "Show MC percentile bands on 2D + 3D" : "Bands not in data pack"}">
+          <label class="tool-label transport-bands" id="bands-label" title="${hasBands() ? "Show soft MC plant-scatter cloud on 2D + 3D" : "Bands not in data pack"}">
             <input type="checkbox" id="bands-toggle" ${showBands && hasBands() ? "checked" : ""} ${hasBands() ? "" : "disabled"} />
-            MC bands
+            MC cloud
           </label>
           <div class="soc-strip ${batt ? "" : "hidden"}" id="soc-strip" title="State of charge @ scrub">
             <span class="soc-label">SOC</span>
@@ -794,52 +794,213 @@
     };
   }
 
-  function bandTrace2d(bands) {
-    if (!bands || !bands.ownship) return null;
+  /** Linear blend of two same-length arrays. */
+  function _lerpArr(a, b, t) {
+    const out = [];
+    for (let i = 0; i < a.length; i++) out.push((1 - t) * a[i] + t * b[i]);
+    return out;
+  }
+
+  /**
+   * Soft MC cloud from axis-wise p5/p50/p95 (no hard envelope stroke).
+   * Nested translucent fills + faint scatter → cloud rather than wire outline.
+   */
+  function bandCloudTraces2d(bands) {
+    if (!bands || !bands.ownship) return [];
     const own = bands.ownship;
-    let xLo, xHi, yLo, yHi, p50x, p50y;
+    let x5, x50, x95, y5, y50, y95;
     if (projection === "NE") {
-      if (!own.E || !own.N) return null;
-      xLo = own.E.p5;
-      xHi = own.E.p95;
-      yLo = own.N.p5;
-      yHi = own.N.p95;
-      p50x = own.E.p50;
-      p50y = own.N.p50;
+      if (!own.E || !own.N) return [];
+      x5 = own.E.p5;
+      x50 = own.E.p50;
+      x95 = own.E.p95;
+      y5 = own.N.p5;
+      y50 = own.N.p50;
+      y95 = own.N.p95;
     } else {
-      if (!own.N || !own.U) return null;
-      xLo = own.N.p5;
-      xHi = own.N.p95;
-      yLo = own.U.p5;
-      yHi = own.U.p95;
-      p50x = own.N.p50;
-      p50y = own.U.p50;
+      if (!own.N || !own.U) return [];
+      x5 = own.N.p5;
+      x50 = own.N.p50;
+      x95 = own.N.p95;
+      y5 = own.U.p5;
+      y50 = own.U.p50;
+      y95 = own.U.p95;
     }
-    if (!xLo || !xHi || !yLo || !yHi) return null;
-    const x = xLo.concat(xHi.slice().reverse());
-    const y = yLo.concat(yHi.slice().reverse());
-    const fill = {
-      x: x,
-      y: y,
-      fill: "toself",
-      fillcolor: "rgba(91, 159, 212, 0.18)",
-      line: { color: "rgba(91, 159, 212, 0.4)", width: 1 },
-      name: "MC p5–p95",
+    if (!x5 || !x95 || !y5 || !y95) return [];
+
+    const traces = [];
+    // Nested lo–hi ribbons (outer → inner): soft fill, no hard stroke
+    // Outer: p5–p95; inner: blend toward p50 for denser core
+    const shells = [
+      { xL: x5, xH: x95, yL: y5, yH: y95, a: 0.11, name: "MC cloud", legend: true },
+      {
+        xL: _lerpArr(x5, x50, 0.45),
+        xH: _lerpArr(x95, x50, 0.45),
+        yL: _lerpArr(y5, y50, 0.45),
+        yH: _lerpArr(y95, y50, 0.45),
+        a: 0.16,
+        name: "MC core",
+        legend: false,
+      },
+    ];
+    shells.forEach(function (sh) {
+      traces.push({
+        x: sh.xL.concat(sh.xH.slice().reverse()),
+        y: sh.yL.concat(sh.yH.slice().reverse()),
+        fill: "toself",
+        fillcolor: "rgba(91, 159, 212, " + sh.a + ")",
+        line: { color: "rgba(91, 159, 212, 0)", width: 0 },
+        name: sh.name,
+        hoverinfo: "skip",
+        mode: "lines",
+        showlegend: sh.legend,
+      });
+    });
+
+    // Soft centerline (very light)
+    if (x50 && y50) {
+      traces.push({
+        x: x50,
+        y: y50,
+        mode: "lines",
+        name: "MC median",
+        line: { color: "rgba(180, 210, 235, 0.35)", width: 1.5 },
+        hoverinfo: "skip",
+        showlegend: false,
+      });
+    }
+
+    // Speckle cloud: sample points between p5 and p95
+    const xs = [];
+    const ys = [];
+    const n = x5.length;
+    const step = Math.max(1, Math.floor(n / 48));
+    for (let i = 0; i < n; i += step) {
+      for (let k = 0; k < 5; k++) {
+        const u = Math.random();
+        // Bias samples toward median for denser core
+        const t = u * u;
+        const side = Math.random() < 0.5;
+        if (side) {
+          xs.push((1 - t) * x5[i] + t * x50[i]);
+          ys.push((1 - t) * y5[i] + t * y50[i]);
+        } else {
+          xs.push((1 - t) * x95[i] + t * x50[i]);
+          ys.push((1 - t) * y95[i] + t * y50[i]);
+        }
+      }
+    }
+    traces.push({
+      x: xs,
+      y: ys,
+      mode: "markers",
+      name: "MC samples",
+      marker: {
+        size: 3,
+        color: "rgba(91, 159, 212, 0.22)",
+        line: { width: 0 },
+      },
       hoverinfo: "skip",
-      mode: "lines",
-    };
-    const med =
-      p50x && p50y
-        ? {
-            x: p50x,
-            y: p50y,
-            mode: "lines",
-            name: "MC p50",
-            line: { color: "rgba(91, 159, 212, 0.55)", width: 1.2, dash: "dot" },
-            hoverinfo: "skip",
-          }
-        : null;
-    return { fill: fill, med: med };
+      showlegend: false,
+    });
+
+    return traces;
+  }
+
+  /** @deprecated alias — drawTraj2d uses bandCloudTraces2d */
+  function bandTrace2d(bands) {
+    const tr = bandCloudTraces2d(bands);
+    if (!tr.length) return null;
+    return { fill: tr[0], med: tr.length > 2 ? tr[2] : null, all: tr };
+  }
+
+  /**
+   * 3D MC cloud: interpolated ribbon strands + soft markers (no hard p5/p95 strokes).
+   */
+  function bandCloudTraces3d(bands) {
+    if (!bands || !bands.ownship) return [];
+    const o = bands.ownship;
+    if (!o.N || !o.E || !o.U) return [];
+    const n5 = o.N.p5;
+    const n50 = o.N.p50;
+    const n95 = o.N.p95;
+    const e5 = o.E.p5;
+    const e50 = o.E.p50;
+    const e95 = o.E.p95;
+    const u5 = o.U.p5;
+    const u50 = o.U.p50;
+    const u95 = o.U.p95;
+    if (!n5 || !n50 || !n95) return [];
+
+    const traces = [];
+    // Soft strands between p5–p50–p95 (percentile blends)
+    const strandTs = [0, 0.2, 0.4, 0.5, 0.6, 0.8, 1.0];
+    strandTs.forEach(function (t, idx) {
+      let Nx, Ex, Ux;
+      if (t <= 0.5) {
+        const a = t / 0.5;
+        Nx = _lerpArr(n5, n50, a);
+        Ex = _lerpArr(e5, e50, a);
+        Ux = _lerpArr(u5, u50, a);
+      } else {
+        const a = (t - 0.5) / 0.5;
+        Nx = _lerpArr(n50, n95, a);
+        Ex = _lerpArr(e50, e95, a);
+        Ux = _lerpArr(u50, u95, a);
+      }
+      const dist = Math.abs(t - 0.5);
+      const op = 0.12 + 0.28 * (1 - dist * 2); // denser near median
+      traces.push({
+        type: "scatter3d",
+        mode: "lines",
+        x: Nx,
+        y: Ex,
+        z: Ux,
+        line: { color: "rgba(91, 159, 212," + op.toFixed(3) + ")", width: dist < 0.05 ? 4 : 2 },
+        name: idx === 0 ? "MC cloud" : "MC strand",
+        showlegend: idx === 0,
+        hoverinfo: "skip",
+      });
+    });
+
+    // Speckle volume along envelope
+    const xs = [];
+    const ys = [];
+    const zs = [];
+    const n = n5.length;
+    const step = Math.max(1, Math.floor(n / 40));
+    for (let i = 0; i < n; i += step) {
+      for (let k = 0; k < 6; k++) {
+        const u = Math.random();
+        const t = u * u;
+        if (Math.random() < 0.5) {
+          xs.push((1 - t) * n5[i] + t * n50[i]);
+          ys.push((1 - t) * e5[i] + t * e50[i]);
+          zs.push((1 - t) * u5[i] + t * u50[i]);
+        } else {
+          xs.push((1 - t) * n95[i] + t * n50[i]);
+          ys.push((1 - t) * e95[i] + t * e50[i]);
+          zs.push((1 - t) * u95[i] + t * u50[i]);
+        }
+      }
+    }
+    traces.push({
+      type: "scatter3d",
+      mode: "markers",
+      x: xs,
+      y: ys,
+      z: zs,
+      marker: {
+        size: 2.2,
+        color: "rgba(91, 159, 212, 0.2)",
+        opacity: 0.85,
+        line: { width: 0 },
+      },
+      name: "MC samples",
+      showlegend: false,
+      hoverinfo: "skip",
+    });
+    return traces;
   }
 
   function cpaIndex(c, ts) {
@@ -928,24 +1089,8 @@
     traces.push(cornerTrace(bounds));
 
     if (showBands && hasBands()) {
-      const o = demo.mc.bands.ownship;
-      const fan = [
-        { k: "p5", op: 0.35, w: 3, name: "MC p5" },
-        { k: "p50", op: 0.55, w: 4, name: "MC p50" },
-        { k: "p95", op: 0.35, w: 3, name: "MC p95" },
-      ];
-      fan.forEach(function (f) {
-        if (!o.N[f.k] || !o.E[f.k] || !o.U[f.k]) return;
-        traces.push({
-          type: "scatter3d",
-          mode: "lines",
-          x: o.N[f.k],
-          y: o.E[f.k],
-          z: o.U[f.k],
-          line: { color: "rgba(91, 159, 212," + f.op + ")", width: f.w },
-          name: f.name,
-          hoverinfo: "skip",
-        });
+      bandCloudTraces3d(demo.mc.bands).forEach(function (tr) {
+        traces.push(tr);
       });
     }
 
@@ -1135,11 +1280,9 @@
     const traces = [];
 
     if (showBands && hasBands()) {
-      const bt = bandTrace2d(demo.mc.bands);
-      if (bt) {
-        traces.push(bt.fill);
-        if (bt.med) traces.push(bt.med);
-      }
+      bandCloudTraces2d(demo.mc.bands).forEach(function (tr) {
+        traces.push(tr);
+      });
     }
 
     if (tgt.length) {
