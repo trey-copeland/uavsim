@@ -107,7 +107,7 @@ Fallback constants live in `app.js` if JSON fields are missing.
 - Dual pane: trajectory (N/E/up) + vehicle attitude/wrench at origin.
 - Time scrubber; **← / →** frame step (Shift = ±10); ignore when focus is text inputs.
 - Trajectory: path, reference, trail, velocity cue, body triad at vehicle.
-- Vehicle: X-quad mesh, RGB body axes, thrust (−body *z*) and torque arrows, HUD (F, |τ|, φθψ, |v|).
+- Vehicle: X-quad mesh, RGB body axes, **per-rotor thrust** arrows (inverse X-quad mix of \(u\)), faint total \(F\), torque arrows, HUD (\(F\), \(f_i\), \(|\tau|\), \(\phi\theta\psi\)).
 - Run picker filtered to active mission; link to Run metrics.
 
 **Data fields:** `timeseries.t`, `pos_plot`, `ref_plot`, `euler_deg`, `vel_ned`, `omega`, `u`, `limits`.

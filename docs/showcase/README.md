@@ -58,7 +58,7 @@ Dual-pane scrubber view:
 | Panel | Content |
 |-------|---------|
 | **Trajectory** (left) | Path + reference, trail, velocity arrow, body triad at the vehicle |
-| **Vehicle attitude & wrench** (right) | X-quad mesh at origin, RGB body axes, thrust (−body \(z\)) and torque arrows scaled by magnitude, numeric HUD for \(F\), \(\|\tau\|\), \(\phi\theta\psi\), \(\|v\|\) |
+| **Vehicle attitude & wrench** (right) | X-quad mesh, RGB body axes, **per-rotor** thrust arrows (inverse mix of commanded \(u\)), faint total \(F\), torque, HUD for \(F\), \(f_i\), \(\|\tau\|\), attitude |
 
 Uses existing timeseries fields (`euler_deg`, `u`, `vel_ned`, `omega`, `limits`) — no gallery rebuild required for the UI.
 

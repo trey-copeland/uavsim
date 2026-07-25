@@ -462,15 +462,62 @@
       z: [o[2], o[2] + (d[2] / n) * length],
     };
   }
+
   /**
-   * X-quad mesh + wrench arrows in plot frame for current Euler (deg) and u.
+   * Default-vehicle X-quad inverse mixer (matches uavsim.dynamics.mixer).
+   * u = [F, τφ, τθ, τψ] → nonnegative motor forces f[4].
+   * arm_length_m=0.25, ct/cq from default_quadrotor.yaml.
+   */
+  function wrenchToMotorForces(u) {
+    const arm = 0.25;
+    const ell = arm / Math.SQRT2;
+    const ct = 3.405e-6;
+    const cq = 5.4e-8;
+    const k = cq / Math.max(ct, 1e-18);
+    // B columns = motors 1..4 (FR, FL, RL, RR in geometry: (+ℓ,+ℓ), (−ℓ,+ℓ), (−ℓ,−ℓ), (+ℓ,−ℓ))
+    // Matches allocation_matrix roll/pitch/yaw rows in mixer.py.
+    const B = [
+      [1, 1, 1, 1],
+      [-ell, -ell, ell, ell],
+      [ell, -ell, -ell, ell],
+      [k, -k, k, -k],
+    ];
+    // Solve B f = u (4×4 Gaussian elimination)
+    const a = B.map(function (row, i) {
+      return row.concat([+(u[i] || 0)]);
+    });
+    for (let col = 0; col < 4; col++) {
+      let piv = col;
+      for (let r = col + 1; r < 4; r++) {
+        if (Math.abs(a[r][col]) > Math.abs(a[piv][col])) piv = r;
+      }
+      const tmp = a[col];
+      a[col] = a[piv];
+      a[piv] = tmp;
+      const diag = a[col][col];
+      if (Math.abs(diag) < 1e-14) return [0, 0, 0, 0];
+      for (let c = col; c < 5; c++) a[col][c] /= diag;
+      for (let r = 0; r < 4; r++) {
+        if (r === col) continue;
+        const f = a[r][col];
+        for (let c = col; c < 5; c++) a[r][c] -= f * a[col][c];
+      }
+    }
+    return a.map(function (row) {
+      return Math.max(0, row[4]);
+    });
+  }
+
+  /**
+   * X-quad mesh + wrench arrows + per-rotor thrust in plot frame.
    */
   function vehicleGeom(eulerDeg, u, limits) {
     const phi = deg2rad(eulerDeg[0]);
     const theta = deg2rad(eulerDeg[1]);
     const psi = deg2rad(eulerDeg[2]);
     const R = rotationBodyToNed(phi, theta, psi);
-    const L = 0.38; // arm (body x/y projection)
+    const L = 0.38; // visual arm (body x/y); mix uses physical ℓ separately
+    // Motor hubs match mixer column order (positions consistent with B)
     const motorsB = [
       [L, L, 0],
       [-L, L, 0],
@@ -529,9 +576,26 @@
     const tNorm = Math.hypot(tx, ty, tz);
     const Fmax = (limits && limits.thrust_max_n) || 10;
     const Tmax = (limits && limits.torque_max_nm) || 1;
-    // Thrust along −body z (up in plot when level)
-    const thrustLen = 0.2 + 0.75 * Math.min(1.2, Math.max(0, F / Fmax));
+    // Total thrust (resultant) along −body z — dimmed when rotor vectors shown
+    const thrustLen = 0.15 + 0.45 * Math.min(1.2, Math.max(0, F / Fmax));
     const thrust = arrowSeg(R, [0, 0, 0], [0, 0, -1], thrustLen);
+
+    // Per-rotor forces from inverse mix; arrows from motor hubs along −body z
+    const fMotors = wrenchToMotorForces(u);
+    const fHover = Fmax > 0 ? Fmax / 8 : 0.6; // ~half of 2g hover per motor scale
+    const fRef = Math.max(fHover, 0.4);
+    const rotorX = [];
+    const rotorY = [];
+    const rotorZ = [];
+    fMotors.forEach(function (fi, i) {
+      const len = 0.12 + 0.7 * Math.min(1.35, Math.max(0, fi / fRef));
+      const seg = arrowSeg(R, motorsB[i], [0, 0, -1], len);
+      rotorX.push(seg.x[0], seg.x[1], null);
+      rotorY.push(seg.y[0], seg.y[1], null);
+      rotorZ.push(seg.z[0], seg.z[1], null);
+    });
+    const rotorThrust = { x: rotorX, y: rotorY, z: rotorZ };
+
     // Resultant torque in body frame
     let torque = { x: [0, 0], y: [0, 0], z: [0, 0] };
     if (tNorm > 1e-9) {
@@ -549,6 +613,8 @@
       motors: motors,
       axes: axes,
       thrust: thrust,
+      rotorThrust: rotorThrust,
+      fMotors: fMotors,
       torque: torque,
       tAx: tAx,
       tAy: tAy,
@@ -778,14 +844,26 @@
   }
 
   /**
-   * Vehicle attitude + wrench: X-quad mesh, body axes, thrust (−body z) and torque arrows.
+   * Vehicle attitude + wrench: X-quad mesh, body axes, per-rotor thrust, torque.
    * Uses same scrub index as the path plot. Fixed cube FOV at origin.
    */
   function VehicleAttitudeView({ runId, ts, frame, limits }) {
     const ref = useRef(null);
     const ready = useRef(false);
-    // trace indices: 0 bounds, 1 frame, 2 motors, 3 ax, 4 ay, 5 az, 6 thrust, 7 torque, 8–10 tau axes
-    const IDX = { frame: 1, motors: 2, ax: 3, ay: 4, az: 5, thrust: 6, torque: 7, tAx: 8, tAy: 9, tAz: 10 };
+    // 0 bounds, 1 frame, 2 motors, 3–5 axes, 6 total F, 7 rotor thrusts, 8 torque, 9–11 tau axes
+    const IDX = {
+      frame: 1,
+      motors: 2,
+      ax: 3,
+      ay: 4,
+      az: 5,
+      thrust: 6,
+      rotors: 7,
+      torque: 8,
+      tAx: 9,
+      tAy: 10,
+      tAz: 11,
+    };
 
     function applyFrame(i) {
       if (!ref.current || !window.Plotly || !ready.current || !ts) return;
@@ -805,6 +883,7 @@
             g.axes.y.x,
             g.axes.z.x,
             g.thrust.x,
+            g.rotorThrust.x,
             g.torque.x,
             g.tAx.x,
             g.tAy.x,
@@ -819,6 +898,7 @@
             g.axes.y.y,
             g.axes.z.y,
             g.thrust.y,
+            g.rotorThrust.y,
             g.torque.y,
             g.tAx.y,
             g.tAy.y,
@@ -833,13 +913,26 @@
             g.axes.y.z,
             g.axes.z.z,
             g.thrust.z,
+            g.rotorThrust.z,
             g.torque.z,
             g.tAx.z,
             g.tAy.z,
             g.tAz.z,
           ],
         },
-        [IDX.frame, IDX.motors, IDX.ax, IDX.ay, IDX.az, IDX.thrust, IDX.torque, IDX.tAx, IDX.tAy, IDX.tAz]
+        [
+          IDX.frame,
+          IDX.motors,
+          IDX.ax,
+          IDX.ay,
+          IDX.az,
+          IDX.thrust,
+          IDX.rotors,
+          IDX.torque,
+          IDX.tAx,
+          IDX.tAy,
+          IDX.tAz,
+        ]
       );
     }
 
@@ -915,7 +1008,8 @@
         line3(g0.axes.x, "#f07178", 6, "body +x", true),
         line3(g0.axes.y, "#3ecf8e", 6, "body +y", true),
         line3(g0.axes.z, "#5b9fd4", 6, "body +z", true),
-        line3(g0.thrust, "#4fd1ff", 12, "thrust −z", true),
+        line3(g0.thrust, "rgba(79,209,255,0.35)", 6, "ΣF −z", true),
+        line3(g0.rotorThrust, "#4fd1ff", 10, "rotor fᵢ", true),
         line3(g0.torque, "#e6b450", 10, "torque τ", true),
         line3(g0.tAx, "rgba(240,113,120,0.55)", 5, "τφ", false),
         line3(g0.tAy, "rgba(62,207,142,0.55)", 5, "τθ", false),
@@ -979,6 +1073,10 @@
     const Tmax = (limits && limits.torque_max_nm) || null;
     const fFrac = Fmax ? Math.min(1, Math.max(0, F / Fmax)) : null;
     const tFrac = Tmax ? Math.min(1, Math.max(0, tNorm / Tmax)) : null;
+    const fMotors = wrenchToMotorForces(u);
+    const fSum = fMotors.reduce(function (a, b) {
+      return a + b;
+    }, 0);
 
     function bar(frac, color) {
       if (frac === null) return null;
@@ -1002,6 +1100,27 @@
         e("div", { className: "hud-value accent-f" }, fmt(F, 3), e("span", { className: "hud-unit" }, " N")),
         bar(fFrac, "linear-gradient(90deg,#1a6a9a,#4fd1ff)"),
         Fmax ? e("div", { className: "hud-sub" }, fmt(100 * fFrac, 0), "% of limit ", fmt(Fmax, 1), " N") : null
+      ),
+      e(
+        "div",
+        { className: "hud-block" },
+        e("div", { className: "hud-label" }, "Rotor fᵢ (mix)"),
+        e(
+          "div",
+          { className: "hud-value mono accent-f", style: { fontSize: "0.92rem" } },
+          fMotors
+            .map(function (fi) {
+              return fmt(fi, 2);
+            })
+            .join(" · ")
+        ),
+        e(
+          "div",
+          { className: "hud-sub mono" },
+          "Σf ",
+          fmt(fSum, 2),
+          " N · inverse X-quad mix from u"
+        )
       ),
       e(
         "div",
@@ -1043,23 +1162,9 @@
           fmt(w[1], 2),
           " ",
           fmt(w[2], 2),
-          " rad/s"
-        )
-      ),
-      e(
-        "div",
-        { className: "hud-block" },
-        e("div", { className: "hud-label" }, "Speed |v|"),
-        e("div", { className: "hud-value" }, fmt(vNorm, 3), e("span", { className: "hud-unit" }, " m/s")),
-        e(
-          "div",
-          { className: "hud-sub mono" },
-          "NED ",
-          fmt(v[0], 2),
-          " ",
-          fmt(v[1], 2),
-          " ",
-          fmt(v[2], 2)
+          " rad/s · |v| ",
+          fmt(vNorm, 2),
+          " m/s"
         )
       )
     );
@@ -1511,7 +1616,7 @@
           e(
             "p",
             { className: "panel-sub" },
-            "X-quad body at origin. Cyan = thrust (−body z) · gold = τ · RGB = body axes. Length ∝ magnitude."
+            "X-quad at origin. Bright cyan = per-rotor fᵢ (inverse mix from u) · faint cyan = ΣF · gold = τ · RGB = body axes."
           ),
           e(VehicleAttitudeView, {
             runId: run.id,
