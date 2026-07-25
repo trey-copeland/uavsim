@@ -112,10 +112,11 @@ Example used for the committed **online** pack:
 
 ```bash
 uv run python docs/demos/intercept/scripts/export_demo_data.py \
-  --success-run runs/intercept_online_success_mc_20260725T172303Z \
-  --fail-run runs/intercept_online_energy_fail_20260725T172234Z \
+  --success-run runs/intercept_online_success_mc_20260725T190528Z \
+  --fail-run runs/intercept_online_energy_fail_20260725T190528Z \
   --with-bands --band-max-trials 80
-# → p_capture ≈ 0.28; fail case = energy-depleted nominal
+# → p_capture ≈ 0.28; tracking RMSE vs commanded x_r (~0.4 m class);
+#    fail case = energy-depleted nominal (SOC→0, no thrust derate)
 ```
 
 ## Files
