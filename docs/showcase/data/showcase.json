@@ -8536,7 +8536,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -8701,7 +8701,16 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: none",
+                "Channels: full state (ideal)",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "none",
@@ -8712,7 +8721,15 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Identity observer (ideal full state)",
+              "lines": [
+                "x\u0302(t) = x_true(t)",
+                "No sensor noise; controller sees the plant state on the Euler 12-bus.",
+                "Measurement model: y = x  (H = I\u2081\u2082)"
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -8870,7 +8887,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -8887,6 +8920,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -8928,7 +8969,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.5,
@@ -17487,7 +17544,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -17655,7 +17712,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.02,
             "seed": 7,
-            "notes": "naive partial sensors; unobserved states zeroed on control bus"
+            "notes": "naive partial sensors; unobserved states zeroed on control bus",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: partial_raw",
+                "Channels: ['pos', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "partial_raw",
@@ -17669,7 +17735,17 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.02,
             "seed": 7,
-            "notes": "naive partial sensors; unobserved states zeroed on control bus"
+            "notes": "naive partial sensors; unobserved states zeroed on control bus",
+            "equations": {
+              "caption": "Naive partial-state bus (no filter)",
+              "lines": [
+                "Observed channels: pos, omega",
+                "y_ch = x_ch + v_ch,   v ~ N(0, \u03c3\u00b2) on observed slices",
+                "x\u0302_i = y_i  if channel i is measured",
+                "x\u0302_i = 0    otherwise  (unobserved states zeroed \u2014 not held or predicted)",
+                "Controller runs on this incomplete x\u0302 (teaching failure mode for LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -17827,7 +17903,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -17844,6 +17936,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -17885,7 +17985,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 1.5,
@@ -26444,7 +26560,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -26612,7 +26728,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['pos', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -26626,7 +26751,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [pos, omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -26784,7 +26926,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -26801,6 +26959,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -26842,7 +27008,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.75,
@@ -35401,7 +35583,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -35569,7 +35751,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['att', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -35583,7 +35774,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [att, omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -35741,7 +35949,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -35758,6 +35982,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -35799,7 +36031,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 1.0,
@@ -44360,7 +44608,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -44529,7 +44777,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['body_vel', 'alt', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -44544,7 +44801,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [body_vel, alt, omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -44702,7 +44976,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -44719,6 +45009,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -44760,7 +45058,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 1.0,
@@ -53317,7 +53631,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -53484,7 +53798,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -53497,7 +53820,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -53655,7 +53995,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -53672,6 +54028,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -53713,7 +54077,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 2.0,
@@ -62269,7 +62649,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "PID cascade",
-            "summary": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench",
+            "summary": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
             "badges": [
               "pid_cascade"
             ]
@@ -62434,7 +62814,16 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: none",
+                "Channels: full state (ideal)",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "none",
@@ -62445,7 +62834,15 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Identity observer (ideal full state)",
+              "lines": [
+                "x\u0302(t) = x_true(t)",
+                "No sensor noise; controller sees the plant state on the Euler 12-bus.",
+                "Measurement model: y = x  (H = I\u2081\u2082)"
+              ]
+            }
           },
           "controller": {
             "type": "pid_cascade",
@@ -62497,7 +62894,24 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench"
+            "equation": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
+            "equations": {
+              "caption": "Cascade PID \u2192 body wrench",
+              "lines": [
+                "Outer loop (NED position / velocity):",
+                "  e_p = p_r \u2212 p,   e_v = v_r \u2212 v",
+                "  a_cmd = Kp_pos \u2299 e_p + Kd_pos \u2299 e_v",
+                "Thrust (NED z+ down; level map):",
+                "  F = m (g \u2212 a_cmd_z),   clipped to thrust limits",
+                "Tilt from horizontal accel (small-angle / hover map):",
+                "  \u03b8_des = clip(\u2212a_cmd_x / g, \u00b1\u03b8_max)",
+                "  \u03c6_des = clip(+a_cmd_y / g, \u00b1\u03b8_max)",
+                "  \u03c8_des from reference yaw",
+                "Inner attitude (SO(3) error vector e_att from actual \u2192 desired):",
+                "  \u03c4 = Kp_att \u2299 e_att \u2212 Kd_rate \u2299 \u03c9",
+                "  u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated"
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -62514,6 +62928,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -62555,7 +62977,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.75,
@@ -71114,7 +71552,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "PID cascade",
-            "summary": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench",
+            "summary": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
             "badges": [
               "pid_cascade"
             ]
@@ -71282,7 +71720,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.02,
             "seed": 7,
-            "notes": "naive partial sensors; unobserved states zeroed on control bus"
+            "notes": "naive partial sensors; unobserved states zeroed on control bus",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: partial_raw",
+                "Channels: ['pos', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "partial_raw",
@@ -71296,7 +71743,17 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.02,
             "seed": 7,
-            "notes": "naive partial sensors; unobserved states zeroed on control bus"
+            "notes": "naive partial sensors; unobserved states zeroed on control bus",
+            "equations": {
+              "caption": "Naive partial-state bus (no filter)",
+              "lines": [
+                "Observed channels: pos, omega",
+                "y_ch = x_ch + v_ch,   v ~ N(0, \u03c3\u00b2) on observed slices",
+                "x\u0302_i = y_i  if channel i is measured",
+                "x\u0302_i = 0    otherwise  (unobserved states zeroed \u2014 not held or predicted)",
+                "Controller runs on this incomplete x\u0302 (teaching failure mode for LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "pid_cascade",
@@ -71348,7 +71805,24 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench"
+            "equation": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
+            "equations": {
+              "caption": "Cascade PID \u2192 body wrench",
+              "lines": [
+                "Outer loop (NED position / velocity):",
+                "  e_p = p_r \u2212 p,   e_v = v_r \u2212 v",
+                "  a_cmd = Kp_pos \u2299 e_p + Kd_pos \u2299 e_v",
+                "Thrust (NED z+ down; level map):",
+                "  F = m (g \u2212 a_cmd_z),   clipped to thrust limits",
+                "Tilt from horizontal accel (small-angle / hover map):",
+                "  \u03b8_des = clip(\u2212a_cmd_x / g, \u00b1\u03b8_max)",
+                "  \u03c6_des = clip(+a_cmd_y / g, \u00b1\u03b8_max)",
+                "  \u03c8_des from reference yaw",
+                "Inner attitude (SO(3) error vector e_att from actual \u2192 desired):",
+                "  \u03c4 = Kp_att \u2299 e_att \u2212 Kd_rate \u2299 \u03c9",
+                "  u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated"
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -71365,6 +71839,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -71406,7 +71888,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 1.5,
@@ -79965,7 +80463,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "PID cascade",
-            "summary": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench",
+            "summary": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
             "badges": [
               "pid_cascade"
             ]
@@ -80133,7 +80631,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['pos', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -80147,7 +80654,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [pos, omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "pid_cascade",
@@ -80199,7 +80723,24 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench"
+            "equation": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
+            "equations": {
+              "caption": "Cascade PID \u2192 body wrench",
+              "lines": [
+                "Outer loop (NED position / velocity):",
+                "  e_p = p_r \u2212 p,   e_v = v_r \u2212 v",
+                "  a_cmd = Kp_pos \u2299 e_p + Kd_pos \u2299 e_v",
+                "Thrust (NED z+ down; level map):",
+                "  F = m (g \u2212 a_cmd_z),   clipped to thrust limits",
+                "Tilt from horizontal accel (small-angle / hover map):",
+                "  \u03b8_des = clip(\u2212a_cmd_x / g, \u00b1\u03b8_max)",
+                "  \u03c6_des = clip(+a_cmd_y / g, \u00b1\u03b8_max)",
+                "  \u03c8_des from reference yaw",
+                "Inner attitude (SO(3) error vector e_att from actual \u2192 desired):",
+                "  \u03c4 = Kp_att \u2299 e_att \u2212 Kd_rate \u2299 \u03c9",
+                "  u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated"
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -80216,6 +80757,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -80257,7 +80806,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.75,
@@ -88816,7 +89381,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "PID cascade",
-            "summary": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench",
+            "summary": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
             "badges": [
               "pid_cascade"
             ]
@@ -88984,7 +89549,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['att', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -88998,7 +89572,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [att, omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "pid_cascade",
@@ -89050,7 +89641,24 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench"
+            "equation": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
+            "equations": {
+              "caption": "Cascade PID \u2192 body wrench",
+              "lines": [
+                "Outer loop (NED position / velocity):",
+                "  e_p = p_r \u2212 p,   e_v = v_r \u2212 v",
+                "  a_cmd = Kp_pos \u2299 e_p + Kd_pos \u2299 e_v",
+                "Thrust (NED z+ down; level map):",
+                "  F = m (g \u2212 a_cmd_z),   clipped to thrust limits",
+                "Tilt from horizontal accel (small-angle / hover map):",
+                "  \u03b8_des = clip(\u2212a_cmd_x / g, \u00b1\u03b8_max)",
+                "  \u03c6_des = clip(+a_cmd_y / g, \u00b1\u03b8_max)",
+                "  \u03c8_des from reference yaw",
+                "Inner attitude (SO(3) error vector e_att from actual \u2192 desired):",
+                "  \u03c4 = Kp_att \u2299 e_att \u2212 Kd_rate \u2299 \u03c9",
+                "  u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated"
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -89067,6 +89675,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -89108,7 +89724,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 1.0,
@@ -97669,7 +98301,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "PID cascade",
-            "summary": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench",
+            "summary": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
             "badges": [
               "pid_cascade"
             ]
@@ -97838,7 +98470,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['body_vel', 'alt', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -97853,7 +98494,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [body_vel, alt, omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "pid_cascade",
@@ -97905,7 +98563,24 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench"
+            "equation": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
+            "equations": {
+              "caption": "Cascade PID \u2192 body wrench",
+              "lines": [
+                "Outer loop (NED position / velocity):",
+                "  e_p = p_r \u2212 p,   e_v = v_r \u2212 v",
+                "  a_cmd = Kp_pos \u2299 e_p + Kd_pos \u2299 e_v",
+                "Thrust (NED z+ down; level map):",
+                "  F = m (g \u2212 a_cmd_z),   clipped to thrust limits",
+                "Tilt from horizontal accel (small-angle / hover map):",
+                "  \u03b8_des = clip(\u2212a_cmd_x / g, \u00b1\u03b8_max)",
+                "  \u03c6_des = clip(+a_cmd_y / g, \u00b1\u03b8_max)",
+                "  \u03c8_des from reference yaw",
+                "Inner attitude (SO(3) error vector e_att from actual \u2192 desired):",
+                "  \u03c4 = Kp_att \u2299 e_att \u2212 Kd_rate \u2299 \u03c9",
+                "  u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated"
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -97922,6 +98597,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -97963,7 +98646,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 1.0,
@@ -106520,7 +107219,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "PID cascade",
-            "summary": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench",
+            "summary": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
             "badges": [
               "pid_cascade"
             ]
@@ -106687,7 +107386,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -106700,7 +107408,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "pid_cascade",
@@ -106752,7 +107477,24 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench"
+            "equation": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
+            "equations": {
+              "caption": "Cascade PID \u2192 body wrench",
+              "lines": [
+                "Outer loop (NED position / velocity):",
+                "  e_p = p_r \u2212 p,   e_v = v_r \u2212 v",
+                "  a_cmd = Kp_pos \u2299 e_p + Kd_pos \u2299 e_v",
+                "Thrust (NED z+ down; level map):",
+                "  F = m (g \u2212 a_cmd_z),   clipped to thrust limits",
+                "Tilt from horizontal accel (small-angle / hover map):",
+                "  \u03b8_des = clip(\u2212a_cmd_x / g, \u00b1\u03b8_max)",
+                "  \u03c6_des = clip(+a_cmd_y / g, \u00b1\u03b8_max)",
+                "  \u03c8_des from reference yaw",
+                "Inner attitude (SO(3) error vector e_att from actual \u2192 desired):",
+                "  \u03c4 = Kp_att \u2299 e_att \u2212 Kd_rate \u2299 \u03c9",
+                "  u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated"
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -106769,6 +107511,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -106810,7 +107560,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 2.0,
@@ -120992,7 +121758,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -121160,7 +121926,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['pos', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -121174,7 +121949,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [pos, omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -121332,7 +122124,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -121349,6 +122157,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -121390,7 +122206,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.75,
@@ -129961,7 +130793,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -130126,7 +130958,16 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: none",
+                "Channels: full state (ideal)",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "none",
@@ -130137,7 +130978,15 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Identity observer (ideal full state)",
+              "lines": [
+                "x\u0302(t) = x_true(t)",
+                "No sensor noise; controller sees the plant state on the Euler 12-bus.",
+                "Measurement model: y = x  (H = I\u2081\u2082)"
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -130295,7 +131144,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -130312,6 +131177,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -130353,7 +131226,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.75,
@@ -138927,7 +139816,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -139095,7 +139984,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.02,
             "seed": 7,
-            "notes": "naive partial sensors; unobserved states zeroed on control bus"
+            "notes": "naive partial sensors; unobserved states zeroed on control bus",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: partial_raw",
+                "Channels: ['pos', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "partial_raw",
@@ -139109,7 +140007,17 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.02,
             "seed": 7,
-            "notes": "naive partial sensors; unobserved states zeroed on control bus"
+            "notes": "naive partial sensors; unobserved states zeroed on control bus",
+            "equations": {
+              "caption": "Naive partial-state bus (no filter)",
+              "lines": [
+                "Observed channels: pos, omega",
+                "y_ch = x_ch + v_ch,   v ~ N(0, \u03c3\u00b2) on observed slices",
+                "x\u0302_i = y_i  if channel i is measured",
+                "x\u0302_i = 0    otherwise  (unobserved states zeroed \u2014 not held or predicted)",
+                "Controller runs on this incomplete x\u0302 (teaching failure mode for LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -139267,7 +140175,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -139284,6 +140208,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -139325,7 +140257,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 1.5,
@@ -147899,7 +148847,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -148067,7 +149015,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['pos', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -148081,7 +149038,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [pos, omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -148239,7 +149213,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -148256,6 +149246,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -148297,7 +149295,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.75,
@@ -156871,7 +157885,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -157039,7 +158053,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['att', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -157053,7 +158076,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [att, omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -157211,7 +158251,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -157228,6 +158284,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -157269,7 +158333,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 1.0,
@@ -165845,7 +166925,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -166014,7 +167094,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['body_vel', 'alt', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -166029,7 +167118,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [body_vel, alt, omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -166187,7 +167293,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -166204,6 +167326,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -166245,7 +167375,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 1.0,
@@ -174817,7 +175963,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -174984,7 +176130,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -174997,7 +176152,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -175155,7 +176327,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -175172,6 +176360,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -175213,7 +176409,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 2.0,
@@ -183784,7 +184996,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "PID cascade",
-            "summary": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench",
+            "summary": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
             "badges": [
               "pid_cascade"
             ]
@@ -183949,7 +185161,16 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: none",
+                "Channels: full state (ideal)",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "none",
@@ -183960,7 +185181,15 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Identity observer (ideal full state)",
+              "lines": [
+                "x\u0302(t) = x_true(t)",
+                "No sensor noise; controller sees the plant state on the Euler 12-bus.",
+                "Measurement model: y = x  (H = I\u2081\u2082)"
+              ]
+            }
           },
           "controller": {
             "type": "pid_cascade",
@@ -184012,7 +185241,24 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench"
+            "equation": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
+            "equations": {
+              "caption": "Cascade PID \u2192 body wrench",
+              "lines": [
+                "Outer loop (NED position / velocity):",
+                "  e_p = p_r \u2212 p,   e_v = v_r \u2212 v",
+                "  a_cmd = Kp_pos \u2299 e_p + Kd_pos \u2299 e_v",
+                "Thrust (NED z+ down; level map):",
+                "  F = m (g \u2212 a_cmd_z),   clipped to thrust limits",
+                "Tilt from horizontal accel (small-angle / hover map):",
+                "  \u03b8_des = clip(\u2212a_cmd_x / g, \u00b1\u03b8_max)",
+                "  \u03c6_des = clip(+a_cmd_y / g, \u00b1\u03b8_max)",
+                "  \u03c8_des from reference yaw",
+                "Inner attitude (SO(3) error vector e_att from actual \u2192 desired):",
+                "  \u03c4 = Kp_att \u2299 e_att \u2212 Kd_rate \u2299 \u03c9",
+                "  u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated"
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -184029,6 +185275,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -184070,7 +185324,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.75,
@@ -192644,7 +193914,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "PID cascade",
-            "summary": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench",
+            "summary": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
             "badges": [
               "pid_cascade"
             ]
@@ -192812,7 +194082,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.02,
             "seed": 7,
-            "notes": "naive partial sensors; unobserved states zeroed on control bus"
+            "notes": "naive partial sensors; unobserved states zeroed on control bus",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: partial_raw",
+                "Channels: ['pos', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "partial_raw",
@@ -192826,7 +194105,17 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.02,
             "seed": 7,
-            "notes": "naive partial sensors; unobserved states zeroed on control bus"
+            "notes": "naive partial sensors; unobserved states zeroed on control bus",
+            "equations": {
+              "caption": "Naive partial-state bus (no filter)",
+              "lines": [
+                "Observed channels: pos, omega",
+                "y_ch = x_ch + v_ch,   v ~ N(0, \u03c3\u00b2) on observed slices",
+                "x\u0302_i = y_i  if channel i is measured",
+                "x\u0302_i = 0    otherwise  (unobserved states zeroed \u2014 not held or predicted)",
+                "Controller runs on this incomplete x\u0302 (teaching failure mode for LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "pid_cascade",
@@ -192878,7 +194167,24 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench"
+            "equation": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
+            "equations": {
+              "caption": "Cascade PID \u2192 body wrench",
+              "lines": [
+                "Outer loop (NED position / velocity):",
+                "  e_p = p_r \u2212 p,   e_v = v_r \u2212 v",
+                "  a_cmd = Kp_pos \u2299 e_p + Kd_pos \u2299 e_v",
+                "Thrust (NED z+ down; level map):",
+                "  F = m (g \u2212 a_cmd_z),   clipped to thrust limits",
+                "Tilt from horizontal accel (small-angle / hover map):",
+                "  \u03b8_des = clip(\u2212a_cmd_x / g, \u00b1\u03b8_max)",
+                "  \u03c6_des = clip(+a_cmd_y / g, \u00b1\u03b8_max)",
+                "  \u03c8_des from reference yaw",
+                "Inner attitude (SO(3) error vector e_att from actual \u2192 desired):",
+                "  \u03c4 = Kp_att \u2299 e_att \u2212 Kd_rate \u2299 \u03c9",
+                "  u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated"
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -192895,6 +194201,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -192936,7 +194250,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 1.5,
@@ -201510,7 +202840,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "PID cascade",
-            "summary": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench",
+            "summary": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
             "badges": [
               "pid_cascade"
             ]
@@ -201678,7 +203008,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['pos', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -201692,7 +203031,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [pos, omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "pid_cascade",
@@ -201744,7 +203100,24 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench"
+            "equation": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
+            "equations": {
+              "caption": "Cascade PID \u2192 body wrench",
+              "lines": [
+                "Outer loop (NED position / velocity):",
+                "  e_p = p_r \u2212 p,   e_v = v_r \u2212 v",
+                "  a_cmd = Kp_pos \u2299 e_p + Kd_pos \u2299 e_v",
+                "Thrust (NED z+ down; level map):",
+                "  F = m (g \u2212 a_cmd_z),   clipped to thrust limits",
+                "Tilt from horizontal accel (small-angle / hover map):",
+                "  \u03b8_des = clip(\u2212a_cmd_x / g, \u00b1\u03b8_max)",
+                "  \u03c6_des = clip(+a_cmd_y / g, \u00b1\u03b8_max)",
+                "  \u03c8_des from reference yaw",
+                "Inner attitude (SO(3) error vector e_att from actual \u2192 desired):",
+                "  \u03c4 = Kp_att \u2299 e_att \u2212 Kd_rate \u2299 \u03c9",
+                "  u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated"
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -201761,6 +203134,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -201802,7 +203183,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.75,
@@ -210376,7 +211773,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "PID cascade",
-            "summary": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench",
+            "summary": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
             "badges": [
               "pid_cascade"
             ]
@@ -210544,7 +211941,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['att', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -210558,7 +211964,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [att, omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "pid_cascade",
@@ -210610,7 +212033,24 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench"
+            "equation": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
+            "equations": {
+              "caption": "Cascade PID \u2192 body wrench",
+              "lines": [
+                "Outer loop (NED position / velocity):",
+                "  e_p = p_r \u2212 p,   e_v = v_r \u2212 v",
+                "  a_cmd = Kp_pos \u2299 e_p + Kd_pos \u2299 e_v",
+                "Thrust (NED z+ down; level map):",
+                "  F = m (g \u2212 a_cmd_z),   clipped to thrust limits",
+                "Tilt from horizontal accel (small-angle / hover map):",
+                "  \u03b8_des = clip(\u2212a_cmd_x / g, \u00b1\u03b8_max)",
+                "  \u03c6_des = clip(+a_cmd_y / g, \u00b1\u03b8_max)",
+                "  \u03c8_des from reference yaw",
+                "Inner attitude (SO(3) error vector e_att from actual \u2192 desired):",
+                "  \u03c4 = Kp_att \u2299 e_att \u2212 Kd_rate \u2299 \u03c9",
+                "  u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated"
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -210627,6 +212067,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -210668,7 +212116,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 1.0,
@@ -219244,7 +220708,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "PID cascade",
-            "summary": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench",
+            "summary": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
             "badges": [
               "pid_cascade"
             ]
@@ -219413,7 +220877,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['body_vel', 'alt', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -219428,7 +220901,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [body_vel, alt, omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "pid_cascade",
@@ -219480,7 +220970,24 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench"
+            "equation": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
+            "equations": {
+              "caption": "Cascade PID \u2192 body wrench",
+              "lines": [
+                "Outer loop (NED position / velocity):",
+                "  e_p = p_r \u2212 p,   e_v = v_r \u2212 v",
+                "  a_cmd = Kp_pos \u2299 e_p + Kd_pos \u2299 e_v",
+                "Thrust (NED z+ down; level map):",
+                "  F = m (g \u2212 a_cmd_z),   clipped to thrust limits",
+                "Tilt from horizontal accel (small-angle / hover map):",
+                "  \u03b8_des = clip(\u2212a_cmd_x / g, \u00b1\u03b8_max)",
+                "  \u03c6_des = clip(+a_cmd_y / g, \u00b1\u03b8_max)",
+                "  \u03c8_des from reference yaw",
+                "Inner attitude (SO(3) error vector e_att from actual \u2192 desired):",
+                "  \u03c4 = Kp_att \u2299 e_att \u2212 Kd_rate \u2299 \u03c9",
+                "  u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated"
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -219497,6 +221004,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -219538,7 +221053,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 1.0,
@@ -228110,7 +229641,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "PID cascade",
-            "summary": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench",
+            "summary": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
             "badges": [
               "pid_cascade"
             ]
@@ -228277,7 +229808,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -228290,7 +229830,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "pid_cascade",
@@ -228342,7 +229899,24 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "cascade PID (pos\u2192att\u2192rate) \u2192 body wrench"
+            "equation": "u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated",
+            "equations": {
+              "caption": "Cascade PID \u2192 body wrench",
+              "lines": [
+                "Outer loop (NED position / velocity):",
+                "  e_p = p_r \u2212 p,   e_v = v_r \u2212 v",
+                "  a_cmd = Kp_pos \u2299 e_p + Kd_pos \u2299 e_v",
+                "Thrust (NED z+ down; level map):",
+                "  F = m (g \u2212 a_cmd_z),   clipped to thrust limits",
+                "Tilt from horizontal accel (small-angle / hover map):",
+                "  \u03b8_des = clip(\u2212a_cmd_x / g, \u00b1\u03b8_max)",
+                "  \u03c6_des = clip(+a_cmd_y / g, \u00b1\u03b8_max)",
+                "  \u03c8_des from reference yaw",
+                "Inner attitude (SO(3) error vector e_att from actual \u2192 desired):",
+                "  \u03c4 = Kp_att \u2299 e_att \u2212 Kd_rate \u2299 \u03c9",
+                "  u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40, then saturated"
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -228359,6 +229933,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -228400,7 +229982,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 2.0,
@@ -242506,7 +244104,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -242674,7 +244272,16 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: linear_kf",
+                "Channels: ['pos', 'omega']",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "linear_kf",
@@ -242688,7 +244295,24 @@
             "omega_sigma_rad_s": 0.04,
             "process_sigma": 0.03,
             "seed": 7,
-            "notes": "linear Kalman filter reconstructs full state from channels"
+            "notes": "linear Kalman filter reconstructs full state from channels",
+            "equations": {
+              "caption": "Linear Kalman filter on hover (A, B)",
+              "lines": [
+                "Design model:  \u1e8b = A x + B (u \u2212 u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A \u0394t,   G = B \u0394t",
+                "  x\u0302\u207b = F x\u0302 + G (u \u2212 u_h)",
+                "  P\u207b = F P F\u1d40 + Q_d,   Q_d \u2248 (\u03c3_process)\u00b2 I \u0394t",
+                "Measurement: y = H x + v,  channels = [pos, omega]",
+                "  H = selection matrix for listed channels; R = diag(\u03c3\u00b2 per channel)",
+                "Update:",
+                "  K = P\u207b H\u1d40 (H P\u207b H\u1d40 + R)\u207b\u00b9",
+                "  x\u0302 = x\u0302\u207b + K (y \u2212 H x\u0302\u207b)",
+                "  P = (I \u2212 K H) P\u207b",
+                "Controller uses x\u0302 on the Euler 12-state bus (classic LQG when law is LQR)."
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -242846,7 +244470,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -242863,6 +244503,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -242904,7 +244552,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.75,
@@ -251460,7 +253124,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -251625,7 +253289,16 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: none",
+                "Channels: full state (ideal)",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "none",
@@ -251636,7 +253309,15 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Identity observer (ideal full state)",
+              "lines": [
+                "x\u0302(t) = x_true(t)",
+                "No sensor noise; controller sees the plant state on the Euler 12-bus.",
+                "Measurement model: y = x  (H = I\u2081\u2082)"
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -251794,7 +253475,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -251811,6 +253508,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -251852,7 +253557,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.5,
@@ -260408,7 +262129,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -260573,7 +262294,16 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: none",
+                "Channels: full state (ideal)",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "none",
@@ -260584,7 +262314,15 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Identity observer (ideal full state)",
+              "lines": [
+                "x\u0302(t) = x_true(t)",
+                "No sensor noise; controller sees the plant state on the Euler 12-bus.",
+                "Measurement model: y = x  (H = I\u2081\u2082)"
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -260742,7 +262480,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "motors",
@@ -260759,6 +262513,17 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Mixer + first-order motors",
+              "lines": [
+                "Controller always commands body wrench u_cmd.",
+                "X-quad allocation B (4\u00d74):  u = B f,  f \u2265 0 motor forces",
+                "  f* = B\u207b\u00b9 u_cmd  (clip f* \u2265 0)",
+                "  \u03c9* = \u221a(f* / c_T),  clipped to [\u03c9_min, \u03c9_max]",
+                "  \u03c9\u0307 = (\u03c9* \u2212 \u03c9) / \u03c4_m",
+                "  f = c_T \u03c9\u00b2,   u_applied = B f \u2192 dynamics"
+              ]
             }
           },
           "plant": {
@@ -260800,7 +262565,26 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, motors actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant (sim.plant: motors):",
+                "  Inverse mix: f* = B\u207b\u00b9 u_cmd  (X-quad allocation)",
+                "  \u03c9*_i = \u221a(f*_i / c_T);   \u03c9\u0307_i = (\u03c9*_i \u2212 \u03c9_i) / \u03c4_m",
+                "  f_i = c_T \u03c9_i\u00b2;   u_applied = B f   (realized wrench into EOM)",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.75,
@@ -269356,7 +271140,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -269521,7 +271305,16 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: none",
+                "Channels: full state (ideal)",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "none",
@@ -269532,7 +271325,15 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Identity observer (ideal full state)",
+              "lines": [
+                "x\u0302(t) = x_true(t)",
+                "No sensor noise; controller sees the plant state on the Euler 12-bus.",
+                "Measurement model: y = x  (H = I\u2081\u2082)"
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -269690,7 +271491,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -269707,6 +271524,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -269748,7 +271573,27 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": null
+            "notes": null,
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero / environment (applied inside f(x,u)):",
+                "  F_drag = \u2212b_\u2113 v \u2212 b_q \u2016v\u2016 v   (NED)",
+                "  \u03c4_damp = \u2212c \u03c9",
+                "  f_xy^body = \u2212k_h F v_xy^body   (prop H-force)",
+                "  Ground effect: off",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.75,
@@ -278304,7 +280149,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -278469,7 +280314,16 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: none",
+                "Channels: full state (ideal)",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "none",
@@ -278480,7 +280334,15 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Identity observer (ideal full state)",
+              "lines": [
+                "x\u0302(t) = x_true(t)",
+                "No sensor noise; controller sees the plant state on the Euler 12-bus.",
+                "Measurement model: y = x  (H = I\u2081\u2082)"
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -278638,7 +280500,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -278655,6 +280533,14 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
@@ -278696,7 +280582,27 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": null
+            "notes": null,
+            "equations": {
+              "caption": "Rigid-body 6DOF (euler plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b2:  [p(3), \u03c6 \u03b8 \u03c8 (ZYX), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  [\u03c6\u0307 \u03b8\u0307 \u03c8\u0307]\u1d40 = E(\u03c6,\u03b8) \u03c9   (Euler-rate kinematics matrix)",
+                "  \u1e7d = (R(\u03c6,\u03b8,\u03c8) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero / environment (applied inside f(x,u)):",
+                "  F_drag = \u2212b_\u2113 v \u2212 b_q \u2016v\u2016 v   (NED)",
+                "  \u03c4_damp = \u2212c \u03c9",
+                "  f_xy^body = \u2212k_h F v_xy^body   (prop H-force)",
+                "  Ground effect: F_eff = \u03ba(h) F,  h = z_ground \u2212 z  (cheeseman model)",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.75,
@@ -287252,7 +289158,7 @@
             "id": "controller",
             "kind": "controller",
             "title": "Hover LQR",
-            "summary": "u = u_h \u2212 K(x\u0302 \u2212 x_r)",
+            "summary": "u = u_h \u2212 K e",
             "badges": [
               "lqr_hover"
             ]
@@ -287417,7 +289323,16 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Measurement model",
+              "lines": [
+                "Observer front-end: none",
+                "Channels: full state (ideal)",
+                "Noise: independent Gaussian on measured slices (\u03c3 from study observer:).",
+                "See Observer block for the estimation recursion."
+              ]
+            }
           },
           "observer": {
             "observer_type": "none",
@@ -287428,7 +289343,15 @@
             "omega_sigma_rad_s": 0.05,
             "process_sigma": 0.02,
             "seed": 0,
-            "notes": "identity (true state); full-state feedback"
+            "notes": "identity (true state); full-state feedback",
+            "equations": {
+              "caption": "Identity observer (ideal full state)",
+              "lines": [
+                "x\u0302(t) = x_true(t)",
+                "No sensor noise; controller sees the plant state on the Euler 12-bus.",
+                "Measurement model: y = x  (H = I\u2081\u2082)"
+              ]
+            }
           },
           "controller": {
             "type": "lqr_hover",
@@ -287586,7 +289509,23 @@
                 "torque_max_nm": 1.0
               }
             },
-            "equation": "u = u_h \u2212 K(x\u0302 \u2212 x_r)"
+            "equation": "u = u_h \u2212 K e",
+            "equations": {
+              "caption": "Hover LQR (infinite-horizon, continuous ARE)",
+              "lines": [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x\u0302, x_r) \u2208 \u211d\u00b9\u00b2",
+                "  e = [\u03b4p, \u03b4\u03b8_SO(3), \u03b4v, \u03b4\u03c9]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  \u1e8b = A x + B (u \u2212 u_h),   u_h = [m g, 0, 0, 0]\u1d40",
+                "  A\u1d40P + P A \u2212 P B R\u207b\u00b9 B\u1d40 P + Q = 0  (CARE)",
+                "  K = R\u207b\u00b9 B\u1d40 P",
+                "Control law:",
+                "  u = u_h \u2212 K e",
+                "  u \u2190 saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact."
+              ]
+            }
           },
           "actuators": {
             "plant_mode": "wrench",
@@ -287603,12 +289542,20 @@
               "thrust_min_n": 0.0,
               "thrust_max_n": 9.81,
               "torque_max_nm": 1.0
+            },
+            "equations": {
+              "caption": "Instantaneous body wrench",
+              "lines": [
+                "u_applied = saturate(u_cmd)",
+                "No motor states; mixer not in the closed-loop ODE.",
+                "Per-rotor forces for viz: f = B\u207b\u00b9 u  (display only)."
+              ]
             }
           },
           "plant": {
             "attitude": "quat",
             "plant_mode": "wrench",
-            "state_dim_bus": 12,
+            "state_dim_bus": 13,
             "dynamics": "rigid_body_6dof",
             "vehicle": {
               "mass_kg": 0.5,
@@ -287644,7 +289591,23 @@
               "rtol": 1e-05,
               "atol": 1e-07
             },
-            "notes": "Aero defaults off (vacuum plant)"
+            "notes": "Aero defaults off (vacuum plant)",
+            "equations": {
+              "caption": "Rigid-body 6DOF (quat plant, wrench actuators)",
+              "lines": [
+                "Frames: NED inertial, FRD body. Control u = [F, \u03c4_\u03c6, \u03c4_\u03b8, \u03c4_\u03c8]\u1d40.",
+                "Thrust force in body: f_b = [0, 0, \u2212F_eff]\u1d40; gravity f_g = [0, 0, m g]\u1d40 (z+ down).",
+                "State x \u2208 \u211d\u00b9\u00b3:  [p(3), q_wxyz(4), v(3), \u03c9(3)]",
+                "Kinematics:",
+                "  \u1e57 = v",
+                "  q\u0307 = \u00bd q \u2297 [0, \u03c9]   (scalar-first unit quaternion; renorm after step)",
+                "  \u1e7d = (R(q) f_b + f_g + f_aero) / m",
+                "  I \u03c9\u0307 = \u03c4_eff \u2212 \u03c9 \u00d7 (I \u03c9)   (I diagonal)",
+                "Aero off: f_aero = 0, F_eff = F, \u03c4_eff = \u03c4  (vacuum rigid body).",
+                "Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.",
+                "Integrated with study sim.method / dt (see integrator fields)."
+              ]
+            }
           },
           "metrics": {
             "position_bound_m": 0.75,

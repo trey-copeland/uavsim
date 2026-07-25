@@ -1217,6 +1217,34 @@ nav.tabs button[aria-selected="true"] {
   color: var(--muted);
   font-size: 0.9rem;
 }
+.stack-equations {
+  margin: 0 0 1rem;
+  border: 1px solid rgba(232, 121, 249, 0.28);
+  border-radius: 8px;
+  background: rgba(232, 121, 249, 0.06);
+  overflow: hidden;
+}
+.stack-equations-caption {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e879f9;
+  border-bottom: 1px solid rgba(232, 121, 249, 0.2);
+  background: rgba(0, 0, 0, 0.2);
+}
+.stack-equations-body {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #e7ecf3;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
 .stack-detail-empty {
   padding: 0.25rem 0;
 }

@@ -233,6 +233,203 @@ def _details_guidance(guidance: dict[str, Any], mission_file: str | None) -> dic
     }
 
 
+def _equations_payload(caption: str, lines: list[str]) -> dict[str, Any]:
+    return {"caption": caption, "lines": [ln for ln in lines if ln is not None]}
+
+
+def _observer_equations(obs_type: str, channels: Any) -> dict[str, Any]:
+    ch = channels if isinstance(channels, list) else None
+    ch_str = ", ".join(str(c) for c in ch) if ch else "all (full identity H)"
+    t = (obs_type or "none").lower()
+    if t in ("none", ""):
+        return _equations_payload(
+            "Identity observer (ideal full state)",
+            [
+                "x̂(t) = x_true(t)",
+                "No sensor noise; controller sees the plant state on the Euler 12-bus.",
+                "Measurement model: y = x  (H = I₁₂)",
+            ],
+        )
+    if t == "partial_raw":
+        return _equations_payload(
+            "Naive partial-state bus (no filter)",
+            [
+                f"Observed channels: {ch_str}",
+                "y_ch = x_ch + v_ch,   v ~ N(0, σ²) on observed slices",
+                "x̂_i = y_i  if channel i is measured",
+                "x̂_i = 0    otherwise  (unobserved states zeroed — not held or predicted)",
+                "Controller runs on this incomplete x̂ (teaching failure mode for LQR).",
+            ],
+        )
+    if t in ("linear_kf", "kf"):
+        return _equations_payload(
+            "Linear Kalman filter on hover (A, B)",
+            [
+                "Design model:  ẋ = A x + B (u − u_h)   from hover_linearization(vehicle)",
+                "Discrete predict (dt):",
+                "  F = I + A Δt,   G = B Δt",
+                "  x̂⁻ = F x̂ + G (u − u_h)",
+                "  P⁻ = F P Fᵀ + Q_d,   Q_d ≈ (σ_process)² I Δt",
+                f"Measurement: y = H x + v,  channels = [{ch_str}]",
+                "  H = selection matrix for listed channels; R = diag(σ² per channel)",
+                "Update:",
+                "  K = P⁻ Hᵀ (H P⁻ Hᵀ + R)⁻¹",
+                "  x̂ = x̂⁻ + K (y − H x̂⁻)",
+                "  P = (I − K H) P⁻",
+                "Controller uses x̂ on the Euler 12-state bus (classic LQG when law is LQR).",
+            ],
+        )
+    if t in ("mekf", "multiplicative_ekf"):
+        return _equations_payload(
+            "Multiplicative EKF (attitude)",
+            [
+                "Error-state / multiplicative attitude KF (see estimation/mekf.py).",
+                "Propagates unit quaternion + rates; updates from configured channels.",
+                f"Channels: {ch_str}",
+            ],
+        )
+    return _equations_payload(
+        f"Observer type: {obs_type}",
+        [f"channels: {ch_str}", "See uavsim.estimation for the implemented recursion."],
+    )
+
+
+def _controller_equations(ctype: str | None) -> dict[str, Any]:
+    t = (ctype or "").lower()
+    if t == "lqr_hover":
+        return _equations_payload(
+            "Hover LQR (infinite-horizon, continuous ARE)",
+            [
+                "Error state (SO(3) attitude, matches hover linearization):",
+                "  e = tracking_error_state(x̂, x_r) ∈ ℝ¹²",
+                "  e = [δp, δθ_SO(3), δv, δω]  (not raw Euler subtraction for attitude)",
+                "Design on hover linearization:",
+                "  ẋ = A x + B (u − u_h),   u_h = [m g, 0, 0, 0]ᵀ",
+                "  AᵀP + P A − P B R⁻¹ Bᵀ P + Q = 0  (CARE)",
+                "  K = R⁻¹ Bᵀ P",
+                "Control law:",
+                "  u = u_h − K e",
+                "  u ← saturate(u; u_min, u_max)",
+                "Q = diag(Q_diag), R = diag(R_diag) from study YAML / artifact.",
+            ],
+        )
+    if t == "pid_cascade":
+        return _equations_payload(
+            "Cascade PID → body wrench",
+            [
+                "Outer loop (NED position / velocity):",
+                "  e_p = p_r − p,   e_v = v_r − v",
+                "  a_cmd = Kp_pos ⊙ e_p + Kd_pos ⊙ e_v",
+                "Thrust (NED z+ down; level map):",
+                "  F = m (g − a_cmd_z),   clipped to thrust limits",
+                "Tilt from horizontal accel (small-angle / hover map):",
+                "  θ_des = clip(−a_cmd_x / g, ±θ_max)",
+                "  φ_des = clip(+a_cmd_y / g, ±θ_max)",
+                "  ψ_des from reference yaw",
+                "Inner attitude (SO(3) error vector e_att from actual → desired):",
+                "  τ = Kp_att ⊙ e_att − Kd_rate ⊙ ω",
+                "  u = [F, τ_φ, τ_θ, τ_ψ]ᵀ, then saturated",
+            ],
+        )
+    return _equations_payload(
+        f"Controller type: {ctype or 'unknown'}",
+        ["See study controller: block and control export artifact."],
+    )
+
+
+def _plant_equations(
+    attitude: str,
+    plant_mode: str,
+    *,
+    aero_enabled: bool,
+    ground_effect: str | None,
+) -> dict[str, Any]:
+    att = (attitude or "euler").lower()
+    mode = (plant_mode or "wrench").lower()
+    lines: list[str] = [
+        "Frames: NED inertial, FRD body. Control u = [F, τ_φ, τ_θ, τ_ψ]ᵀ.",
+        "Thrust force in body: f_b = [0, 0, −F_eff]ᵀ; gravity f_g = [0, 0, m g]ᵀ (z+ down).",
+    ]
+    if att == "quat":
+        lines.extend(
+            [
+                "State x ∈ ℝ¹³:  [p(3), q_wxyz(4), v(3), ω(3)]",
+                "Kinematics:",
+                "  ṗ = v",
+                "  q̇ = ½ q ⊗ [0, ω]   (scalar-first unit quaternion; renorm after step)",
+                "  ṽ = (R(q) f_b + f_g + f_aero) / m",
+                "  I ω̇ = τ_eff − ω × (I ω)   (I diagonal)",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "State x ∈ ℝ¹²:  [p(3), φ θ ψ (ZYX), v(3), ω(3)]",
+                "Kinematics:",
+                "  ṗ = v",
+                "  [φ̇ θ̇ ψ̇]ᵀ = E(φ,θ) ω   (Euler-rate kinematics matrix)",
+                "  ṽ = (R(φ,θ,ψ) f_b + f_g + f_aero) / m",
+                "  I ω̇ = τ_eff − ω × (I ω)   (I diagonal)",
+            ]
+        )
+    if aero_enabled:
+        lines.extend(
+            [
+                "Aero / environment (applied inside f(x,u)):",
+                "  F_drag = −b_ℓ v − b_q ‖v‖ v   (NED)",
+                "  τ_damp = −c ω",
+                "  f_xy^body = −k_h F v_xy^body   (prop H-force)",
+            ]
+        )
+        ge = (ground_effect or "none").lower()
+        if ge not in ("none", "", "false"):
+            lines.append(f"  Ground effect: F_eff = κ(h) F,  h = z_ground − z  ({ge} model)")
+        else:
+            lines.append("  Ground effect: off")
+    else:
+        lines.append("Aero off: f_aero = 0, F_eff = F, τ_eff = τ  (vacuum rigid body).")
+    if mode == "motors":
+        lines.extend(
+            [
+                "Actuator plant (sim.plant: motors):",
+                "  Inverse mix: f* = B⁻¹ u_cmd  (X-quad allocation)",
+                "  ω*_i = √(f*_i / c_T);   ω̇_i = (ω*_i − ω_i) / τ_m",
+                "  f_i = c_T ω_i²;   u_applied = B f   (realized wrench into EOM)",
+            ]
+        )
+    else:
+        lines.append("Actuator plant: instantaneous wrench (sim.plant: wrench); u_applied = u_cmd.")
+    lines.append("Integrated with study sim.method / dt (see integrator fields).")
+    return _equations_payload(
+        f"Rigid-body 6DOF ({att} plant, {mode} actuators)",
+        lines,
+    )
+
+
+def _actuator_equations(plant_mode: str) -> dict[str, Any]:
+    mode = (plant_mode or "wrench").lower()
+    if mode == "motors":
+        return _equations_payload(
+            "Mixer + first-order motors",
+            [
+                "Controller always commands body wrench u_cmd.",
+                "X-quad allocation B (4×4):  u = B f,  f ≥ 0 motor forces",
+                "  f* = B⁻¹ u_cmd  (clip f* ≥ 0)",
+                "  ω* = √(f* / c_T),  clipped to [ω_min, ω_max]",
+                "  ω̇ = (ω* − ω) / τ_m",
+                "  f = c_T ω²,   u_applied = B f → dynamics",
+            ],
+        )
+    return _equations_payload(
+        "Instantaneous body wrench",
+        [
+            "u_applied = saturate(u_cmd)",
+            "No motor states; mixer not in the closed-loop ODE.",
+            "Per-rotor forces for viz: f = B⁻¹ u  (display only).",
+        ],
+    )
+
+
 def _details_sensors_observer(
     observer_cfg: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -255,7 +452,8 @@ def _details_sensors_observer(
         notes = "naive partial sensors; unobserved states zeroed on control bus"
     elif obs_type in ("linear_kf", "kf"):
         notes = "linear Kalman filter reconstructs full state from channels"
-    shared_obs = {**shared, "notes": notes}
+    eqs = _observer_equations(str(obs_type), channels)
+    shared_obs = {**shared, "notes": notes, "equations": eqs}
     # sensors share noise/channel fields; observer emphasizes type/notes
     sensors = {
         "observer_type": obs_type,
@@ -267,6 +465,15 @@ def _details_sensors_observer(
         "process_sigma": shared["process_sigma"],
         "seed": shared["seed"],
         "notes": notes,
+        "equations": _equations_payload(
+            "Measurement model",
+            [
+                f"Observer front-end: {obs_type}",
+                f"Channels: {channels if channels is not None else 'full state (ideal)'}",
+                "Noise: independent Gaussian on measured slices (σ from study observer:).",
+                "See Observer block for the estimation recursion.",
+            ],
+        ),
     }
     return sensors, shared_obs
 
@@ -286,7 +493,18 @@ def _details_controller(
     if u_hover is None and "u_hover" in controller_cfg:
         u_hover = controller_cfg.get("u_hover")
 
-    equation = _controller_equation(str(ctype) if ctype else None)
+    eqs = _controller_equations(str(ctype) if ctype else None)
+    equation = None
+    if eqs.get("lines"):
+        # One-line summary for node subtitle / legacy field
+        for ln in eqs["lines"]:
+            if ln.strip().startswith("u =") or ln.strip().startswith("u="):
+                equation = ln.strip()
+                break
+        if equation is None and ctype == "lqr_hover":
+            equation = "u = u_h − K e"
+        elif equation is None and ctype == "pid_cascade":
+            equation = "cascade: a_cmd → F, tilt; τ = Kp e_att − Kd ω"
     design = art.get("design") if isinstance(art.get("design"), dict) else None
     vehicle_trim = None
     if isinstance(art.get("vehicle"), dict):
@@ -306,6 +524,7 @@ def _details_controller(
         "design": design,
         "vehicle_trim": vehicle_trim,
         "equation": equation,
+        "equations": eqs,
     }
     return out
 
@@ -337,16 +556,6 @@ def _gains_from_controller_cfg(cfg: dict[str, Any], ctype: Any) -> dict[str, Any
     return {k: v for k, v in cfg.items() if k != "type"} or None
 
 
-def _controller_equation(ctype: str | None) -> str | None:
-    if not ctype:
-        return None
-    if ctype == "lqr_hover":
-        return "u = u_h − K(x̂ − x_r)"
-    if ctype == "pid_cascade":
-        return "cascade PID (pos→att→rate) → body wrench"
-    return None
-
-
 def _details_actuators(sim: dict[str, Any], vehicle: dict[str, Any] | None) -> dict[str, Any]:
     plant_mode = sim.get("plant") or "wrench"
     vehicle = vehicle or {}
@@ -373,6 +582,7 @@ def _details_actuators(sim: dict[str, Any], vehicle: dict[str, Any] | None) -> d
         }
         if lim
         else None,
+        "equations": _actuator_equations(str(plant_mode)),
     }
 
 
@@ -383,6 +593,8 @@ def _details_plant(sim: dict[str, Any], vehicle: dict[str, Any] | None) -> dict[
     aero = vehicle.get("aero") if isinstance(vehicle.get("aero"), dict) else None
     aero_out = None
     notes = None
+    enabled = False
+    ge = "none"
     if aero:
         enabled = any(
             float(aero.get(k) or 0.0) != 0.0
@@ -394,6 +606,7 @@ def _details_plant(sim: dict[str, Any], vehicle: dict[str, Any] | None) -> dict[
             )
         ) or (aero.get("ground_effect") not in (None, "none", False))
         aero_out = {**aero, "enabled": bool(enabled)}
+        ge = str(aero.get("ground_effect") or "none")
         if not enabled:
             notes = "Aero defaults off (vacuum plant)"
     else:
@@ -409,7 +622,7 @@ def _details_plant(sim: dict[str, Any], vehicle: dict[str, Any] | None) -> dict[
     return {
         "attitude": attitude,
         "plant_mode": plant_mode,
-        "state_dim_bus": 12,
+        "state_dim_bus": 12 if str(attitude).lower() != "quat" else 13,
         "dynamics": "rigid_body_6dof",
         "vehicle": v_snap,
         "aero": aero_out,
@@ -420,6 +633,12 @@ def _details_plant(sim: dict[str, Any], vehicle: dict[str, Any] | None) -> dict[
             "atol": sim.get("atol"),
         },
         "notes": notes,
+        "equations": _plant_equations(
+            str(attitude),
+            str(plant_mode),
+            aero_enabled=bool(enabled),
+            ground_effect=ge,
+        ),
     }
 
 

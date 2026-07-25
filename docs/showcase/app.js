@@ -2537,6 +2537,117 @@
     );
   }
 
+  /**
+   * Prefer detail.equations {caption, lines[]}; SPA fallback from type fields
+   * so older showcase.json still shows laws / EOM before a full rebuild.
+   */
+  function resolveEquations(nodeId, detail) {
+    if (detail && detail.equations && Array.isArray(detail.equations.lines)) {
+      return detail.equations;
+    }
+    if (!detail) return null;
+    if (nodeId === "controller") {
+      const t = detail.type || "";
+      if (t === "lqr_hover") {
+        return {
+          caption: "Hover LQR (from type)",
+          lines: [
+            "e = tracking_error_state(x̂, x_r)  (SO(3) attitude error)",
+            "Design: CARE on hover (A,B) with Q=diag(Q_diag), R=diag(R_diag)",
+            "K = R⁻¹ Bᵀ P",
+            detail.equation || "u = u_h − K e",
+            "u ← saturate(u)",
+          ],
+        };
+      }
+      if (t === "pid_cascade") {
+        return {
+          caption: "Cascade PID (from type)",
+          lines: [
+            "a_cmd = Kp_pos ⊙ e_p + Kd_pos ⊙ e_v",
+            "F = m (g − a_cmd_z); tilt from a_cmd_x,y",
+            "τ = Kp_att ⊙ e_att − Kd_rate ⊙ ω",
+            "u = [F, τ] saturated",
+          ],
+        };
+      }
+    }
+    if (nodeId === "observer" || nodeId === "sensors") {
+      const t = detail.observer_type || "none";
+      if (t === "none") {
+        return {
+          caption: "Identity observer",
+          lines: ["x̂ = x_true", "H = I (full state)"],
+        };
+      }
+      if (t === "partial_raw") {
+        return {
+          caption: "Naive partial bus",
+          lines: [
+            "x̂_i = y_i on measured channels; else 0",
+            "channels: " + JSON.stringify(detail.channels || []),
+          ],
+        };
+      }
+      if (t === "linear_kf" || t === "kf") {
+        return {
+          caption: "Linear KF (hover model)",
+          lines: [
+            "Predict: x̂⁻ = F x̂ + G (u−u_h),  F=I+AΔt",
+            "Update: x̂ = x̂⁻ + K (y − H x̂⁻)",
+            "channels: " + JSON.stringify(detail.channels || []),
+          ],
+        };
+      }
+    }
+    if (nodeId === "plant") {
+      const att = detail.attitude || "euler";
+      const mode = detail.plant_mode || "wrench";
+      const aeroOn = detail.aero && detail.aero.enabled;
+      const lines = [
+        att === "quat"
+          ? "x = [p, q_wxyz, v, ω] ∈ ℝ¹³;  q̇ = ½ q ⊗ [0,ω]"
+          : "x = [p, φθψ, v, ω] ∈ ℝ¹²;  euler rates E(φ,θ) ω",
+        "ṽ = (R f_b + m g e_z + f_aero) / m;   Iω̇ = τ − ω×Iω",
+        aeroOn ? "Aero terms active (drag / H / GE per vehicle.aero)" : "Vacuum: f_aero = 0",
+        mode === "motors"
+          ? "Motors plant: ω̇=(ω*−ω)/τ_m, f=c_T ω², u=B f"
+          : "Wrench plant: u_applied = u_cmd",
+      ];
+      return { caption: "Equations of motion (" + att + ", " + mode + ")", lines: lines };
+    }
+    if (nodeId === "actuators") {
+      return detail.plant_mode === "motors"
+        ? {
+            caption: "Mixer + motors",
+            lines: ["f* = B⁻¹ u_cmd", "ω̇ = (ω* − ω)/τ_m", "u_applied = B (c_T ω²)"],
+          }
+        : {
+            caption: "Instantaneous wrench",
+            lines: ["u_applied = saturate(u_cmd)"],
+          };
+    }
+    return null;
+  }
+
+  function StackEquationsBlock({ equations }) {
+    if (!equations || !equations.lines || !equations.lines.length) return null;
+    return e(
+      "div",
+      { className: "stack-equations" },
+      e(
+        "div",
+        { className: "stack-equations-caption" },
+        equations.caption || "Equations"
+      ),
+      e(
+        "pre",
+        { className: "stack-equations-body" },
+        equations.lines.join("\n")
+      )
+    );
+  }
+
   function StackDetailPanel({ node, detail }) {
     if (!node) {
       return e(
@@ -2544,6 +2655,15 @@
         { className: "stack-detail stack-detail-empty" },
         e("p", { className: "stack-muted" }, "Select a block to inspect provenance fields.")
       );
+    }
+    const eqs = resolveEquations(node.id, detail);
+    // Omit nested equations object from kv dump (rendered above)
+    let fields = detail;
+    if (detail && typeof detail === "object" && detail.equations) {
+      fields = {};
+      Object.keys(detail).forEach(function (k) {
+        if (k !== "equations") fields[k] = detail[k];
+      });
     }
     return e(
       "div",
@@ -2555,13 +2675,16 @@
         e("span", { className: "stack-detail-kind" }, node.kind || node.id)
       ),
       node.summary ? e("p", { className: "stack-detail-summary" }, node.summary) : null,
-      detail && typeof detail === "object" && Object.keys(detail).length
-        ? e(StackObjectFields, { obj: detail, depth: 0 })
-        : e(
-            "p",
-            { className: "stack-muted" },
-            "No structured fields for this block in the gallery payload."
-          )
+      e(StackEquationsBlock, { equations: eqs }),
+      fields && typeof fields === "object" && Object.keys(fields).length
+        ? e(StackObjectFields, { obj: fields, depth: 0 })
+        : !eqs
+          ? e(
+              "p",
+              { className: "stack-muted" },
+              "No structured fields for this block in the gallery payload."
+            )
+          : null
     );
   }
 
