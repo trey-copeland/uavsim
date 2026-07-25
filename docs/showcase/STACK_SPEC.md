@@ -132,6 +132,7 @@ When `observer.type == none` (ideal full state), still include the observer node
 | `process_sigma` | |
 | `seed` | observer seed |
 | `notes` | human string, e.g. naive zeros unobserved states |
+| `equations` | `{caption, lines[]}` — measurement / KF / identity recursion |
 
 ### 2.6 `details.controller`
 
@@ -165,12 +166,13 @@ Prefer **`nominal/controller_artifact.yaml`** when present; else study `controll
 |-------|--------|
 | `attitude` | `euler` \| `quat` |
 | `plant_mode` | same as actuators |
-| `state_dim_bus` | 12 (control bus) |
+| `state_dim_bus` | 12 (control bus) or 13 (quat plant) |
 | `dynamics` | `rigid_body_6dof` |
 | `vehicle` | mass, gravity, arm, inertia, limits |
 | `aero` | full aero dict or flags `enabled` / key coeffs |
 | `integrator` | dt, method, rtol, atol from sim |
 | `notes` | e.g. “Aero defaults off (vacuum plant)” |
+| `equations` | `{caption, lines[]}` — EOM for this attitude/plant/aero mode |
 
 ### 2.9 `details.metrics`
 
