@@ -1,4 +1,6 @@
-/* uavsim intercept L0 demo — vanilla JS + Plotly. Data: ./data/demo.json */
+/* uavsim intercept L0 demo — vanilla JS + Plotly. Data: ./data/demo.json
+ * R2: 3D trajectory + MC confidence bands (2D fill + 3D percentile fan).
+ */
 (function () {
   "use strict";
 
@@ -12,6 +14,7 @@
     paper: "#0c1018",
     plot: "#111315",
     text: "#e8eaed",
+    scene: "#0a0e16",
   };
 
   const PLOTLY_CFG = { displaylogo: false, responsive: true, modeBarButtonsToRemove: ["lasso2d", "select2d"] };
@@ -30,6 +33,12 @@
   /** @type {number|null} */
   let rafId = null;
   let lastWall = 0;
+
+  /** 3D restyle bookkeeping */
+  let traj3dReady = false;
+  /** @type {{trail:number, own:number, tgt:number}|null} */
+  let traj3dIdx = null;
+  let traj3dKey = "";
 
   const el = {
     app: document.getElementById("app"),
@@ -68,7 +77,7 @@
 
   function hasBands() {
     const b = demo && demo.mc && demo.mc.bands;
-    return !!(b && b.ownship && b.ownship.N && b.ownship.E);
+    return !!(b && b.ownship && b.ownship.N && b.ownship.E && b.ownship.N.p5 && b.ownship.N.p5.length);
   }
 
   function hasFail() {
@@ -111,6 +120,107 @@
     );
   }
 
+  /* ── Scene bounds (showcase-style) ─────────────────── */
+
+  function fitSceneBounds(plotArrays) {
+    const xs = [];
+    const ys = [];
+    const zs = [];
+    (plotArrays || []).forEach(function (arr) {
+      if (!arr) return;
+      for (let k = 0; k < arr.length; k++) {
+        if (!arr[k] || arr[k].length < 3) continue;
+        const a = +arr[k][0];
+        const b = +arr[k][1];
+        const c = +arr[k][2];
+        if (Number.isFinite(a)) xs.push(a);
+        if (Number.isFinite(b)) ys.push(b);
+        if (Number.isFinite(c)) zs.push(c);
+      }
+    });
+    function lohi(a, minSpan) {
+      if (!a.length) return { lo: -minSpan / 2, hi: minSpan / 2, mid: 0, span: minSpan };
+      let lo = Math.min.apply(null, a);
+      let hi = Math.max.apply(null, a);
+      if (!Number.isFinite(lo) || !Number.isFinite(hi)) {
+        return { lo: -minSpan / 2, hi: minSpan / 2, mid: 0, span: minSpan };
+      }
+      let span = hi - lo;
+      if (span < minSpan) {
+        const mid = 0.5 * (lo + hi);
+        lo = mid - minSpan / 2;
+        hi = mid + minSpan / 2;
+        span = minSpan;
+      }
+      return { lo: lo, hi: hi, mid: 0.5 * (lo + hi), span: span };
+    }
+    const px = lohi(xs, 1.0);
+    const py = lohi(ys, 1.0);
+    const pz = lohi(zs, 0.25);
+    const hSpan = Math.max(px.span, py.span, 1.0);
+    const vSpan = Math.max(pz.span, 0.4 * hSpan, 0.8);
+    const padH = 0.22 * hSpan;
+    const padV = 0.15 * vSpan;
+    const halfH = 0.5 * hSpan + padH;
+    const halfV = 0.5 * vSpan + padV;
+    return {
+      x: [px.mid - halfH, px.mid + halfH],
+      y: [py.mid - halfH, py.mid + halfH],
+      z: [pz.mid - halfV, pz.mid + halfV],
+      halfH: halfH,
+      halfV: halfV,
+      ar: {
+        x: 1,
+        y: 1,
+        z: Math.max(0.35, Math.min(1.0, halfV / halfH)),
+      },
+    };
+  }
+
+  function cornerTrace(bounds) {
+    const xr = bounds.x;
+    const yr = bounds.y;
+    const zr = bounds.z;
+    const xs = [];
+    const ys = [];
+    const zs = [];
+    for (let ix = 0; ix < 2; ix++) {
+      for (let iy = 0; iy < 2; iy++) {
+        for (let iz = 0; iz < 2; iz++) {
+          xs.push(xr[ix]);
+          ys.push(yr[iy]);
+          zs.push(zr[iz]);
+        }
+      }
+    }
+    return {
+      type: "scatter3d",
+      mode: "markers",
+      x: xs,
+      y: ys,
+      z: zs,
+      marker: { size: 1, opacity: 0, color: "#000" },
+      name: "_bounds",
+      hoverinfo: "skip",
+      showlegend: false,
+    };
+  }
+
+  function bandPathsAsPlotArrays(bands) {
+    if (!bands || !bands.ownship) return [];
+    const o = bands.ownship;
+    const out = [];
+    ["p5", "p50", "p95"].forEach(function (k) {
+      if (!o.N || !o.E || !o.U || !o.N[k] || !o.E[k] || !o.U[k]) return;
+      const arr = [];
+      for (let i = 0; i < o.N[k].length; i++) {
+        arr.push([o.N[k][i], o.E[k][i], o.U[k][i]]);
+      }
+      out.push(arr);
+    });
+    return out;
+  }
+
   /* ── Render shell ──────────────────────────────────── */
 
   function renderShell() {
@@ -125,6 +235,11 @@
     const c = activeCase();
     const interceptOk = c && c.metrics && c.metrics.intercept_success;
     const pClass = !hasMc() ? "" : pCap >= 0.5 ? "good" : "bad";
+    const failMcNote = caseId === "fail" && hasMc();
+
+    traj3dReady = false;
+    traj3dIdx = null;
+    traj3dKey = "";
 
     el.app.innerHTML = `
       <header class="app-header">
@@ -167,31 +282,45 @@
         Capture when
         <span class="capture-eq">min ‖p<sub>own</sub> − p<sub>tgt</sub>‖ ≤ ${fmt(rCap, 2)} m</span>.
         Plant MC on the success recipe; Fail is a miss nominal for geometry contrast.
+        ${
+          failMcNote
+            ? '<span class="fail-mc-note"> MC / bands: success plant study</span>'
+            : ""
+        }
       </div>
 
       <main>
         <div class="primary-row">
           <section class="card">
             <h2>
-              Trajectory
+              Trajectory 3D
               <span class="card-tools">
-                <div class="seg" id="proj-seg" role="group" aria-label="Projection">
-                  <button type="button" data-proj="NE" class="${projection === "NE" ? "active" : ""}">N–E</button>
-                  <button type="button" data-proj="NU" class="${projection === "NU" ? "active" : ""}">N–Up</button>
-                </div>
-                <label class="tool-label" id="bands-label" title="${hasBands() ? "Show MC percentile bands" : "Bands not in data pack"}">
+                <label class="tool-label" id="bands-label" title="${hasBands() ? "Show MC percentile bands on 2D + 3D" : "Bands not in data pack"}">
                   <input type="checkbox" id="bands-toggle" ${showBands && hasBands() ? "checked" : ""} ${hasBands() ? "" : "disabled"} />
                   MC bands
                 </label>
               </span>
             </h2>
-            <div class="plot-host tall" id="traj-plot"></div>
+            <div class="plot-host tall" id="traj3d-plot"></div>
           </section>
           <section class="card">
             <h2>Range vs time</h2>
             <div class="plot-host tall" id="range-plot"></div>
           </section>
         </div>
+
+        <section class="card traj2d-card">
+          <h2>
+            Trajectory 2D
+            <span class="card-tools">
+              <div class="seg" id="proj-seg" role="group" aria-label="Projection">
+                <button type="button" data-proj="NE" class="${projection === "NE" ? "active" : ""}">N–E</button>
+                <button type="button" data-proj="NU" class="${projection === "NU" ? "active" : ""}">N–Up</button>
+              </div>
+            </span>
+          </h2>
+          <div class="plot-host mid" id="traj-plot"></div>
+        </section>
 
         <div class="transport" id="transport">
           <button type="button" class="btn primary" id="play-btn">${playing ? "Pause" : "Play"}</button>
@@ -280,7 +409,7 @@
         btn.addEventListener("click", () => {
           projection = btn.getAttribute("data-proj");
           projSeg.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
-          drawTraj();
+          drawTraj2d();
         });
       });
     }
@@ -289,7 +418,10 @@
     if (bands) {
       bands.addEventListener("change", () => {
         showBands = bands.checked;
-        drawTraj();
+        traj3dReady = false;
+        traj3dKey = "";
+        drawTraj3d(true);
+        drawTraj2d();
       });
     }
 
@@ -314,7 +446,8 @@
         frameIndex = parseInt(scrub.value, 10) || 0;
         if (playing) stopPlay();
         updateReadouts();
-        drawTraj();
+        drawTraj3d(false);
+        drawTraj2d();
         drawRange();
       });
     }
@@ -328,7 +461,6 @@
         });
       });
     }
-
   }
 
   function onKey(ev) {
@@ -344,7 +476,8 @@
       stopPlay();
       syncScrub();
       updateReadouts();
-      drawTraj();
+      drawTraj3d(false);
+      drawTraj2d();
       drawRange();
     } else if (ev.key === " " || ev.code === "Space") {
       ev.preventDefault();
@@ -406,7 +539,8 @@
     stopPlay();
     syncScrub();
     updateReadouts();
-    drawTraj();
+    drawTraj3d(false);
+    drawTraj2d();
     drawRange();
   }
 
@@ -445,29 +579,28 @@
       stopPlay();
       return;
     }
-    // Advance by wall*speed in sim time, map to nearest index
     const tNow = t[frameIndex] + dtWall * speed;
     if (tNow >= t[t.length - 1]) {
       frameIndex = t.length - 1;
       updateReadouts();
       syncScrub();
-      drawTraj();
+      drawTraj3d(false);
+      drawTraj2d();
       drawRange();
       stopPlay();
       return;
     }
-    // find first index with t[i] >= tNow
     let i = frameIndex;
     while (i < t.length - 1 && t[i + 1] < tNow) i++;
     if (t[i] < tNow && i < t.length - 1) {
-      // pick closer
       if (Math.abs(t[i + 1] - tNow) < Math.abs(t[i] - tNow)) i++;
     }
     if (i !== frameIndex) {
       frameIndex = i;
       updateReadouts();
       syncScrub();
-      drawTraj();
+      drawTraj3d(false);
+      drawTraj2d();
       drawRange();
     }
     rafId = requestAnimationFrame(tick);
@@ -476,7 +609,6 @@
   /* ── Plots ─────────────────────────────────────────── */
 
   function extractXY(plotPts) {
-    // plotPts: array of [N,E,U]
     if (!plotPts || !plotPts.length) return { x: [], y: [] };
     if (projection === "NU") {
       return {
@@ -514,62 +646,56 @@
     };
   }
 
-  function bandTrace(bands) {
+  function bandTrace2d(bands) {
     if (!bands || !bands.ownship) return null;
     const own = bands.ownship;
-    const nKey = projection === "NU" ? "U" : "E";
-    const eKey = projection === "NU" ? "N" : "N";
-    // For NE: x=E, y=N; for NU: x=N, y=U
-    let xLo, xHi, yLo, yHi;
+    let xLo, xHi, yLo, yHi, p50x, p50y;
     if (projection === "NE") {
       if (!own.E || !own.N) return null;
       xLo = own.E.p5;
       xHi = own.E.p95;
       yLo = own.N.p5;
       yHi = own.N.p95;
+      p50x = own.E.p50;
+      p50y = own.N.p50;
     } else {
       if (!own.N || !own.U) return null;
       xLo = own.N.p5;
       xHi = own.N.p95;
       yLo = own.U.p5;
       yHi = own.U.p95;
+      p50x = own.N.p50;
+      p50y = own.U.p50;
     }
     if (!xLo || !xHi || !yLo || !yHi) return null;
-    // Closed polygon along time then reverse
     const x = xLo.concat(xHi.slice().reverse());
     const y = yLo.concat(yHi.slice().reverse());
-    return {
-      x,
-      y,
+    const fill = {
+      x: x,
+      y: y,
       fill: "toself",
-      fillcolor: "rgba(91, 159, 212, 0.15)",
-      line: { color: "rgba(91, 159, 212, 0.35)", width: 1 },
+      fillcolor: "rgba(91, 159, 212, 0.18)",
+      line: { color: "rgba(91, 159, 212, 0.4)", width: 1 },
       name: "MC p5–p95",
       hoverinfo: "skip",
       mode: "lines",
     };
+    const med =
+      p50x && p50y
+        ? {
+            x: p50x,
+            y: p50y,
+            mode: "lines",
+            name: "MC p50",
+            line: { color: "rgba(91, 159, 212, 0.55)", width: 1.2, dash: "dot" },
+            hoverinfo: "skip",
+          }
+        : null;
+    return { fill: fill, med: med };
   }
 
-  function drawTraj() {
-    const host = document.getElementById("traj-plot");
-    const c = activeCase();
-    if (!host || !c || !c.timeseries || typeof Plotly === "undefined") return;
-    const ts = c.timeseries;
-    const own = ts.pos_plot || [];
-    const tgt = ts.target_plot || [];
-    const i = Math.min(frameIndex, Math.max(0, own.length - 1));
-    const rCap = captureRadius();
-
-    const ownXY = extractXY(own);
-    const tgtXY = extractXY(tgt);
-    const trailOwn = extractXY(own.slice(0, i + 1));
-    const ownNow = own[i] || [0, 0, 0];
-    const tgtNow = tgt[i] || [0, 0, 0];
-    const nowOwn = extractXY([ownNow]);
-    const nowTgt = extractXY([tgtNow]);
-
-    // Capture circle centered on target at CPA (or current target if no metric)
-    let cpaIdx = i;
+  function cpaIndex(c, ts) {
+    let cpaIdx = 0;
     if (c.metrics && c.metrics.time_of_min_range_s != null) {
       const tCpa = c.metrics.time_of_min_range_s;
       let best = Infinity;
@@ -589,14 +715,226 @@
         }
       }
     }
+    return cpaIdx;
+  }
+
+  /* ── 3D trajectory ─────────────────────────────────── */
+
+  function applyTraj3dFrame(host, ts, i) {
+    if (!traj3dReady || !traj3dIdx || !host || !ts || !ts.pos_plot) return;
+    const own = ts.pos_plot;
+    const tgt = ts.target_plot || [];
+    const ii = Math.max(0, Math.min(i, own.length - 1));
+    const trail = own.slice(0, ii + 1);
+    const px = own[ii][0];
+    const py = own[ii][1];
+    const pz = own[ii][2];
+    const tx = tgt[ii] ? tgt[ii][0] : px;
+    const ty = tgt[ii] ? tgt[ii][1] : py;
+    const tz = tgt[ii] ? tgt[ii][2] : pz;
+    Plotly.restyle(
+      host,
+      {
+        x: [trail.map((p) => p[0]), [px], [tx]],
+        y: [trail.map((p) => p[1]), [py], [ty]],
+        z: [trail.map((p) => p[2]), [pz], [tz]],
+      },
+      [traj3dIdx.trail, traj3dIdx.own, traj3dIdx.tgt]
+    );
+  }
+
+  function drawTraj3d(forceFull) {
+    const host = document.getElementById("traj3d-plot");
+    const c = activeCase();
+    if (!host || !c || !c.timeseries || typeof Plotly === "undefined") return;
+    const ts = c.timeseries;
+    const own = ts.pos_plot || [];
+    const tgt = ts.target_plot || [];
+    const i = Math.min(frameIndex, Math.max(0, own.length - 1));
+    const key = caseId + "|" + (showBands && hasBands() ? "b1" : "b0");
+
+    if (!forceFull && traj3dReady && traj3dKey === key) {
+      applyTraj3dFrame(host, ts, i);
+      return;
+    }
+
+    traj3dReady = false;
+    traj3dKey = key;
+
+    const bandArrs = showBands && hasBands() ? bandPathsAsPlotArrays(demo.mc.bands) : [];
+    const bounds = fitSceneBounds([own, tgt, ts.ref_plot].concat(bandArrs));
+
+    function axis(title, range) {
+      return {
+        title: title,
+        range: range.slice(),
+        autorange: false,
+        gridcolor: "#243044",
+        zerolinecolor: "#3a4a60",
+        showbackground: true,
+        backgroundcolor: "rgba(10,14,22,0.95)",
+      };
+    }
+
+    const traces = [];
+    traces.push(cornerTrace(bounds));
+
+    if (showBands && hasBands()) {
+      const o = demo.mc.bands.ownship;
+      const fan = [
+        { k: "p5", op: 0.35, w: 3, name: "MC p5" },
+        { k: "p50", op: 0.55, w: 4, name: "MC p50" },
+        { k: "p95", op: 0.35, w: 3, name: "MC p95" },
+      ];
+      fan.forEach(function (f) {
+        if (!o.N[f.k] || !o.E[f.k] || !o.U[f.k]) return;
+        traces.push({
+          type: "scatter3d",
+          mode: "lines",
+          x: o.N[f.k],
+          y: o.E[f.k],
+          z: o.U[f.k],
+          line: { color: "rgba(91, 159, 212," + f.op + ")", width: f.w },
+          name: f.name,
+          hoverinfo: "skip",
+        });
+      });
+    }
+
+    if (tgt.length) {
+      traces.push({
+        type: "scatter3d",
+        mode: "lines",
+        x: tgt.map((p) => p[0]),
+        y: tgt.map((p) => p[1]),
+        z: tgt.map((p) => p[2]),
+        line: { color: COLORS.warn, width: 5 },
+        name: "target",
+        hoverinfo: "skip",
+      });
+    }
+    if (own.length) {
+      traces.push({
+        type: "scatter3d",
+        mode: "lines",
+        x: own.map((p) => p[0]),
+        y: own.map((p) => p[1]),
+        z: own.map((p) => p[2]),
+        line: { color: "rgba(91, 159, 212, 0.4)", width: 4 },
+        name: "ownship",
+        hoverinfo: "skip",
+      });
+    }
+
+    const trailIdx = traces.length;
+    traces.push({
+      type: "scatter3d",
+      mode: "lines",
+      x: own.length ? [own[0][0]] : [0],
+      y: own.length ? [own[0][1]] : [0],
+      z: own.length ? [own[0][2]] : [0],
+      line: { color: COLORS.accent, width: 8 },
+      name: "trail",
+    });
+    const ownIdx = traces.length;
+    traces.push({
+      type: "scatter3d",
+      mode: "markers",
+      x: own.length ? [own[0][0]] : [0],
+      y: own.length ? [own[0][1]] : [0],
+      z: own.length ? [own[0][2]] : [0],
+      marker: {
+        size: 6,
+        color: "#e8f4ff",
+        line: { color: COLORS.accent, width: 2 },
+        symbol: "circle",
+      },
+      name: "ownship @ t",
+    });
+    const tgtIdx = traces.length;
+    traces.push({
+      type: "scatter3d",
+      mode: "markers",
+      x: tgt.length ? [tgt[0][0]] : [0],
+      y: tgt.length ? [tgt[0][1]] : [0],
+      z: tgt.length ? [tgt[0][2]] : [0],
+      marker: {
+        size: 6,
+        color: COLORS.warn,
+        symbol: "diamond",
+      },
+      name: "target @ t",
+    });
+
+    traj3dIdx = { trail: trailIdx, own: ownIdx, tgt: tgtIdx };
+
+    const layout = {
+      paper_bgcolor: COLORS.scene,
+      plot_bgcolor: COLORS.scene,
+      font: { color: COLORS.text, size: 11 },
+      margin: { l: 0, r: 0, t: 8, b: 0 },
+      uirevision: "intercept3d-" + caseId,
+      scene: {
+        xaxis: axis("N [m]", bounds.x),
+        yaxis: axis("E [m]", bounds.y),
+        zaxis: axis("up [m]", bounds.z),
+        aspectmode: "manual",
+        aspectratio: bounds.ar,
+        bgcolor: COLORS.scene,
+        camera: {
+          eye: { x: 1.9, y: 1.9, z: 1.25 },
+          center: { x: 0, y: 0, z: 0 },
+          up: { x: 0, y: 0, z: 1 },
+        },
+      },
+      showlegend: true,
+      legend: {
+        orientation: "h",
+        y: 1.08,
+        x: 0,
+        font: { size: 10, color: COLORS.muted },
+        bgcolor: "rgba(0,0,0,0)",
+      },
+    };
+
+    Plotly.react(host, traces, layout, PLOTLY_CFG).then(function () {
+      traj3dReady = true;
+      applyTraj3dFrame(host, ts, i);
+    });
+  }
+
+  /* ── 2D trajectory ─────────────────────────────────── */
+
+  function drawTraj2d() {
+    const host = document.getElementById("traj-plot");
+    const c = activeCase();
+    if (!host || !c || !c.timeseries || typeof Plotly === "undefined") return;
+    const ts = c.timeseries;
+    const own = ts.pos_plot || [];
+    const tgt = ts.target_plot || [];
+    const i = Math.min(frameIndex, Math.max(0, own.length - 1));
+    const rCap = captureRadius();
+
+    const ownXY = extractXY(own);
+    const tgtXY = extractXY(tgt);
+    const trailOwn = extractXY(own.slice(0, i + 1));
+    const ownNow = own[i] || [0, 0, 0];
+    const tgtNow = tgt[i] || [0, 0, 0];
+    const nowOwn = extractXY([ownNow]);
+    const nowTgt = extractXY([tgtNow]);
+
+    const cpaIdx = cpaIndex(c, ts);
     const cpaTgt = tgt[cpaIdx] || tgtNow;
     const cpaXY = extractXY([cpaTgt]);
 
     const traces = [];
 
     if (showBands && hasBands()) {
-      const bt = bandTrace(demo.mc.bands);
-      if (bt) traces.push(bt);
+      const bt = bandTrace2d(demo.mc.bands);
+      if (bt) {
+        traces.push(bt.fill);
+        if (bt.med) traces.push(bt.med);
+      }
     }
 
     if (tgt.length) {
@@ -638,9 +976,7 @@
       });
     }
 
-    traces.push(
-      circleTrace(cpaXY.x[0], cpaXY.y[0], rCap, `capture ${fmt(rCap, 1)} m`)
-    );
+    traces.push(circleTrace(cpaXY.x[0], cpaXY.y[0], rCap, `capture ${fmt(rCap, 1)} m`));
 
     traces.push({
       x: nowTgt.x,
@@ -658,7 +994,10 @@
     });
 
     const layout = plotLayoutBase({
-      title: { text: projection === "NE" ? "North–East (top-down)" : "North–Up", font: { size: 12, color: COLORS.muted } },
+      title: {
+        text: projection === "NE" ? "North–East (top-down)" : "North–Up",
+        font: { size: 12, color: COLORS.muted },
+      },
       xaxis: {
         title: ownXY.xlabel,
         gridcolor: COLORS.grid,
@@ -674,6 +1013,7 @@
         color: COLORS.muted,
       },
       margin: { l: 52, r: 12, t: 36, b: 44 },
+      uirevision: "traj2d-" + caseId + "-" + projection,
     });
 
     Plotly.react(host, traces, layout, PLOTLY_CFG);
@@ -739,6 +1079,7 @@
         rangemode: "tozero",
       },
       margin: { l: 52, r: 12, t: 20, b: 44 },
+      uirevision: "range-" + caseId,
     });
 
     Plotly.react(host, traces, layout, PLOTLY_CFG);
@@ -790,7 +1131,6 @@
       });
     }
 
-    // Capture radius vertical line via shapes
     const layout = plotLayoutBase({
       barmode: "overlay",
       xaxis: {
@@ -834,11 +1174,11 @@
 
     Plotly.react(host, traces, layout, PLOTLY_CFG);
 
-    // Stats panel
     const statsHost = document.getElementById("mc-stats");
     const s = demo.mc.summary || {};
     const mr = s.min_range_m || {};
     const tilt = s.peak_tilt_rad || {};
+    const nBand = hasBands() ? demo.mc.bands.n_paths_used : null;
     if (statsHost) {
       statsHost.innerHTML = `
         <li><span>P(capture)</span><strong class="${s.p_capture >= 0.5 ? "ok" : "fail"}">${fmtPct(s.p_capture)}</strong></li>
@@ -852,6 +1192,11 @@
             ? `<li><span>peak tilt mean</span><strong>${fmt((tilt.mean * 180) / Math.PI, 1)}°</strong></li>`
             : ""
         }
+        ${
+          nBand != null
+            ? `<li><span>band paths used</span><strong>${nBand}</strong></li>`
+            : ""
+        }
       `;
     }
 
@@ -861,6 +1206,7 @@
         "Plant parameter scatter only — controller gains are fixed.",
         "Capture = min range ≤ capture radius (not tracking success).",
         "MC is on the success recipe; Fail toggle is geometry contrast only.",
+        "Bands = ownship spatial percentiles under plant re-sim (not sensor noise).",
       ];
     if (how) {
       how.innerHTML = bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("");
@@ -868,7 +1214,8 @@
   }
 
   function drawAll() {
-    drawTraj();
+    drawTraj3d(true);
+    drawTraj2d();
     drawRange();
     drawHist();
   }
@@ -883,7 +1230,7 @@
         ${detail ? `<p><code>${escapeHtml(detail)}</code></p>` : ""}
         <p class="muted-note">
           From repo root, regenerate with
-          <code>uv run python docs/demos/intercept/scripts/export_demo_data.py --success-run &lt;run&gt;</code>
+          <code>uv run python docs/demos/intercept/scripts/export_demo_data.py --success-run &lt;run&gt; --with-bands</code>
           then open this page via <code>python -m http.server</code> from
           <code>docs/demos/intercept</code> (or any ancestor with the relative path intact).
         </p>
@@ -909,7 +1256,6 @@
       if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
       demo = await res.json();
     } catch (err) {
-      // file:// often blocks fetch; try to guide user
       showError(
         "Failed to fetch data/demo.json. Prefer a local static server if opening via file://.",
         String(err && err.message ? err.message : err)

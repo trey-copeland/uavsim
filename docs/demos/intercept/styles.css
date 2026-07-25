@@ -262,8 +262,19 @@ main {
   border-radius: 8px;
   border: 1px solid var(--border);
 }
-.plot-host.tall { min-height: 360px; }
+.plot-host.tall { min-height: 380px; }
+.plot-host.mid { min-height: 320px; }
 .plot-host.hist { min-height: 280px; }
+
+.traj2d-card {
+  margin-bottom: 0.75rem;
+}
+
+.fail-mc-note {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-style: italic;
+}
 
 .tool-label {
   font-size: 0.72rem;

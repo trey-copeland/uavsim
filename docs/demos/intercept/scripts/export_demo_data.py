@@ -6,13 +6,15 @@ Usage (from repo root)::
   uv run python docs/demos/intercept/scripts/export_demo_data.py \\
     --success-run runs/intercept_l0_success_mc_20260725T153348Z \\
     --fail-run runs/intercept_l0_fail_20260725T140842Z \\
+    --with-bands --band-max-trials 100 \\
     --out docs/demos/intercept/data/demo.json
 
 Success run may include ``monte_carlo/trials.csv`` or ``monte_carlo/shards/*/trials.csv``.
 Capture KPIs use ``intercept_success`` / ``min_range_m`` — not tracking ``success``.
 
-MC trajectory bands are only emitted when per-trial paths exist (not typical for
-table-only MC packs). Histogram + P(capture) always come from trials when present.
+MC trajectory bands: with ``--with-bands`` (default when trials are present), re-simulate
+selected plant-MC trials offline (fixed NDI gains) and write axis-wise p5/p50/p95
+ownship paths in plot frame (N, E, up).
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ import argparse
 import json
 import math
 import sys
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -259,10 +262,262 @@ def compact_trial_row(row: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _select_trial_indices(n: int, max_trials: int, seed: int) -> np.ndarray:
+    """Evenly spaced subsample of trial indices (deterministic)."""
+    if n <= 0:
+        return np.array([], dtype=int)
+    if max_trials <= 0 or n <= max_trials:
+        return np.arange(n, dtype=int)
+    # Stratified-ish: uniform index grid; seed only shuffles a bit for variety
+    base = np.linspace(0, n - 1, max_trials)
+    idx = np.unique(np.round(base).astype(int))
+    if idx.size < max_trials:
+        rng = np.random.default_rng(seed)
+        extra = rng.choice(
+            np.setdiff1d(np.arange(n), idx),
+            size=min(max_trials - idx.size, n - idx.size),
+            replace=False,
+        )
+        idx = np.sort(np.concatenate([idx, extra]))
+    return idx[:max_trials]
+
+
+def _float_or_none(row: dict[str, Any], key: str) -> float | None:
+    v = row.get(key)
+    if v is None or v == "":
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _plant_from_trial_row(nominal: Any, row: dict[str, Any]) -> Any:
+    """Build plant vehicle from trial CSV columns; fall back to re-perturb via trial_id."""
+    from uavsim.vehicles.params import InertiaParams
+
+    mass = _float_or_none(row, "mass_kg")
+    ixx = _float_or_none(row, "ixx_kg_m2")
+    iyy = _float_or_none(row, "iyy_kg_m2")
+    izz = _float_or_none(row, "izz_kg_m2")
+    arm = _float_or_none(row, "arm_length_m")
+    thrust = _float_or_none(row, "thrust_max_n")
+
+    if mass is None or ixx is None or iyy is None or izz is None or arm is None:
+        return None
+
+    thrust_max = thrust
+    if thrust_max is None:
+        thrust_scale = mass / nominal.mass_kg
+        thrust_max = max(
+            nominal.limits.thrust_max_n * thrust_scale,
+            mass * nominal.gravity_m_s2 * 1.2,
+        )
+
+    updates: dict[str, Any] = {
+        "mass_kg": mass,
+        "arm_length_m": arm,
+        "inertia": InertiaParams(ixx_kg_m2=ixx, iyy_kg_m2=iyy, izz_kg_m2=izz),
+        "limits": nominal.limits.model_copy(update={"thrust_max_n": float(thrust_max)}),
+    }
+    tid = row.get("trial_id")
+    if tid is not None:
+        updates["vehicle_id"] = f"{nominal.vehicle_id}_trial{tid}"
+
+    # Optional propulsion columns when present
+    ct = _float_or_none(row, "ct_n_s2")
+    cq = _float_or_none(row, "cq_nm_s2")
+    mtau = _float_or_none(row, "motor_time_const_s")
+    wmax = _float_or_none(row, "omega_max_rad_s")
+    if any(v is not None for v in (ct, cq, mtau, wmax)):
+        prop = nominal.propulsion
+        updates["propulsion"] = prop.model_copy(
+            update={
+                "ct_n_s2": ct if ct is not None else prop.ct_n_s2,
+                "cq_nm_s2": cq if cq is not None else prop.cq_nm_s2,
+                "motor_time_const_s": mtau if mtau is not None else prop.motor_time_const_s,
+                "omega_max_rad_s": wmax if wmax is not None else prop.omega_max_rad_s,
+            }
+        )
+    return nominal.model_copy(update=updates)
+
+
+def compute_mc_bands(
+    success_run: Path,
+    trials_raw: list[dict[str, Any]],
+    *,
+    max_trials: int,
+    band_points: int,
+    seed: int,
+    progress: bool = True,
+) -> dict[str, Any] | None:
+    """Re-sim plant-MC trials and compute axis-wise ownship position percentiles."""
+    import yaml
+
+    from uavsim.control.factory import build_controller_from_mapping
+    from uavsim.monte_carlo.perturb import perturb_vehicle
+    from uavsim.studies.config import StudyConfig, guidance_mission_dict
+    from uavsim.studies.pipeline import PreparedStudy, _build_guidance, run_closed_loop_trial
+    from uavsim.vehicles.params import load_vehicle
+
+    if not trials_raw:
+        return None
+
+    cfg_path = success_run / "study_config.yaml"
+    if not cfg_path.is_file():
+        print(f"warn: no study_config.yaml under {success_run}; bands skipped", file=sys.stderr)
+        return None
+
+    raw = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    cfg = StudyConfig.model_validate(raw)
+
+    vpath = Path(cfg.vehicle)
+    if not vpath.is_file():
+        vpath = (REPO_ROOT / vpath).resolve()
+    if not vpath.is_file():
+        vpath = (Path.cwd() / cfg.vehicle).resolve()
+    if not vpath.is_file():
+        print(f"warn: vehicle not found: {cfg.vehicle}; bands skipped", file=sys.stderr)
+        return None
+
+    vehicle = load_vehicle(vpath)
+    controller = build_controller_from_mapping(cfg.controller, vehicle)
+    backend = _build_guidance(cfg)
+    plan = backend.plan(guidance_mission_dict(cfg), vehicle)
+    if cfg.initial_state is not None:
+        x0 = cfg.initial_state.to_array()
+    else:
+        x0 = plan.reference.evaluate(plan.reference.t0).x_ref.copy()
+
+    prepared = PreparedStudy(
+        cfg=cfg,
+        vehicle_nominal=vehicle,
+        vehicle_path=vpath,
+        cfg_hash="demo_bands",
+        controller=controller,
+        reference=plan.reference,
+        feasibility=plan.feasibility,
+        plan_diagnostics=plan.diagnostics,
+        x0=x0,
+    )
+
+    # Common time grid from nominal timeseries when available
+    try:
+        npz = np.load(_resolve_timeseries(success_run))
+        t_nom = np.asarray(npz["t"], dtype=float)
+    except FileNotFoundError:
+        t_nom = np.asarray(
+            plan.reference.t_grid if hasattr(plan.reference, "t_grid") else [], dtype=float
+        )
+        if t_nom.size == 0:
+            t0, tf = float(plan.reference.t0), float(plan.reference.tf)
+            t_nom = np.linspace(t0, tf, max(band_points, 50))
+
+    t_grid = t_nom[_downsample_idx(t_nom.size, band_points)]
+    n_grid = int(t_grid.size)
+
+    sel = _select_trial_indices(len(trials_raw), max_trials, seed)
+    paths_n = np.full((sel.size, n_grid), np.nan, dtype=float)
+    paths_e = np.full((sel.size, n_grid), np.nan, dtype=float)
+    paths_u = np.full((sel.size, n_grid), np.nan, dtype=float)
+
+    base_seed = int(cfg.seed)
+    redesign = bool(cfg.monte_carlo.redesign_controller)
+    n_ok = 0
+    t_start = time.time()
+
+    if progress:
+        print(
+            f"bands: re-sim {sel.size}/{len(trials_raw)} trials "
+            f"(redesign_controller={redesign}, grid={n_grid} pts)…",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    for i, row_i in enumerate(sel):
+        row = trials_raw[int(row_i)]
+        plant = _plant_from_trial_row(vehicle, row)
+        if plant is None:
+            tid = int(row.get("trial_id", row_i))
+            plant, _ = perturb_vehicle(
+                vehicle,
+                base_seed=base_seed,
+                trial_id=tid,
+                spec=cfg.monte_carlo.perturbation_spec(),
+            )
+        ctrl = build_controller_from_mapping(cfg.controller, plant) if redesign else controller
+        try:
+            sim, _metrics = run_closed_loop_trial(prepared, plant, controller=ctrl)
+        except Exception as exc:  # noqa: BLE001 — one bad trial should not kill pack
+            if progress:
+                print(f"  trial {row.get('trial_id', row_i)} failed: {exc}", file=sys.stderr)
+            continue
+
+        t_sim = np.asarray(sim.t, dtype=float)
+        pos_ned = np.asarray(sim.x[:, 0:3], dtype=float)
+        if t_sim.size < 2:
+            continue
+        # Interpolate each NED axis onto common grid, then plot-frame
+        n_i = np.interp(t_grid, t_sim, pos_ned[:, 0])
+        e_i = np.interp(t_grid, t_sim, pos_ned[:, 1])
+        d_i = np.interp(t_grid, t_sim, pos_ned[:, 2])
+        pos_plot = ned_to_plot(np.column_stack([n_i, e_i, d_i]))
+        paths_n[i, :] = pos_plot[:, 0]
+        paths_e[i, :] = pos_plot[:, 1]
+        paths_u[i, :] = pos_plot[:, 2]
+        n_ok += 1
+
+        if progress and ((i + 1) % 10 == 0 or i + 1 == sel.size):
+            elapsed = time.time() - t_start
+            rate = (i + 1) / elapsed if elapsed > 0 else 0.0
+            eta = (sel.size - i - 1) / rate if rate > 0 else float("nan")
+            print(
+                f"  {i + 1}/{sel.size} ok={n_ok}  {elapsed:.0f}s elapsed  eta {eta:.0f}s",
+                file=sys.stderr,
+                flush=True,
+            )
+
+    if n_ok < 2:
+        print("warn: fewer than 2 successful band re-sims; bands skipped", file=sys.stderr)
+        return None
+
+    def axis_percentiles(paths: np.ndarray) -> dict[str, list[float]]:
+        # paths: (n_trials, n_grid); nan rows ignored
+        p5 = np.nanpercentile(paths, 5, axis=0)
+        p50 = np.nanpercentile(paths, 50, axis=0)
+        p95 = np.nanpercentile(paths, 95, axis=0)
+        return {
+            "p5": [float(x) for x in p5],
+            "p50": [float(x) for x in p50],
+            "p95": [float(x) for x in p95],
+        }
+
+    return {
+        "frame": "plot",
+        "percentiles": [5, 50, 95],
+        "t": [float(x) for x in t_grid],
+        "n_paths_used": int(n_ok),
+        "n_paths_requested": int(sel.size),
+        "method": "axiswise_percentile",
+        "notes": (
+            "Ownship N/E/U percentiles from plant-param re-sim of success recipe; "
+            "fixed NDI gains (redesign_controller=false). Axis-wise percentiles are "
+            "not a joint spatial ellipsoid."
+        ),
+        "ownship": {
+            "N": axis_percentiles(paths_n),
+            "E": axis_percentiles(paths_e),
+            "U": axis_percentiles(paths_u),
+        },
+    }
+
+
 def build_mc_block(
     success_run: Path,
     trials_raw: list[dict[str, Any]],
     capture_radius_m: float,
+    *,
+    bands: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     if not trials_raw:
         return None
@@ -315,7 +570,7 @@ def build_mc_block(
         "summary": summary,
         "pipeline_summary": mc_summary_file,
         "trials": trials,
-        "bands": None,  # no per-trial paths in standard MC pack
+        "bands": bands,
     }
 
 
@@ -327,6 +582,10 @@ def build_demo(
     capture_radius_m: float,
     max_points: int,
     uavsim_version: str,
+    with_bands: bool,
+    band_max_trials: int,
+    band_points: int,
+    band_seed: int,
 ) -> dict[str, Any]:
     success = load_case_pack(
         success_run,
@@ -348,7 +607,16 @@ def build_demo(
         )
 
     trials_raw = load_mc_trials(success_run)
-    mc = build_mc_block(success_run, trials_raw, capture_radius_m)
+    bands = None
+    if with_bands and trials_raw:
+        bands = compute_mc_bands(
+            success_run,
+            trials_raw,
+            max_trials=band_max_trials,
+            band_points=band_points,
+            seed=band_seed,
+        )
+    mc = build_mc_block(success_run, trials_raw, capture_radius_m, bands=bands)
 
     r_cap = capture_radius_m
     if mc and mc.get("summary"):
@@ -359,6 +627,17 @@ def build_demo(
     cases: dict[str, Any] = {"success": success}
     if fail is not None:
         cases["fail"] = fail
+
+    how_to = [
+        "Plant parameter scatter only — controller gains are fixed.",
+        "Capture = min range ≤ capture radius (not tracking RMSE / success flag).",
+        "MC summary attaches to the success recipe; Fail toggle shows a miss nominal only.",
+    ]
+    if bands is not None:
+        how_to.append(
+            "Trajectory bands = ownship spatial p5/p50/p95 from plant re-sim "
+            f"(n={bands.get('n_paths_used')}); axis-wise, not sensor noise."
+        )
 
     return {
         "schema_version": 1,
@@ -384,16 +663,13 @@ def build_demo(
                 (
                     "Monte Carlo perturbs plant parameters only (mass, I, arm length, …). "
                     "Gains stay fixed so the histogram reflects plant robustness, "
-                    "not retuned control."
+                    "not retuned control. Trajectory confidence bands are offline re-sim "
+                    "percentiles of ownship position under that plant scatter."
                 ),
             ],
             "capture_radius_m": r_cap,
             "default_case": "success",
-            "how_to_read": [
-                "Plant parameter scatter only — controller gains are fixed.",
-                "Capture = min range ≤ capture radius (not tracking RMSE / success flag).",
-                "MC summary attaches to the success recipe; Fail toggle shows a miss nominal only.",
-            ],
+            "how_to_read": how_to,
         },
         "cases": cases,
         "mc": mc,
@@ -445,6 +721,33 @@ def main() -> int:
         type=str,
         default="0.1.0",
     )
+    p.add_argument(
+        "--with-bands",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Re-sim MC trials and write mc.bands "
+            "(default on when trials exist; --no-with-bands to skip)"
+        ),
+    )
+    p.add_argument(
+        "--band-max-trials",
+        type=int,
+        default=100,
+        help="Max plant trials to re-sim for bands (default 100; up to full MC size)",
+    )
+    p.add_argument(
+        "--band-points",
+        type=int,
+        default=160,
+        help="Common time-grid length for band percentiles (default 160)",
+    )
+    p.add_argument(
+        "--band-seed",
+        type=int,
+        default=0,
+        help="Seed for band trial subsample when band-max-trials < n_trials",
+    )
     args = p.parse_args()
 
     success_run = args.success_run
@@ -465,6 +768,10 @@ def main() -> int:
         capture_radius_m=args.capture_radius_m,
         max_points=args.max_points,
         uavsim_version=args.uavsim_version,
+        with_bands=bool(args.with_bands),
+        band_max_trials=int(args.band_max_trials),
+        band_points=int(args.band_points),
+        band_seed=int(args.band_seed),
     )
 
     out = args.out
@@ -475,8 +782,16 @@ def main() -> int:
 
     n_mc = demo["mc"]["n_trials"] if demo.get("mc") else 0
     p_cap = demo["mc"]["summary"]["p_capture"] if demo.get("mc") else None
+    bands = demo["mc"]["bands"] if demo.get("mc") else None
     cases = list(demo["cases"].keys())
     size_kb = out.stat().st_size / 1024
+    band_info: dict[str, Any] | None = None
+    if bands:
+        band_info = {
+            "n_paths_used": bands.get("n_paths_used"),
+            "t_len": len(bands.get("t") or []),
+            "N_p5_len": len((bands.get("ownship") or {}).get("N", {}).get("p5") or []),
+        }
     print(
         json.dumps(
             {
@@ -485,6 +800,7 @@ def main() -> int:
                 "cases": cases,
                 "n_mc_trials": n_mc,
                 "p_capture": p_cap,
+                "bands": band_info,
             },
             indent=2,
         )
