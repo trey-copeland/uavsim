@@ -2,7 +2,7 @@
 
 **Package:** `uavsim.control`  
 **Protocol:** `Controller` in `control/base.py`  
-**Built-ins:** `lqr_hover`, `pid_cascade`  
+**Built-ins:** `lqr_hover`, `pid_cascade`, `ndi_cascade`  
 **Wiring:** `control/factory.py` + study YAML `controller:` block
 
 ---
@@ -66,15 +66,16 @@ ctrl = design_lqr_hover(
 # Law: u = u_hover - K (x - x_ref), then saturate
 ```
 
-### Export
+### SIL controller artifacts (what exists today)
 
-Runs write `nominal/controller_artifact.yaml`. CLI:
+Each study run writes **`nominal/controller_artifact.yaml`** (gains, trim, vehicle slice) for System-tab provenance and **in-process** reload via `controller_from_artifact`. That is a **SIL artifact**, not a firmware handoff.
 
 ```bash
+# Optional: copy/re-export the run artifact to another path (SIL only)
 uv run uavsim export-controller runs/<run_id> --out artifacts/controllers/lqr.yaml
 ```
 
-Round-trip: `controller_from_artifact` rebuilds an in-process LQR controller.
+**TODO (HIL / product export):** fixed-rate packing, target-side code generation, and a documented handoff path into HIL or flight software. Do **not** treat `export-controller` as “ready for the vehicle.” Tracked as **C-12** in [EXTENSIBILITY_TODO.md](EXTENSIBILITY_TODO.md).
 
 ### Caveats
 
@@ -236,11 +237,13 @@ If the law needs synthesis (like LQR), expose `design_my_law(vehicle, **weights)
 
 | Gap | Status |
 |-----|--------|
+| **HIL / target controller export** (codegen, fixed-rate, packing) | **TODO** (C-12) — SIL artifacts only today |
 | **Registry** for controllers (parity with `register_guidance`) | **TODO** — factory is manual `if/elif` |
 | Plugin discovery (entry points / external packages) | **TODO** |
-| Geometric / SE(3) controller | **TODO** (SPEC Should alternate — PID shipped first) |
+| Geometric / SE(3) controller | **TODO** |
 | Discrete-time / sample-rate aware laws | **TODO** — continuous ODE + hold for now |
-| Measurement-based laws / observers | **Done (5d)** — `none \| linear_kf \| mekf \| partial_raw`; channels incl. `body_vel`/`alt`; `x_hat` in timeseries; see [estimation.md](estimation.md) |
+| Cascade NDI | **Done** — `ndi_cascade`; vacuum inverse; see above |
+| Measurement-based laws / observers | **Done (5d)** — see [estimation.md](estimation.md) |
 | Per-trial redesign of non-LQR laws in MC | Partial — `redesign_controller` re-runs factory; document per law |
 
 See [EXTENSIBILITY_TODO.md](EXTENSIBILITY_TODO.md).

@@ -5,8 +5,8 @@ Guides for **using** and **extending** `uavsim` without reading the whole tree.
 | Guide | Topics |
 |-------|--------|
 | [Vehicles](vehicles.md) | Define mass properties, limits, point studies at a vehicle YAML |
+| [Control](control.md) | LQR, PID, **NDI**; SIL artifacts; HIL export TODO |
 | [Airframe families](airframes.md) | Quad today; tilt-rotor / multi-airframe vision; HIL rig tie-in |
-| [Control](control.md) | Built-in LQR & PID, tuning, adding a new control law |
 | [Guidance & navigation](guidance.md) | Hold / waypoints, missions, adding a guidance backend |
 | [Dynamics](dynamics.md) | Euler/quat/motors plants, aero/GE, `DynamicsModel`, SO(3); flex next |
 | [Estimation](estimation.md) | KF/MEKF/partial_raw, channels (GPS, AHRS, **flow+alt**), `sim.observer` |

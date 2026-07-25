@@ -24,6 +24,7 @@ Deep guides still own the detail: [estimation](developer/estimation.md) · [dyna
 | Real IMU / GPS / optical-flow physics | Channel noise + simple models; not bias random walks, multipath, scale-factor maps, etc. |
 | Multi-airframe fleet / tilt-rotor | Single X-quad path; multi-airframe is backlog. |
 | Flight-test validated numbers | Metrics are **in-sim**; regenerate showcase after model changes. |
+| HIL / firmware controller export | Runs write **SIL** `controller_artifact.yaml` for provenance and round-trip. **HIL/target export is TODO** (C-12) — not a flight handoff. |
 
 ---
 
@@ -59,7 +60,7 @@ Peak position error ≤ **3×** study `position_bound_m` and peak attitude error
 | **Linearization** | Hover / small-angle \(A,B\) for LQR design and linear KF. Aggressive flight is outside the design model (envelope tab explores that). |
 | **Attitude feedforward** | Hover-thrust inversion at ψ=0: \(\phi=\mathrm{asin}(a_y/g)\), \(\theta=-\mathrm{asin}(a_x/(g\cos\phi))\). Not full differential flatness / geometric tracking (yaw coupling, variable thrust). |
 | **PID cascade** | Underactuated small-angle outer loop + attitude PD — comparison baseline, not a geometric controller. |
-| **NDI cascade** | Vacuum rigid-body inverse only (no aero/motors in inverse); not INDI / not adaptive; \(\omega_\mathrm{des}\approx 0\) (memoryless, RK45-safe). |
+| **NDI cascade** | Vacuum rigid-body inverse only (no aero/motors in inverse); not INDI / not adaptive; memoryless feedforward (`a_ref`, \(x_r\) rates); tilt cone safety. |
 | **Motors plant** | First-order \(\omega\) lag + X-quad mixer \(f=c_T\omega^2\). No battery, ESC, or inflow dynamics. |
 | **Mixer** | Allocation matches FRD \(r \times [0,0,-f]\) for the documented motor map; reaction yaw via \(c_Q/c_T\). Self-consistent SIL; not a drop-in for every airframe mixer. |
 | **Aero / GE** | Opt-in, teaching-scale coeffs. LQR linearization includes **linear** drag/rate damping only; quadratic drag, prop H, and ground-effect \(\kappa\) are **not** in \(A,B\). Hover with GE is not trimmed at \(mg\). |

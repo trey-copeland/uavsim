@@ -29,7 +29,7 @@ Public **quadrotor simulation & GNC framework** for portfolio-quality demos: dyn
 | Language convention notes (TBD) | Idioms, tooling, lint/format per language (after skeleton) |
 
 **Product workflow to honor in design reviews:**  
-vehicle → dynamics → SIL design/analyze → export controller → HIL → compare (SPEC §1.3).
+vehicle → dynamics → SIL design/analyze → (TODO: HIL-ready controller export) → HIL → compare (SPEC §1.3).
 
 ---
 

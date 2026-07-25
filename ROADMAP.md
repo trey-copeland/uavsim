@@ -1,7 +1,7 @@
 # ROADMAP — `uavsim` / quadrotor-sim
 
 **Status:** Active  
-**Last updated:** 2026-07-22  
+**Last updated:** 2026-07-25  
 **Normative detail:** [`SPEC.md`](SPEC.md) (requirements, stories, acceptance) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (how) · [`GROK.md`](GROK.md) (process) · [developer hub](docs/developer/README.md)
 
 This roadmap is the **sequencing and prioritization** view. It does not replace the SPEC.
@@ -13,8 +13,8 @@ This roadmap is the **sequencing and prioritization** view. It does not replace 
 | | |
 |--|--|
 | **Problem** | ME590 domain work is strong but trapped in a private MATLAB tree with architectural debt — not a public GNC portfolio piece. |
-| **Opportunity** | Ship `uavsim`: modern SIL GNC + systems demos, with a clear path to controller export and HIL compare. |
-| **North-star workflow** | Vehicle → dynamics → SIL design/analyze → **export** → **HIL** → **compare** |
+| **Opportunity** | Ship `uavsim`: modern SIL GNC + portfolio design-review demos, with a clear path to **HIL** compare. |
+| **North-star workflow** | Vehicle → dynamics → SIL design/analyze → **(TODO: HIL-ready controller export)** → **HIL** → **compare** |
 
 ---
 
@@ -28,9 +28,10 @@ Ship when SPEC §17 holds, especially:
 - LQR tracks a gentle mission; artifacts + metrics  
 - Containers + sharded MC  
 - Extensibility story (controller + guidance backend)  
-- **Should:** second controller, **export**, **compare** two SIL runs, SIL plant adapter  
+- **Should:** multi-law control (LQR / PID / NDI), **compare** two SIL runs, SIL plant adapter  
+- **Partial:** SIL `controller_artifact.yaml` provenance (not HIL/target export)  
 
-**Not required for core:** live HIL hardware, firmware flash, certification claims.
+**Not required for core:** live HIL hardware, firmware flash, HIL-ready controller export, certification claims.
 
 ### Long-term product success
 
@@ -53,16 +54,18 @@ Ship when SPEC §17 holds, especially:
 | Phase 2 Guidance + control interface | **Done** |
 | Phase 3 Robustness (local MC + study/report) | **Done** |
 | Phase 4 Systems (Docker + sharded MC) | **Done** |
-| Phase 5 Workflow polish (export / compare / 2nd controller) | **Done** |
+| Phase 5 Workflow polish (compare / multi-controller; SIL artifacts) | **Done** (HIL controller export still **TODO** C-12) |
 | Phase 5b Visualization pack (S5 / §11A V1–V8) | **Done** |
 | Portfolio advertise (Pages + LinkedIn) | **Done** |
 | Phase 5c Attitude / plant fidelity (quaternions → richer missions) | **Done** (optional native 13-state export still open) |
 | Phase 5d Observer-in-the-loop (KF/EKF) | **Done** (`linear_kf`, `mekf`, `partial_raw`, channels incl. flow+alt, `x_hat` log) |
-| Showcase controller × sensor matrix | **Done** (LQR/LQG + PID × ideal/GPS/AHRS/flow/IMU; interactive Compare) |
+| Showcase controller × sensor matrix | **Done** (LQR/LQG + PID + **NDI** × sensors; multi-mission; envelope; law-compare) |
+| Cascade NDI portfolio | **Done** (`ndi_cascade`, matrix/envelope/hi-fi/law-compare) |
 | HIL test rig (hardware order/build) | **In progress (parallel, long lead)** |
 | Motors / mixer (D-7, D-8) | **Done** (`sim.plant: motors`, figure_eight_motors) |
 | Drag / aero / ground effect (D-4, D-5) | **Done** (`AeroParams`, figure_eight_aero, hover_ground_effect) |
 | GPS-denied flow + altitude sensing (EST-6) | **Done** (`body_vel`/`alt`, flow_alt showcase column) |
+| HIL-ready controller export (C-12) | **TODO** |
 | Next SIL: flex (D-13 / V-7) | **Now** (Track A) |
 | Phase 6 nav / Phase 7 HIL software | **Not started** (nav after plant fidelity as needed; HIL when rig ready) |
 
@@ -79,7 +82,7 @@ Phases are **capability gates**, not calendar dates. Prefer finishing a gate’s
 | **2** | Guidance + control interface | B, C | Waypoints, interp/min-snap, feasibility, registries, ≥3 missions | Done |
 | **3** | Robustness | C, F | Local MC, `study`, seed-stable smoke, plots-as-consumer | Done |
 | **4** | Systems | F | Docker study + sharded MC assemble | Done |
-| **5** | Workflow polish | D, E-SIL | **Export** + **`compare`** two SIL runs; second controller if not done | Done |
+| **5** | Workflow polish | D, E-SIL | **`compare`** two SIL runs; multi-controller; SIL artifacts (HIL export later) | Done |
 | **5b** | Visualization | S5 | Interactive 3D + MC pack + showcase | Done |
 | **5c** | Attitude & plant fidelity | A+ | Quaternion kinematics + error-state control; large-attitude demo; `DynamicsModel` for flex/motors | **Done** |
 | **5d** | Observer-in-the-loop | C+, E | Noisy measurements + filter (KF/MEKF) feeding control; ideal full-state remains default | **Done** |
@@ -103,20 +106,19 @@ Detail and MoSCoW: SPEC §6, §19. Module map: ARCH §3, §16. Backlog IDs: [`do
 Do **not** stall Track A on Track B. Keep HIL **seams** (fixed-step, I/O schemas) thin until the rig exists.
 
 ### Now (Track A — SIL)
-1. Keep showcase / gentle figure-eight as regression baseline.  
-2. ~~**Motor dynamics + mixer** (D-7, D-8)~~ — **Done** (`sim.plant: motors`).  
-3. ~~**Drag / aero / ground effect** (D-4, D-5)~~ — **Done** (`dynamics/aero.py`).  
-4. ~~**GPS-denied flow + altitude** (EST-6)~~ — **Done** (`body_vel`/`alt` channels + showcase).  
-5. **Flexible / elastic plant** (V-7 / D-13) — next fidelity.  
-6. Optional: native 13-state export polish (not blocking).
+1. Keep multi-mission showcase as regression baseline (incl. NDI).  
+2. ~~**Motor / aero / GE / estimation matrix / NDI**~~ — **Done**.  
+3. **Flexible / elastic plant** (V-7 / D-13) — next fidelity.  
+4. Optional: native 13-state timeseries polish (not blocking).
 
 ### Next (Track A, still SIL)
 1. Phase 6 non-waypoint guidance if mission design needs it more than plant fidelity.  
-2. Deeper estimation (EST-7/8: state-dep. flow \(H\), accel-aided MEKF) as HIL approaches.
+2. Deeper estimation (EST-7/8: state-dep. flow \(H\), accel-aided MEKF) as HIL approaches.  
+3. **C-12 HIL-ready controller export** when approaching Phase 7 (do not market SIL artifacts as handoff).
 
 ### Later / when rig is ready (Track B + Phase 7)
 1. Companion project: NATS/MQTT, high-rate accels, ESC RPM (COMM-*, INSTR-1).  
-2. Phase 7 fixed-step plant + transport + SIL↔HIL compare.  
+2. Phase 7 fixed-step plant + transport + SIL↔HIL compare (uses C-12 + observers).
 3. Multi-airframe families (V-8, D-12, S-7) once mixer + dynamics protocol exist.
 
 ### 5.1 Phase 5c — attitude & plant fidelity (detail)

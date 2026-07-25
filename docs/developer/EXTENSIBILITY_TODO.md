@@ -31,14 +31,16 @@ Guide: [vehicles.md](vehicles.md) · [airframes.md](airframes.md)
 | C-1 | `Controller` protocol | **Done** | |
 | C-2 | LQR hover design + study config | **Done** | |
 | C-3 | PID cascade + study config | **Done** | |
-| C-4 | Factory from study `controller.type` | **Done** | Manual branches |
+| C-3b | Cascade NDI (`ndi_cascade`) + study/portfolio matrix | **Done** | Vacuum inverse; tilt cone safety; SIL artifacts |
+| C-4 | Factory from study `controller.type` | **Done** | Manual branches (`lqr` / `pid` / `ndi`) |
 | C-5 | Controller **registry** (like guidance) | **TODO** | Reduce pipeline/factory edits |
-| C-6 | Export / load for LQR + PID | **Done** | |
-| C-7 | Export for arbitrary new laws | **Partial** | Must extend export module |
+| C-6 | SIL artifact export / load (LQR + PID + NDI) | **Done** | `controller_artifact.yaml` + round-trip; **not** HIL handoff |
+| C-7 | SIL export for arbitrary new laws | **Partial** | Extend `export.py` / factory per law |
 | C-8 | Geometric / SE(3) controller | **TODO** | |
 | C-9 | Partial-state / noisy measurements | **Done** | Noise + channels / \(H\); `body_vel`+`alt` GPS-denied; richer IMU physics still open |
 | C-10 | Entry-point plugins for third-party laws | **TODO** | |
 | C-11 | Control from state estimate (not only x_true) | **Done** | Closed-loop: plant → measure → observer → controller |
+| C-12 | **HIL / target-ready controller export** | **TODO** | Fixed-rate packing, target codegen, documented handoff; do not market SIL artifacts as firmware export |
 
 Guide: [control.md](control.md)
 

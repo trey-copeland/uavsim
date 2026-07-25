@@ -1,66 +1,63 @@
 # uavsim flight results (React)
 
-Single-page React app for the portfolio base case: a **guided technical report** with a **controller × sensor** matrix (LQR/LQG and PID) on **baseline** and **near-envelope** missions, a **higher-fidelity dynamics** mission (ideal LQR × motors / aero / GE / quat), Flight 3D, System block diagram, Monte Carlo, and a **tracking envelope**.
+Single-page React app for the portfolio **base case**: a guided technical report with a **controller × sensor** matrix (**LQR/LQG**, **PID**, **NDI**) on **baseline** and **near-envelope** missions, **higher-fidelity plant** variants, a **law-compare** mission (aggressive path + aero + quat), Flight 3D, System block diagram, Monte Carlo, and a **tracking envelope**.
 
-**UI product spec (as-built):** [UI_SPEC.md](UI_SPEC.md) — IA, screens, data contract, copy slots, sync policy. Keep it updated when the SPA or `showcase.json` shape changes.
+**UI product spec:** [UI_SPEC.md](UI_SPEC.md)  
+**Closed-loop stack provenance:** [STACK_SPEC.md](STACK_SPEC.md)
 
-**Closed-loop stack provenance:** [STACK_SPEC.md](STACK_SPEC.md) — `runs[].stack` schema + **System** tab contract.
-
-**Walkthrough (header strip):** Matrix → Flight → Laws (LQR vs PID) → Envelope.  
+**Walkthrough (header strip):** Matrix → Flight → Laws → Envelope.  
 **Mission** is a segmented control in the sticky header (rebinds all tabs).  
-**Suggested first look** opens Flight on the envelope-edge mission.  
-**System** tab (after Flight) shows the active run’s block diagram and config/gains when gallery includes `stack`.
+**System** tab shows the active run’s block diagram and equations when gallery includes `stack`.
 
-## Base-case studies
+## Missions
 
-| Cell | Study | Notes |
-|------|--------|--------|
-| Ideal LQR | `configs/studies/figure_eight.yaml` | Full true state (upper bound) |
-| GPS+IMU naive → LQR | `figure_eight_gps_imu_naive.yaml` | `pos`+`omega`, zeros elsewhere → LQR |
-| GPS+IMU LQG | `figure_eight_gps_imu_lqg.yaml` | Same sensors → linear KF → LQR |
-| AHRS LQG | `figure_eight_ahrs_lqg.yaml` | GPS-denied: `att`+`omega` |
-| **Flow+alt LQG** | **`figure_eight_flow_alt_lqg.yaml`** | **`body_vel`+`alt`+`omega` → KF → LQR** |
-| IMU-only LQG | `figure_eight_imu_only_lqg.yaml` | Rates only — position not observable |
-| Ideal PID | `figure_eight_pid.yaml` | Full-state cascade |
-| GPS+IMU naive → PID | `figure_eight_gps_imu_naive_pid.yaml` | Same incomplete bus as LQR naive |
-| GPS+IMU KF → PID | `figure_eight_gps_imu_kf_pid.yaml` | linear KF → PID (not classical LQG) |
-| AHRS KF → PID | `figure_eight_ahrs_kf_pid.yaml` | `att`+`omega` → KF → PID |
-| **Flow+alt KF → PID** | **`figure_eight_flow_alt_kf_pid.yaml`** | **Same flow+alt stack → PID** |
-| IMU-only KF → PID | `figure_eight_imu_only_kf_pid.yaml` | Rates only → KF → PID |
-| MC | `figure_eight_gps_imu_lqg_mc.yaml` | Mass/inertia/arm under GPS+IMU LQG |
-| **Overview** tab | matrix grid | Law × sensors RMSE cards |
-| **Estimation** tab | grouped bars + table | LQR/LQG vs PID per column |
+| Mission | Path / stress | Matrix |
+|---------|----------------|--------|
+| **Baseline** | `figure_eight.yaml`, constant yaw | Estimation (3 laws × sensors) |
+| **Envelope edge** | `figure_eight_envelope_edge.yaml` (τ★≈0.28), scheduled yaw | Same estimation matrix, edge twins |
+| **Hi-fi** | Plant variants, ideal state | LQR + NDI × vacuum / motors / aero / GE / quat |
+| **Laws (hi-fi)** | `law_compare_hifi.yaml`, aggressive + scheduled yaw | LQR vs PID vs NDI on aero + quat plant |
 
-Mission: [`configs/missions/figure_eight.yaml`](../../configs/missions/figure_eight.yaml) — constant yaw, ≥4 s segments, altitude undulation.
+## Estimation matrix (baseline / edge)
 
-### Higher-fidelity dynamics mission (UI: **Hi-fi**)
+| Row | Ideal | GPS+IMU naive | GPS+IMU KF | AHRS | Flow+alt | IMU-only |
+|-----|-------|---------------|------------|------|----------|----------|
+| **LQR / LQG** | `figure_eight` | `…_gps_imu_naive` | `…_gps_imu_lqg` | `…_ahrs_lqg` | `…_flow_alt_lqg` | `…_imu_only_lqg` |
+| **PID** | `figure_eight_pid` | `…_naive_pid` | `…_kf_pid` | `…_ahrs_kf_pid` | `…_flow_alt_kf_pid` | `…_imu_only_kf_pid` |
+| **NDI** | `figure_eight_ndi` | `…_naive_ndi` | `…_kf_ndi` | `…_ahrs_kf_ndi` | `…_flow_alt_kf_ndi` | `…_imu_only_kf_ndi` |
 
-| Cell | Study | Notes |
-|------|--------|--------|
-| Vacuum wrench | `figure_eight.yaml` (gallery id `plant_nominal_lqr`) | Same plant as portfolio baseline ideal LQR |
-| Mixer + motors | `figure_eight_motors.yaml` | `sim.plant: motors` |
-| Body drag + prop H | `figure_eight_aero.yaml` | `default_quadrotor_aero` |
-| Ground effect | `figure_eight_ge.yaml` | Low path + `default_quadrotor_ge` |
-| Quaternion plant | `figure_eight_quat.yaml` | `sim.attitude: quat` |
+Edge twins use `edge_*` study ids (same roles). MC: `figure_eight_gps_imu_lqg_mc` (+ edge twin).
 
-Overview uses `plant_matrix` when Mission = **Hi-fi**. CLI: `--skip-plant-mission` on `uavsim gallery --base-case`.
+**Naming:** LQG = linear KF + hover LQR. **KF → PID/NDI** is not classical LQG.  
+**Honesty:** [docs/LIMITATIONS.md](../LIMITATIONS.md).
 
-**Naming:** LQG = linear KF + hover LQR. PID+KF is the cascade on \(\hat x\), not classical LQG.  
-**Full honesty list:** [docs/LIMITATIONS.md](../LIMITATIONS.md).  
-**Flow+alt:** body-frame velocity (optical-flow *proxy*) + NED \(z\) altitude + gyro — practical GPS-denied teaching column.
+## Higher-fidelity plant mission
 
-Data lives in `data/showcase.json` (browser-safe, downsampled). No build step: React + Plotly load from CDN.
+| Plant | LQR run id | NDI run id |
+|-------|------------|------------|
+| Vacuum wrench | `plant_nominal_lqr` | `plant_nominal_ndi` |
+| Mixer + motors | `plant_motors_lqr` | `plant_motors_ndi` |
+| Body drag + prop H | `plant_aero_lqr` | `plant_aero_ndi` |
+| Ground effect | `plant_ge_lqr` | `plant_ge_ndi` |
+| Quaternion plant | `plant_quat_lqr` | `plant_quat_ndi` |
 
-### Flight tab
+## Law-compare mission
 
-Dual-pane scrubber view:
+| Law | Study |
+|-----|--------|
+| Hover LQR | `law_compare_hifi_lqr` |
+| Cascade PID | `law_compare_hifi_pid` |
+| Cascade NDI | `law_compare_hifi_ndi` |
 
-| Panel | Content |
-|-------|---------|
-| **Trajectory** (left) | Path + reference, trail, velocity arrow, body triad at the vehicle |
-| **Vehicle attitude & wrench** (right) | X-quad mesh, RGB body axes, **per-rotor** thrust arrows (inverse mix of commanded \(u\)), faint total \(F\), torque, HUD for \(F\), \(f_i\), \(\|\tau\|\), attitude |
+Shared aggressive mission + aero vehicle + quat plant; metrics only (no ranking copy in the SPA).
 
-Uses existing timeseries fields (`euler_deg`, `u`, `vel_ned`, `omega`, `limits`) — no gallery rebuild required for the UI.
+## Envelope tab (τ sweep)
+
+Time-scale sweep over matrix schemes (LQR family, PID family, **ideal NDI**). Shared position bound for comparable success. Solid = LQR family, dashed = PID, NDI as its own scheme id `ideal_ndi`.
+
+## Flight tab
+
+Dual-pane scrubber: trajectory + vehicle attitude / per-rotor thrust (inverse mix of \(u\)).
 
 ## Rebuild gallery
 
@@ -69,30 +66,12 @@ uv run uavsim gallery --base-case
 # writes docs/showcase/data/showcase.json (+ SPA files)
 ```
 
-Smoke (fewer MC trials, skip envelope and/or edge mission):
+Smoke:
 
 ```bash
 uv run uavsim gallery --base-case --n-mc-trials 8 --skip-envelope
 uv run uavsim gallery --base-case --n-mc-trials 2 --skip-envelope --skip-edge-mission
 ```
-
-### Dual missions
-
-| Mission | Path | Yaw | Role |
-|---------|------|-----|------|
-| **Baseline** | `configs/missions/figure_eight.yaml` | constant | Calm matrix teaching |
-| **Envelope edge** | `configs/missions/figure_eight_envelope_edge.yaml` (τ★≈0.28) | `from_waypoints` scheduled ±~50° | Near hover-LQR linearization edge; full matrix twin |
-
-UI: global **Mission** selector rebinds Overview matrix, Estimation bars/table, Flight/Metrics run list, MC, and Compare defaults.
-
-### Envelope tab (τ sweep)
-
-Sweeps **all 12 matrix schemes** (not only ideal LQR) over time-scale τ on the constant-yaw figure-eight:
-
-- LQR row: ideal, GPS+IMU naive, GPS+IMU LQG, AHRS, flow+alt, IMU-only  
-- PID row: same sensor stacks with cascade PID  
-
-Shared position bound for comparable success. UI filters: All / LQR family / PID only + per-scheme toggles. Solid lines = LQR family, dashed = PID.
 
 Local preview:
 
@@ -100,23 +79,5 @@ Local preview:
 python -m http.server 8765 --directory docs/showcase
 ```
 
-## GitHub Pages
-
-Workflow: [`.github/workflows/pages-showcase.yml`](../../.github/workflows/pages-showcase.yml)  
-publishes this folder to the **`gh-pages`** branch (not the Actions Pages API).
-
-If the live site looks stale after a green **Pages showcase** run:
-
-1. Hard-refresh / disable cache.
-2. Confirm `data/meta.json` `generated_at` moved.
-3. Workflow now **cache-busts** `app.js` / `styles.css` / `showcase.json` query strings and calls the Pages **request build** API after each deploy.
-
-## Tabs
-
-- **Overview** — controller × sensor RMSE grid + MC card  
-- **Flight 3D** — rotate/zoom path, scrub time, velocity vector, strip charts  
-- **System** — closed-loop stack diagram + per-block provenance (`run.stack`; rebuild gallery if missing)  
-- **Estimation** — grouped RMSE bars (LQR/LQG vs PID) + scenario table  
-- **Metrics / Monte Carlo / Envelope** — as before  
-- **Compare** — pick any two runs (A/B) for metric deltas + path overlay  
-
+Data: `data/showcase.json` (browser-safe, downsampled). React + Plotly from CDN.  
+**Stale-data risk:** rebuild before external demos.

@@ -9,8 +9,8 @@
 This document is the **implementation map**: packages, interfaces, data flow, results, systems, and extension points. If code and this doc disagree, fix one of them — do not leave drift.
 
 **Product north star (SPEC §1.3):**  
-`vehicle config → dynamics → SIL design/analyze → export controller → HIL → compare SIL↔HIL`  
-Core ships the SIL path + export/compare foundations; HIL transports are post-core.
+`vehicle config → dynamics → SIL design/analyze → (TODO: HIL-ready controller export) → HIL → compare SIL↔HIL`  
+Core ships the SIL path, multi-law control (LQR/PID/NDI), SIL artifacts, and compare; HIL transports and target export are post-core (**C-12**).
 
 ---
 

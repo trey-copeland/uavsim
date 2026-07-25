@@ -1,6 +1,6 @@
 # quadrotor-sim (`uavsim`)
 
-**Software-in-the-loop (SIL) quadrotor GNC** — configure a vehicle and mission, close the loop with **LQR**, **PID**, or **NDI**, run Monte Carlo, estimate state with optional KF/MEKF, export controllers, and compare runs. Portfolio-grade analysis report, not flight-critical software.
+**Software-in-the-loop (SIL) quadrotor GNC** — configure a vehicle and mission, close the loop with **LQR**, cascade **PID**, or cascade **NDI**, run Monte Carlo, estimate state with optional KF/MEKF, and compare runs. Portfolio-grade analysis report (GitHub Pages showcase). Not flight-critical software.
 
 <p align="center">
   <img src="docs/uavsim.gif" alt="uavsim closed-loop figure-eight Flight 3D showcase" width="720" />
@@ -34,18 +34,19 @@
 
 ### Control
 - **LQR hover** design on linearization (heritage Q/R style)
-- **LQG path**: same LQR on KF estimates from realistic partial sensors
-- **PID cascade** and cascade **NDI** (nonlinear dynamic inversion) for side-by-side laws
+- **LQG path**: same LQR on KF estimates from partial sensors
+- **PID cascade** and cascade **NDI** (nonlinear dynamic inversion; vacuum rigid-body inverse)
 - **SO(3) attitude error** in control/metrics (not naive Euler subtract)
-- **Linearization / tracking envelope**: time-scale sweep across controller × sensor stacks
-- Controller **export** + reload artifacts — [control guide](docs/developer/control.md)
+- **Tracking envelope**: time-scale sweep across controller × sensor stacks (incl. ideal NDI)
+- Runs write **SIL** `nominal/controller_artifact.yaml` (gains / trim for provenance and round-trip)
+- **TODO:** HIL / target-ready **controller export** (firmware handoff, fixed-rate packing) — not shipped as a handoff product yet — [control guide](docs/developer/control.md) · [EXTENSIBILITY_TODO](docs/developer/EXTENSIBILITY_TODO.md)
 
 ### Estimation (optional)
 - Observer-in-the-loop: plant → noisy measurements → filter → controller
 - **`partial_raw`**: naive pack of measured channels (zeros elsewhere) — teaching baseline
 - **`linear_kf`** (hover \(A,B\)) and **`mekf`** (error-state / multiplicative attitude)
 - Channels: `pos` / `att` / `vel` / `omega`, plus GPS-denied **`body_vel` (optical-flow proxy)**, **`alt`**, `vel_xy`
-- Sensor stories: GPS+IMU, AHRS, **flow+altitude**, IMU-only — same matrix for LQR / PID / **NDI**
+- Sensor stories: GPS+IMU, AHRS, **flow+altitude**, IMU-only — same matrix for **LQR / PID / NDI**
 - Estimates logged as `x_hat` — [estimation guide](docs/developer/estimation.md)
 
 ### Studies, robustness & systems
@@ -55,8 +56,8 @@
 
 ### Visualization & compare
 - Interactive **3D flight** scrubber, strip charts, MC hist/CDF/sensitivity grids — [viz](docs/viz.md)
-- **`compare`** two runs (metrics deltas + path overlay)
-- **React portfolio showcase** (GitHub Pages) — [showcase](docs/showcase/README.md)
+- **`compare`** two SIL run directories (metrics deltas + path overlay)
+- **React portfolio showcase** (GitHub Pages) — multi-mission design-review surface — [showcase](docs/showcase/README.md)
 
 ### Extensibility (direction of travel)
 - Multi-airframe / flex / motors backlog — [airframes](docs/developer/airframes.md) · [EXTENSIBILITY_TODO](docs/developer/EXTENSIBILITY_TODO.md)
@@ -71,11 +72,11 @@
 | `uavsim simulate` | Nominal closed-loop SIL study |
 | `uavsim study` | Nominal + optional Monte Carlo |
 | `uavsim report` | Markdown report + figures (optional interactive 3D) |
-| `uavsim compare` | Diff two run directories |
-| `uavsim export-controller` | Write a versioned controller artifact |
+| `uavsim compare` | Diff two SIL run directories |
 | `uavsim gallery` | Build the React results showcase |
 | `uavsim mc-shard` / `mc-merge` | Sharded MC workers |
-| `uavsim hil` | HIL session stub (post-core) |
+| `uavsim export-controller` | **SIL only:** re-export `controller_artifact.yaml` from a run (not HIL handoff) |
+| `uavsim hil` | HIL session stub (**TODO** / post-core) |
 
 ```bash
 uv run uavsim --help
@@ -93,6 +94,7 @@ uv run uavsim --help
 | **[SPEC.md](SPEC.md)** | Product scope, requirements, acceptance |
 | **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Packages, data flow, SIL/HIL seams |
 | **[ROADMAP.md](ROADMAP.md)** | Phases, milestones, now / next / later |
+| **[LIMITATIONS.md](docs/LIMITATIONS.md)** | Honest framing (LQG naming, sensors, NDI vacuum inverse) |
 
 ### How-to guides
 
@@ -100,13 +102,13 @@ uv run uavsim --help
 |-----|------|
 | [Vehicles](docs/developer/vehicles.md) | YAML vehicle params and limits |
 | [Dynamics](docs/developer/dynamics.md) | Euler/quat plant, SO(3) error, `DynamicsModel` |
-| [Control](docs/developer/control.md) | LQR, PID, adding a law, export |
+| [Control](docs/developer/control.md) | LQR, PID, **NDI**, SIL artifacts; HIL export TODO |
 | [Guidance](docs/developer/guidance.md) | Missions, waypoints, backends |
 | [Estimation](docs/developer/estimation.md) | KF/MEKF, channels, `sim.observer` |
 | [Airframes](docs/developer/airframes.md) | Multi-airframe vision + HIL rig notes |
 | [Extensibility backlog](docs/developer/EXTENSIBILITY_TODO.md) | What works today vs TODO |
 | [Visualization](docs/viz.md) | Report figure pack (§11A) |
-| [Showcase / Pages](docs/showcase/README.md) | React demo hosting |
+| [Showcase / Pages](docs/showcase/README.md) | React demo hosting + study matrix |
 | [Containers](docs/containers.md) | Docker + sharded MC |
 
 ### Process
@@ -120,7 +122,7 @@ uv run uavsim --help
 
 ## Live showcase
 
-Interactive React rollup of the portfolio **base case** (elevated figure-eight under LQR and PID, multi-hundred-trial Monte Carlo):
+Interactive React rollup of the portfolio studies (controller × sensor matrix, multi-mission stress, plant fidelity, **LQR / PID / NDI**, envelope, MC):
 
 **→ [Open the live showcase](https://trey-copeland.github.io/uavsim/)**
 
@@ -130,7 +132,9 @@ Interactive React rollup of the portfolio **base case** (elevated figure-eight u
 | **Local** | `python -m http.server 8765 --directory docs/showcase` → http://127.0.0.1:8765/ |
 | **Regenerate** | `uv run uavsim gallery --base-case` · source in [`docs/showcase/`](docs/showcase/) |
 
-Tabs: overview · **estimation matrix** · 3D flight · metrics · MC · **envelope (ideal LQR limits)** · naive vs LQG compare. Details: [showcase README](docs/showcase/README.md).
+**Missions:** baseline · near-envelope (τ★) · hi-fi plant · law-compare (aggressive aero+quat).  
+**Tabs:** overview matrix · estimation · Flight 3D · System · metrics · MC · envelope · compare.  
+Details: [showcase README](docs/showcase/README.md).
 
 ---
 
@@ -149,28 +153,27 @@ uv run ruff check src tests
 ### Representative studies
 
 ```bash
-# Hover + waypoints
-uv run uavsim simulate configs/studies/hover_nominal.yaml
-uv run uavsim simulate configs/studies/figure_eight.yaml
+# Ideal full-state laws
+uv run uavsim simulate configs/studies/figure_eight.yaml          # LQR
+uv run uavsim simulate configs/studies/figure_eight_pid.yaml      # PID
+uv run uavsim simulate configs/studies/figure_eight_ndi.yaml      # NDI
+
+# Estimation (LQG = KF + LQR)
 uv run uavsim simulate configs/studies/figure_eight_gps_imu_lqg.yaml
 uv run uavsim simulate configs/studies/figure_eight_gps_imu_naive.yaml
-uv run uavsim simulate configs/studies/figure_eight_pid.yaml
+uv run uavsim simulate configs/studies/figure_eight_flow_alt_lqg.yaml
+
+# Hi-fi plant / aggressive three-law compare
+uv run uavsim simulate configs/studies/figure_eight_motors.yaml
+uv run uavsim simulate configs/studies/law_compare_hifi_ndi.yaml
 
 # Monte Carlo (small N for a quick loop)
 uv run uavsim study configs/studies/hover_mc_smoke.yaml
 uv run uavsim study configs/studies/figure_eight_mc.yaml --n-trials 20
 uv run uavsim report runs/<study_id>_<timestamp>/ --interactive
 
-# Quaternion plant stress path
-uv run uavsim simulate configs/studies/figure_eight_aggressive.yaml
-
-# Observers (estimates in timeseries as x_hat)
-uv run uavsim simulate configs/studies/figure_eight_observer.yaml
-uv run uavsim simulate configs/studies/figure_eight_mekf.yaml
-
-# Compare + export
-uv run uavsim compare runs/<lqr_run> runs/<pid_run> --figures
-uv run uavsim export-controller runs/<lqr_run> --out artifacts/controllers/lqr.yaml
+# Compare two SIL runs
+uv run uavsim compare runs/<run_a> runs/<run_b> --figures
 
 # Portfolio showcase (MC default N≈200 — slow; smoke with --n-mc-trials 8)
 uv run uavsim gallery --base-case
@@ -183,7 +186,7 @@ More study YAMLs live under [`configs/studies/`](configs/studies/). Artifacts la
 
 ## Heritage
 
-Prior implementation and domain reference: **[quad_uav](https://github.com/trey-copeland/quad_uav)** (ME590 quadrotor GNC, MATLAB). This project is a **clean redesign** (architecture, Python packaging, studies pipeline, viz, estimation). Runtime does **not** depend on MATLAB or on that repository.
+Prior implementation and domain reference: **[quad_uav](https://github.com/trey-copeland/quad_uav)** (ME590 quadrotor GNC, MATLAB). This project is a **clean redesign** (architecture, Python packaging, studies pipeline, viz, estimation, multi-law portfolio). Runtime does **not** depend on MATLAB or on that repository.
 
 ---
 
