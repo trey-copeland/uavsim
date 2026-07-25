@@ -576,19 +576,26 @@
     const tNorm = Math.hypot(tx, ty, tz);
     const Fmax = (limits && limits.thrust_max_n) || 10;
     const Tmax = (limits && limits.torque_max_nm) || 1;
-    // Total thrust (resultant) along −body z — dimmed when rotor vectors shown
-    const thrustLen = 0.15 + 0.45 * Math.min(1.2, Math.max(0, F / Fmax));
+    // Total thrust (resultant) — short / faint so rotor fᵢ stay readable
+    const thrustLen = 0.08 + 0.18 * Math.min(1.0, Math.max(0, F / Fmax));
     const thrust = arrowSeg(R, [0, 0, 0], [0, 0, -1], thrustLen);
 
-    // Per-rotor forces from inverse mix; arrows from motor hubs along −body z
+    // Per-rotor forces from inverse mix; short arrows, length bias on Δf vs equal share
+    // so roll/pitch differentials read clearly (common-mode hover is subtle).
     const fMotors = wrenchToMotorForces(u);
-    const fHover = Fmax > 0 ? Fmax / 8 : 0.6; // ~half of 2g hover per motor scale
-    const fRef = Math.max(fHover, 0.4);
+    const fEq = Math.max(Math.abs(F), 1e-6) / 4; // equal-share for this F
+    const fRef = 0.5 * 9.81 / 4; // ~hover per motor (m=0.5 kg)
     const rotorX = [];
     const rotorY = [];
     const rotorZ = [];
     fMotors.forEach(function (fi, i) {
-      const len = 0.12 + 0.7 * Math.min(1.35, Math.max(0, fi / fRef));
+      const common = Math.min(1.2, Math.max(0, fi / fRef));
+      const delta = (fi - fEq) / fRef;
+      // base + small common + amplified differential (clamped)
+      const len = Math.max(
+        0.04,
+        0.05 + 0.1 * common + 0.28 * Math.max(-0.4, Math.min(1.4, delta))
+      );
       const seg = arrowSeg(R, motorsB[i], [0, 0, -1], len);
       rotorX.push(seg.x[0], seg.x[1], null);
       rotorY.push(seg.y[0], seg.y[1], null);
