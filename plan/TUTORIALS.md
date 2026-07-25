@@ -203,19 +203,21 @@ ONLINE_INTERCEPT_AND_BATTERY          TUTORIALS / DEMOS
 
 ## 9. Exit criteria (track v1)
 
-- [ ] Intercept product MVP green (see product plan §11)  
-- [ ] **Interactive demo live**: scrub, **play**, 3D path, attitude, battery, energy, **success/fail**, **MC 2D bands + P(capture)**  
-- [ ] README points at live demo + local re-run  
-- [ ] Markdown guides for intercept + battery (extension-oriented)  
-- [ ] Developer docs / LIMITATIONS synced  
-- [ ] Smoke tests for tutorial studies + MC smoke  
+- [x] Intercept product MVP on branch (see product plan §11; Pages pending merge)  
+- [x] Interactive demo SPA in-repo (live after merge)  
+- [x] Local re-run recipes (tutorials + demo README)  
+- [x] **T-GUIDE-ONLINE** + **T-ENERGY** Markdown guides  
+- [x] Developer docs / LIMITATIONS synced  
+- [ ] T0 first-run tutorial (deferred to tutorials branch)  
+- [ ] Pages live + smoke tests polish  
 
-### Not required
+### Not required / deferred
 
+- T0 first-run (separate branch)  
 - Trirotor tutorial  
 - Jupyter  
-- Full showcase refactor (extract for intercept is enough; optional later reuse in showcase)  
-- 3D MC trial cloud (stretch)
+- Full showcase refactor  
+- 3D MC trial cloud
 
 ---
 
