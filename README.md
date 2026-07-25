@@ -1,6 +1,10 @@
 # quadrotor-sim (`uavsim`)
 
-**Software-in-the-loop (SIL) quadrotor GNC** — configure a vehicle and mission, close the loop with LQR or PID, run Monte Carlo, estimate state with optional KF/MEKF, export controllers, and compare runs. Built for research demos and portfolio-quality analysis, with HIL seams planned but not flight-critical software.
+**Software-in-the-loop (SIL) quadrotor GNC** — configure a vehicle and mission, close the loop with **LQR**, **PID**, or **NDI**, run Monte Carlo, estimate state with optional KF/MEKF, export controllers, and compare runs. Portfolio-grade analysis report, not flight-critical software.
+
+<p align="center">
+  <img src="docs/uavsim.gif" alt="uavsim closed-loop figure-eight Flight 3D showcase" width="720" />
+</p>
 
 | | |
 |--|--|
@@ -31,9 +35,9 @@
 ### Control
 - **LQR hover** design on linearization (heritage Q/R style)
 - **LQG path**: same LQR on KF estimates from realistic partial sensors
-- **PID cascade** for controller compare studies
-- **SO(3) attitude error** in LQR/PID/metrics (not naive Euler subtract)
-- **Linearization envelope**: time-scale sweep for limits of *idealized* hover LQR
+- **PID cascade** and cascade **NDI** (nonlinear dynamic inversion) for side-by-side laws
+- **SO(3) attitude error** in control/metrics (not naive Euler subtract)
+- **Linearization / tracking envelope**: time-scale sweep across controller × sensor stacks
 - Controller **export** + reload artifacts — [control guide](docs/developer/control.md)
 
 ### Estimation (optional)
@@ -41,7 +45,7 @@
 - **`partial_raw`**: naive pack of measured channels (zeros elsewhere) — teaching baseline
 - **`linear_kf`** (hover \(A,B\)) and **`mekf`** (error-state / multiplicative attitude)
 - Channels: `pos` / `att` / `vel` / `omega`, plus GPS-denied **`body_vel` (optical-flow proxy)**, **`alt`**, `vel_xy`
-- Sensor stories: GPS+IMU, AHRS, **flow+altitude**, IMU-only — same matrix for LQR/LQG and PID
+- Sensor stories: GPS+IMU, AHRS, **flow+altitude**, IMU-only — same matrix for LQR / PID / **NDI**
 - Estimates logged as `x_hat` — [estimation guide](docs/developer/estimation.md)
 
 ### Studies, robustness & systems
