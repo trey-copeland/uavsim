@@ -17,9 +17,13 @@ class ReferenceSample:
 
     t: float
     x_ref: np.ndarray  # full 12-state reference for LQR tracking
+    # Optional NED acceleration feedforward (m/s²). None → controller may use zeros.
+    a_ref: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "x_ref", np.asarray(self.x_ref, dtype=float).reshape(STATE_DIM))
+        if self.a_ref is not None:
+            object.__setattr__(self, "a_ref", np.asarray(self.a_ref, dtype=float).reshape(3))
 
 
 @dataclass
@@ -59,6 +63,7 @@ class SampledReference(ReferenceTrajectory):
     t_grid: np.ndarray = field(default_factory=lambda: np.array([0.0, 1.0]))
     x_grid: np.ndarray = field(default_factory=lambda: np.zeros((2, STATE_DIM)))
     _interp: Any = field(default=None, repr=False, compare=False)
+    _a_interp: Any = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         self.t_grid = np.asarray(self.t_grid, dtype=float).reshape(-1)
@@ -84,11 +89,23 @@ class SampledReference(ReferenceTrajectory):
             fill_value=(self.x_grid[0], self.x_grid[-1]),
             assume_sorted=True,
         )
+        # NED accel from numerical derivative of velocity grid (memoryless at eval).
+        a_grid = np.gradient(self.x_grid[:, 6:9], self.t_grid, axis=0)
+        self._a_interp = interp1d(
+            self.t_grid,
+            a_grid,
+            axis=0,
+            kind="linear",
+            bounds_error=False,
+            fill_value=(a_grid[0], a_grid[-1]),
+            assume_sorted=True,
+        )
 
     def evaluate(self, t: float) -> ReferenceSample:
         tc = float(np.clip(t, self.t0, self.tf))
         x_ref = np.asarray(self._interp(tc), dtype=float).reshape(STATE_DIM)
-        return ReferenceSample(t=t, x_ref=x_ref)
+        a_ref = np.asarray(self._a_interp(tc), dtype=float).reshape(3)
+        return ReferenceSample(t=t, x_ref=x_ref, a_ref=a_ref)
 
 
 def hold_at_ned(

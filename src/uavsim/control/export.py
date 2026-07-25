@@ -248,6 +248,8 @@ def controller_from_artifact(
             "invert_model", "vacuum_rigid_body"
         )
         f_min_frac = g.get("f_min_frac_hover", 0.05)
+        use_a = g.get("use_ref_accel", True)
+        use_w = g.get("use_ref_omega", True)
         return design_ndi_cascade(
             vehicle,
             gains=gains,
@@ -255,6 +257,8 @@ def controller_from_artifact(
             max_tilt_rad=float(max_tilt),
             invert_model=str(invert),
             f_min_frac_hover=float(f_min_frac),
+            use_ref_accel=bool(use_a),
+            use_ref_omega=bool(use_w),
         )
     msg = f"Unknown controller_type in artifact: {ctype!r}"
     raise ValueError(msg)

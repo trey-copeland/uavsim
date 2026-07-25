@@ -5,7 +5,8 @@ Plant frames: NED inertial, FRD body; thrust along **−body-z**.
 
 Design notes (v1):
 - Collective uses ``F = ‖f_des‖`` (not geometric-control ``−f_des · (R e₃)``).
-- ``a_r ≈ 0`` and ``ω_des ≈ 0`` (memoryless / RK45-safe; ``x_ref[9:12]`` unused).
+- Feedforward is **memoryless** (RK45-safe): ``a_r`` from ``ReferenceSample.a_ref``
+  when present (sampled refs), else 0; ``ω_des = x_ref[9:12]`` (trajectory rates).
 - Thrust direction is cone-clamped to ``max_tilt_rad`` about vertical (upper hemisphere).
 """
 
@@ -147,8 +148,8 @@ class NdiCascadeController:
     No aero or motor dynamics in the inverse — plant may still include them.
 
     Memoryless (safe under SciPy RK45, which re-enters the controller at
-    intermediate times). ``ω_des ≈ 0``; keep ``k_omega`` modest so rate damping
-    does not fight a moving ``R_des``.
+    intermediate times). Uses ``a_ref`` and ``x_ref[9:12]`` when provided; no
+    internal finite-difference state.
     """
 
     id: str
@@ -158,12 +159,14 @@ class NdiCascadeController:
     invert_model: str = "vacuum_rigid_body"
     # Floor as fraction of hover thrust when limits.thrust_min is 0
     f_min_frac_hover: float = 0.05
+    use_ref_accel: bool = True
+    use_ref_omega: bool = True
 
     @property
     def u_hover(self) -> np.ndarray:
         return self.vehicle.u_hover()
 
-    def gains_dict(self) -> dict[str, list[float] | float | str]:
+    def gains_dict(self) -> dict[str, list[float] | float | str | bool]:
         g = self.gains
         return {
             "kp_pos": g.kp_pos.tolist(),
@@ -173,6 +176,8 @@ class NdiCascadeController:
             "max_tilt_rad": float(self.max_tilt_rad),
             "invert_model": self.invert_model,
             "f_min_frac_hover": float(self.f_min_frac_hover),
+            "use_ref_accel": bool(self.use_ref_accel),
+            "use_ref_omega": bool(self.use_ref_omega),
         }
 
     def compute(
@@ -200,8 +205,12 @@ class NdiCascadeController:
 
         e_pos = pos_ref - pos
         e_vel = vel_ref - vel
-        # Virtual control: desired inertial acceleration (NED). a_r ≈ 0 in v1.
-        a_des = gains.kp_pos * e_pos + gains.kd_pos * e_vel
+        # Virtual control: a_des = a_r + Kp e_p + Kd e_v  (a_r from sample when set)
+        if self.use_ref_accel and reference.a_ref is not None:
+            a_r = np.asarray(reference.a_ref, dtype=float).reshape(3)
+        else:
+            a_r = np.zeros(3)
+        a_des = a_r + gains.kp_pos * e_pos + gains.kd_pos * e_vel
         # Cone clamp: keep f_z < 0 and tilt(b3_des) ≤ max_tilt_rad (plan §2.4)
         a_des = clip_virtual_accel_for_tilt(a_des, g, self.max_tilt_rad)
 
@@ -223,10 +232,14 @@ class NdiCascadeController:
         r_des = desired_rotation_from_thrust_and_yaw(f_thrust_i, psi_des)
         r = rotation_body_to_inertial(float(euler[0]), float(euler[1]), float(euler[2]))
 
-        # e_R = vee(log(R_desᵀ R)); ω_des ≈ 0 (memoryless / RK45-safe)
+        # e_R = vee(log(R_desᵀ R)); ω_des from trajectory rates when enabled
         # Torque-space gains: α_des = −I⁻¹ (K_R e_R + K_ω e_ω)
         e_R = rotation_error_vector_from_dcm(r, r_des)
-        e_omega = omega
+        if self.use_ref_omega:
+            omega_des = np.asarray(x_ref[9:12], dtype=float).reshape(3)
+        else:
+            omega_des = np.zeros(3)
+        e_omega = omega - omega_des
         torque_pd = gains.k_R * e_R + gains.k_omega * e_omega
         alpha_des = -np.linalg.solve(inertia, torque_pd)
 
@@ -247,6 +260,8 @@ def design_ndi_cascade(
     max_tilt_rad: float | None = None,
     invert_model: str = "vacuum_rigid_body",
     f_min_frac_hover: float = 0.05,
+    use_ref_accel: bool = True,
+    use_ref_omega: bool = True,
 ) -> NdiCascadeController:
     g = gains or DEFAULT_NDI_GAINS
     return NdiCascadeController(
@@ -256,4 +271,6 @@ def design_ndi_cascade(
         max_tilt_rad=float(max_tilt_rad) if max_tilt_rad is not None else 0.7,
         invert_model=invert_model,
         f_min_frac_hover=float(f_min_frac_hover),
+        use_ref_accel=bool(use_ref_accel),
+        use_ref_omega=bool(use_ref_omega),
     )

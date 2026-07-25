@@ -48,6 +48,8 @@ class NdiControllerConfig(BaseModel):
     max_tilt_rad: float = Field(default=0.7, gt=0)
     invert_model: str = "vacuum_rigid_body"
     f_min_frac_hover: float = Field(default=0.05, ge=0.0, le=1.0)
+    use_ref_accel: bool = True
+    use_ref_omega: bool = True
 
 
 ControllerConfig = Annotated[

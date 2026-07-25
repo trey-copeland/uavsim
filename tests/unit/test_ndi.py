@@ -74,19 +74,78 @@ def test_ndi_attitude_error_zero_torque_at_aligned_hover() -> None:
 def test_ndi_inversion_identity_nonzero_rate() -> None:
     """
     With e_R≈0 and prescribed ω, torque matches Euler inverse:
-    τ = ω×Iω − K_ω ω  (torque-space gains; ω_des=0).
+    τ = ω×Iω − K_ω (ω − ω_des)  (torque-space gains).
     """
     vehicle = default_vehicle()
     ctrl = design_ndi_cascade(vehicle)
     omega = np.array([0.2, -0.1, 0.05])
     x = np.zeros(12)
     x[9:12] = omega
-    ref = ReferenceSample(t=0.0, x_ref=np.zeros(12))
+    ref = ReferenceSample(t=0.0, x_ref=np.zeros(12))  # ω_des = 0
     u = ctrl.compute(0.0, MeasurementBus(t=0.0, x=x), ref).u
 
     i = vehicle.inertia.as_diag()
     tau_expected = np.cross(omega, i @ omega) - ctrl.gains.k_omega * omega
     np.testing.assert_allclose(u[1:4], tau_expected, rtol=1e-5, atol=1e-4)
+
+
+def test_ndi_uses_ref_omega_feedforward() -> None:
+    """When x_ref carries body rates, e_ω = ω − ω_des (memoryless)."""
+    vehicle = default_vehicle()
+    ctrl = design_ndi_cascade(vehicle)
+    omega = np.array([0.2, -0.1, 0.05])
+    omega_des = np.array([0.05, 0.0, -0.02])
+    x = np.zeros(12)
+    x[9:12] = omega
+    x_ref = np.zeros(12)
+    x_ref[9:12] = omega_des
+    u = ctrl.compute(0.0, MeasurementBus(t=0.0, x=x), ReferenceSample(t=0.0, x_ref=x_ref)).u
+    i = vehicle.inertia.as_diag()
+    e_w = omega - omega_des
+    tau_expected = np.cross(omega, i @ omega) - ctrl.gains.k_omega * e_w
+    np.testing.assert_allclose(u[1:4], tau_expected, rtol=1e-5, atol=1e-4)
+
+
+def test_ndi_uses_ref_accel_feedforward() -> None:
+    """a_ref shifts thrust command at matched hover (memoryless)."""
+    vehicle = default_vehicle()
+    ctrl = design_ndi_cascade(vehicle)
+    x = np.zeros(12)
+    # Desired upward accel in NED (−z): a_r = [0,0,-1] → more thrust
+    a_ref = np.array([0.0, 0.0, -1.0])
+    ref = ReferenceSample(t=0.0, x_ref=np.zeros(12), a_ref=a_ref)
+    u = ctrl.compute(0.0, MeasurementBus(t=0.0, x=x), ref).u
+    # f = m(a_r - g e_z) at e=0 → ‖f‖ = m sqrt(0+0+(−1−g)²) = m|g+1|
+    f_expect = vehicle.mass_kg * abs(vehicle.gravity_m_s2 + 1.0)
+    assert abs(u[0] - f_expect) < 0.05
+
+
+def test_ndi_near_pi_attitude_error_finite() -> None:
+    """
+    Near-inverted plant vs level R_des: SO(3) log near-π path, finite wrench.
+
+    Not a showcase inverted-flight mission — unit coverage that NDI does not
+    NaN/explode when e_R is large (upside-down relative to desired).
+    """
+    from uavsim.dynamics.attitude_error import geodesic_attitude_error_rad
+    from uavsim.dynamics.rotations import quat_to_euler
+
+    vehicle = default_vehicle()
+    ctrl = design_ndi_cascade(vehicle)
+    # 180° about body-x via quaternion, convert to Euler for 12-state bus
+    q_flip = np.array([0.0, 1.0, 0.0, 0.0])
+    e_flip = quat_to_euler(q_flip)
+    x = np.zeros(12)
+    x[3:6] = e_flip
+    ref = ReferenceSample(t=0.0, x_ref=np.zeros(12))  # level desired via PD
+    # Geodesic error to level should be ~π
+    ang = geodesic_attitude_error_rad(e_flip, np.zeros(3))
+    assert ang > 2.5  # near π
+    u = ctrl.compute(0.0, MeasurementBus(t=0.0, x=x), ref).u
+    assert np.isfinite(u).all()
+    assert u.shape == (4,)
+    # Restoring roll torque should be large (not zero)
+    assert abs(u[1]) > 1e-3 or abs(u[2]) > 1e-3 or abs(u[3]) > 1e-3
 
 
 def test_ndi_factory_default_gains_match_yaml_shape() -> None:

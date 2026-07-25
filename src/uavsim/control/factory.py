@@ -64,6 +64,8 @@ def build_controller_from_mapping(cfg: Any, vehicle: VehicleParams) -> AnyBuiltC
         max_tilt = get("max_tilt_rad", 0.7)
         invert_model = get("invert_model", "vacuum_rigid_body") or "vacuum_rigid_body"
         f_min_frac = get("f_min_frac_hover", 0.05)
+        use_a = get("use_ref_accel", True)
+        use_w = get("use_ref_omega", True)
         return design_ndi_cascade(
             vehicle,
             gains=gains,
@@ -71,6 +73,8 @@ def build_controller_from_mapping(cfg: Any, vehicle: VehicleParams) -> AnyBuiltC
             max_tilt_rad=float(max_tilt),
             invert_model=str(invert_model),
             f_min_frac_hover=float(f_min_frac if f_min_frac is not None else 0.05),
+            use_ref_accel=bool(True if use_a is None else use_a),
+            use_ref_omega=bool(True if use_w is None else use_w),
         )
     msg = f"Unsupported controller type: {ctype!r}"
     raise ValueError(msg)

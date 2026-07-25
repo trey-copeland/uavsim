@@ -82,6 +82,53 @@ def test_ndi_study_catalog_loads() -> None:
         assert cfg.controller.type == "ndi_cascade", path.name
 
 
+def test_ndi_all_studies_smoke_finite(tmp_path: Path) -> None:
+    """
+    Execute every *ndi* study once; assert finite metrics (no crash / NaN).
+
+    Soft bounds only — naive / IMU-only / motor-lag cells may drift far
+    (teaching failures). Does not expand the showcase.
+    """
+    studies = sorted((ROOT / "configs" / "studies").glob("*ndi*.yaml"))
+    assert len(studies) >= 16
+    # Core cells that should stay in honesty success under ideal/full KF
+    expect_success = {
+        "figure_eight_ndi",
+        "plant_nominal_ndi",
+        "plant_aero_ndi",
+        "plant_ge_ndi",
+        "plant_quat_ndi",
+        "law_compare_hifi_ndi",
+        "figure_eight_gps_imu_kf_ndi",
+        "figure_eight_flow_alt_kf_ndi",
+    }
+    # Teaching / incomplete-bus / harsh plant: finite only (may wander far)
+    teaching_fail = {
+        "figure_eight_gps_imu_naive_ndi",
+        "edge_gps_imu_naive_ndi",
+        "figure_eight_imu_only_kf_ndi",
+        "edge_imu_only_kf_ndi",
+        "figure_eight_ahrs_kf_ndi",
+        "edge_ahrs_kf_ndi",
+        "plant_motors_ndi",
+    }
+    for path in studies:
+        result = run_nominal_study(path, output_root=tmp_path / "runs", run_mc=False)
+        m = result.metrics
+        rmse = float(m["rmse_position_m"])
+        max_e = float(m["max_position_error_m"])
+        assert np.isfinite(rmse), f"{path.name}: non-finite RMSE"
+        assert np.isfinite(max_e), f"{path.name}: non-finite max error"
+        if path.stem in teaching_fail or "naive" in path.stem or "imu_only" in path.stem:
+            # Completeness: sim finished with numbers (may be multi-hundred m drift)
+            assert rmse < 1.0e6, f"{path.name}: RMSE {rmse} non-physical"
+            continue
+        assert rmse < 50.0, f"{path.name}: RMSE {rmse} m exploded"
+        assert max_e < 200.0, f"{path.name}: max |e| {max_e} m exploded"
+        if path.stem in expect_success:
+            assert m["success"] is True, f"{path.name}: expected success, metrics={m}"
+
+
 def test_ndi_stack_equations_from_study() -> None:
     from uavsim.studies.config import load_study
 
