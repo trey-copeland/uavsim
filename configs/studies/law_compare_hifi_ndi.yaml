@@ -1,0 +1,36 @@
+# Three-law comparison cell: cascade NDI on aggressive path + aero + quat plant.
+# Gains tuned for this stress path (still vacuum inverse; plant has aero + quat).
+schema_version: 1
+study_id: law_compare_hifi_ndi
+seed: 0
+
+vehicle: configs/vehicles/default_quadrotor_aero.yaml
+
+controller:
+  type: ndi_cascade
+  kp_pos: [10.0, 10.0, 16.0]
+  kd_pos: [7.0, 7.0, 9.0]
+  k_R: [20.0, 20.0, 5.0]
+  k_omega: [1.5, 1.5, 0.6]
+  max_tilt_rad: 1.0
+  invert_model: vacuum_rigid_body
+  f_min_frac_hover: 0.05
+
+guidance:
+  type: waypoints
+  mission_file: configs/missions/law_compare_hifi.yaml
+  method: auto
+  yaw_mode: from_waypoints
+  sample_dt_s: 0.01
+  fail_on_infeasible: false
+
+sim:
+  dt_s: 0.01
+  method: rk45
+  rtol: 1.0e-5
+  atol: 1.0e-7
+  attitude: quat
+  plant: wrench
+
+metrics:
+  position_bound_m: 1.0

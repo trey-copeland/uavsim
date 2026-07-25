@@ -168,9 +168,9 @@
   /** 4-step walkthrough for first-time readers. */
   function StoryStrip({ activeTab, onNavigate }) {
     const steps = [
-      { id: "overview", n: "1", label: "Matrix", blurb: "12 stacks" },
+      { id: "overview", n: "1", label: "Matrix", blurb: "controller × sensors" },
       { id: "flight", n: "2", label: "Flight", blurb: "scrub trajectory" },
-      { id: "estimation", n: "3", label: "Laws", blurb: "LQR vs PID" },
+      { id: "estimation", n: "3", label: "Laws", blurb: "LQR · PID · NDI" },
       { id: "envelope", n: "4", label: "Envelope", blurb: "vs time scale τ" },
     ];
     return e(
@@ -205,14 +205,14 @@
   }
 
   const VALUE_PROP =
-    "SIL comparison of hover LQR and cascade PID under the same sensor suites.";
+    "SIL comparison of hover LQR, cascade PID, and cascade NDI under shared sensor suites and plant variants.";
   const DEFAULT_TITLE = "uavsim · controller × sensor flight study";
   /** Fallback About panel when gallery JSON has no ui.about_paragraphs */
   const ABOUT_PARAGRAPHS = [
-    "Offline SIL results for a quadrotor figure-eight: the same path flown by hover LQR and cascade PID under several sensor suites (ideal full state, GPS+IMU naive, GPS+IMU + linear KF, AHRS, optical-flow proxy + altitude, IMU-only).",
-    "Two missions share that geometry. Baseline uses constant yaw and the portfolio timing. Near-envelope compresses time (τ★≈0.28) and adds scheduled yaw so tilt and heading demand are visible under ideal LQR.",
-    "Ideal full-state is the tracking upper bound. Stacks that do not observe position (or feed an incomplete state bus) are expected to exceed the position bound; those cases are included on purpose.",
-    "Also included: Monte Carlo on GPS+IMU LQG, and a time-scale envelope over every matrix stack. Simulation only — not flight software.",
+    "Offline SIL for a quadrotor under hover LQR, cascade PID, and cascade NDI with shared sensor suites.",
+    "Missions include baseline, near-envelope, plant variants, and an aggressive three-law comparison on an aero + quaternion plant.",
+    "Ideal full-state is the tracking upper bound on gentle paths; incomplete sensor buses are honesty cases.",
+    "Monte Carlo, τ-envelope, and System equations per run. Simulation only — not flight software.",
   ];
 
   /** GPS+IMU naive vs KF columns (same bus; shows value of a state estimate). */
@@ -1201,11 +1201,14 @@
     const matrix =
       matrixKind === "plant"
         ? doc.plant_matrix || null
-        : doc.estimation_matrix || null;
+        : matrixKind === "law_compare"
+          ? doc.law_compare_matrix || null
+          : doc.estimation_matrix || null;
     const columns = (matrix && matrix.columns) || null;
     const rowDefs = (matrix && matrix.rows) || null;
     const scenarios = (matrix && matrix.scenarios) || [];
     const isPlantMatrix = matrixKind === "plant";
+    const isLawCompare = matrixKind === "law_compare";
     const [highlightPair, setHighlightPair] = useState(true);
 
     function fmtRmse(v) {
@@ -1306,9 +1309,12 @@
               "p",
               { className: "matrix-lead" },
               isPlantMatrix
-                ? "Position RMSE when the plant/actuator model is richer (same ideal LQR). Click a cell → Flight 3D; System tab shows which dynamics are on."
+                ? "Position RMSE when the plant/actuator model is richer. Click a cell → Flight 3D; System tab shows which dynamics are on."
                 : null,
-              !isPlantMatrix
+              isLawCompare
+                ? "Same aggressive reference and aero+quat plant; only the control law changes. Click a cell → Flight 3D, or use Compare for path overlay."
+                : null,
+              !isPlantMatrix && !isLawCompare
                 ? e(
                     React.Fragment,
                     null,
@@ -1434,11 +1440,17 @@
         { className: "card hero-cta", style: { gridColumn: "1 / -1" } },
         e("div", { className: "hero-cta-body" },
           e("div", { className: "hero-cta-kicker" }, "Suggested first look"),
-          e("h2", { className: "hero-cta-title" }, "Flight 3D on the near-envelope mission"),
+          e("h2", { className: "hero-cta-title" },
+            isLawCompare
+              ? "Three laws · same aggressive path and plant"
+              : "Flight 3D and the mission matrix"
+          ),
           e(
             "p",
             { className: "hero-cta-copy" },
-            "Start on the near-envelope mission in Flight 3D (τ★≈0.28 + scheduled yaw) so tilt and heading change under ideal LQR are easy to see. The matrix and envelope tabs use the same stacks for cross-comparison."
+            isLawCompare
+              ? "This mission holds the reference and plant fixed (aero vehicle, quaternion kinematics, full state) and only changes the control law. Open the matrix cells or Compare LQR vs NDI for path overlay."
+              : "Use the mission selector for baseline, near-envelope, plant variants, or the aggressive law-comparison path. Matrix cells open Flight 3D; Compare overlays two runs."
           ),
           e(
             "div",
@@ -1452,7 +1464,7 @@
                   if (onOpenHeroFlight) onOpenHeroFlight();
                 },
               },
-              "Open Flight · envelope edge"
+              isLawCompare ? "Open Flight · default run" : "Open Flight"
             ),
             e(
               "button",
@@ -1463,7 +1475,7 @@
                   if (onGoEstimation) onGoEstimation();
                 },
               },
-              "LQR vs PID by sensors"
+              "Laws × sensors table"
             ),
             e(
               "button",
@@ -4612,24 +4624,14 @@
 
     function openHeroFlight() {
       if (!doc) return;
-      const edge = (doc.missions || []).find(function (m) {
-        return m.id === "envelope_edge";
-      });
-      if (edge) {
-        setMissionId(edge.id);
-        setRunId(edge.default_run || "edge_figure_eight_lqr");
-      } else {
-        const hero =
-          (doc.runs || []).find(function (r) {
-            return r.id === "edge_figure_eight_lqr";
-          }) ||
-          (doc.runs || []).find(function (r) {
-            return r.id === "figure_eight_lqr";
-          });
-        if (hero) setRunId(hero.id);
+      const m = getMission(doc, missionId) || (doc.missions || [])[0];
+      if (m) {
+        if (m.id) setMissionId(m.id);
+        if (m.default_run) setRunId(m.default_run);
       }
       setTab("flight");
     }
+
 
     const run = useMemo(() => {
       if (!doc || !runId) return null;

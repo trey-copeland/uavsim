@@ -1,0 +1,30 @@
+# Three-law comparison cell: hover LQR on aggressive path + aero + quat plant.
+schema_version: 1
+study_id: law_compare_hifi_lqr
+seed: 0
+
+vehicle: configs/vehicles/default_quadrotor_aero.yaml
+
+controller:
+  type: lqr_hover
+  Q_diag: [100, 100, 100, 10, 10, 1, 10, 10, 10, 1, 1, 0.1]
+  R_diag: [0.1, 1.0, 1.0, 1.0]
+
+guidance:
+  type: waypoints
+  mission_file: configs/missions/law_compare_hifi.yaml
+  method: auto
+  yaw_mode: from_waypoints
+  sample_dt_s: 0.01
+  fail_on_infeasible: false
+
+sim:
+  dt_s: 0.01
+  method: rk45
+  rtol: 1.0e-5
+  atol: 1.0e-7
+  attitude: quat
+  plant: wrench
+
+metrics:
+  position_bound_m: 1.0

@@ -50,6 +50,28 @@ def test_edge_figure_eight_ndi_finite(tmp_path: Path) -> None:
     assert np.isfinite(max_e) and max_e < 5.0
 
 
+def test_law_compare_hifi_three_laws(tmp_path: Path) -> None:
+    """Aggressive aero+quat path: NDI should clearly beat hover LQR on RMSE."""
+    results = {}
+    for name in ("lqr", "pid", "ndi"):
+        r = run_nominal_study(
+            ROOT / "configs" / "studies" / f"law_compare_hifi_{name}.yaml",
+            output_root=tmp_path / "runs",
+            run_mc=False,
+        )
+        results[name] = r.metrics
+        assert np.isfinite(float(r.metrics["rmse_position_m"]))
+
+    ndi_rmse = float(results["ndi"]["rmse_position_m"])
+    lqr_rmse = float(results["lqr"]["rmse_position_m"])
+    pid_rmse = float(results["pid"]["rmse_position_m"])
+    assert ndi_rmse < lqr_rmse, f"NDI {ndi_rmse} should beat LQR {lqr_rmse} on law-compare path"
+    assert ndi_rmse < pid_rmse
+    # LQR leaves honesty band; NDI stays inside on this profile
+    assert results["ndi"]["success"] is True
+    assert results["lqr"]["success"] is False
+
+
 def test_ndi_study_catalog_loads() -> None:
     """All portfolio NDI YAMLs validate as ndi_cascade studies."""
     from uavsim.studies.config import load_study

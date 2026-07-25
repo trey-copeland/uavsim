@@ -1,0 +1,33 @@
+# Three-law comparison cell: cascade PID on aggressive path + aero + quat plant.
+schema_version: 1
+study_id: law_compare_hifi_pid
+seed: 0
+
+vehicle: configs/vehicles/default_quadrotor_aero.yaml
+
+controller:
+  type: pid_cascade
+  kp_pos: [2.5, 2.5, 6.0]
+  kd_pos: [2.0, 2.0, 3.5]
+  kp_att: [8.0, 8.0, 2.0]
+  kd_rate: [0.8, 0.8, 0.4]
+  max_tilt_rad: 0.7
+
+guidance:
+  type: waypoints
+  mission_file: configs/missions/law_compare_hifi.yaml
+  method: auto
+  yaw_mode: from_waypoints
+  sample_dt_s: 0.01
+  fail_on_infeasible: false
+
+sim:
+  dt_s: 0.01
+  method: rk45
+  rtol: 1.0e-5
+  atol: 1.0e-7
+  attitude: quat
+  plant: wrench
+
+metrics:
+  position_bound_m: 1.0

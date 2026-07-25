@@ -1,0 +1,21 @@
+# Aggressive figure-eight + scheduled yaw for three-law comparison under a
+# richer plant (aero vehicle + quaternion kinematics). Timing chosen so hover
+# LQR leaves its linear comfort zone while cascade NDI still tracks.
+#
+# Use with guidance.yaw_mode: from_waypoints.
+schema_version: 1
+name: law_compare_hifi
+description: >
+  High-rate elevated figure-eight with scheduled yaw (±~1.2 rad) for side-by-side
+  LQR / PID / NDI comparison on an aero + quaternion plant.
+frame: NED
+waypoints:
+  - {label: start_rest, time: 0.0, x: 0.0, y: 0.0, z: 1.5, yaw: 0.0}
+  - {label: right_begin, time: 1.12, x: 1.5, y: 0.8, z: 2.2, yaw: 0.7}
+  - {label: right_peak, time: 2.24, x: 3.0, y: 0.0, z: 2.6, yaw: 1.2}
+  - {label: right_bottom, time: 3.36, x: 1.5, y: -0.8, z: 2.2, yaw: 0.7}
+  - {label: center_cross, time: 4.48, x: 0.0, y: 0.0, z: 1.5, yaw: 0.0}
+  - {label: left_bottom, time: 5.6, x: -1.5, y: -0.8, z: 0.9, yaw: -0.7}
+  - {label: left_peak, time: 6.72, x: -3.0, y: 0.0, z: 0.6, yaw: -1.2}
+  - {label: left_top, time: 7.84, x: -1.5, y: 0.8, z: 0.9, yaw: -0.7}
+  - {label: end_rest, time: 8.96, x: 0.0, y: 0.0, z: 1.5, yaw: 0.0}

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-24T04:28:59.049017+00:00",
+  "generated_at": "2026-07-25T03:16:24.739689+00:00",
   "uavsim_version": "0.1.0",
   "runs": [
     "figure_eight_lqr",
@@ -15,6 +15,12 @@
     "ahrs_kf_pid",
     "flow_alt_kf_pid",
     "imu_only_kf_pid",
+    "figure_eight_ndi",
+    "gps_imu_naive_ndi",
+    "gps_imu_kf_ndi",
+    "ahrs_kf_ndi",
+    "flow_alt_kf_ndi",
+    "imu_only_kf_ndi",
     "gps_imu_lqg_mc",
     "edge_figure_eight_lqr",
     "edge_gps_imu_naive",
@@ -28,19 +34,33 @@
     "edge_ahrs_kf_pid",
     "edge_flow_alt_kf_pid",
     "edge_imu_only_kf_pid",
+    "edge_figure_eight_ndi",
+    "edge_gps_imu_naive_ndi",
+    "edge_gps_imu_kf_ndi",
+    "edge_ahrs_kf_ndi",
+    "edge_flow_alt_kf_ndi",
+    "edge_imu_only_kf_ndi",
     "edge_gps_imu_lqg_mc",
     "plant_nominal_lqr",
     "plant_motors_lqr",
     "plant_aero_lqr",
     "plant_ge_lqr",
-    "plant_quat_lqr"
+    "plant_quat_lqr",
+    "plant_nominal_ndi",
+    "plant_motors_ndi",
+    "plant_aero_ndi",
+    "plant_ge_ndi",
+    "plant_quat_ndi",
+    "law_compare_hifi_lqr",
+    "law_compare_hifi_pid",
+    "law_compare_hifi_ndi"
   ],
   "missions": [
     "baseline",
     "envelope_edge",
-    "plant_fidelity"
+    "plant_fidelity",
+    "law_compare_hifi"
   ],
   "has_envelope": true,
-  "command": "uavsim gallery --base-case",
-  "has_plant_matrix": true
+  "command": "uavsim gallery --base-case"
 }

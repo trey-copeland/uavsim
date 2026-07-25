@@ -207,6 +207,33 @@ EDGE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
 MISSION_BASELINE = "baseline"
 MISSION_ENVELOPE_EDGE = "envelope_edge"
 MISSION_PLANT_FIDELITY = "plant_fidelity"
+MISSION_LAW_COMPARE = "law_compare_hifi"
+
+# Aggressive path + aero vehicle + quaternion plant — three laws, same stack.
+# Evidence mission: large tilt / scheduled yaw where hover LQR degrades and NDI tracks.
+LAW_COMPARE_STUDIES: tuple[tuple[str, str, str], ...] = (
+    (
+        "configs/studies/law_compare_hifi_lqr.yaml",
+        "law_compare_hifi_lqr",
+        "law_compare_lqr",
+    ),
+    (
+        "configs/studies/law_compare_hifi_pid.yaml",
+        "law_compare_hifi_pid",
+        "law_compare_pid",
+    ),
+    (
+        "configs/studies/law_compare_hifi_ndi.yaml",
+        "law_compare_hifi_ndi",
+        "law_compare_ndi",
+    ),
+)
+
+_LAW_COMPARE_LABELS: dict[str, str] = {
+    "law_compare_hifi_lqr": "Hover LQR · aero + quat",
+    "law_compare_hifi_pid": "Cascade PID · aero + quat",
+    "law_compare_hifi_ndi": "Cascade NDI · aero + quat",
+}
 
 # Plant variants × ideal laws (LQR + NDI); vary actuators / aero / attitude plant
 PLANT_FIDELITY_STUDIES: tuple[tuple[str, str, str], ...] = (
@@ -290,6 +317,83 @@ def _plant_scenario(
         "run_id_by_mission": {MISSION_PLANT_FIDELITY: run_id},
         "lesson": lesson,
     }
+
+
+def _law_compare_scenario(
+    *,
+    sid: str,
+    controller: str,
+    label: str,
+    method: str,
+    role: str,
+    run_id: str,
+    lesson: str,
+) -> dict[str, Any]:
+    return {
+        "id": sid,
+        "column": "hifi",
+        "controller": controller,
+        "label": label,
+        "sensors": "aero vehicle · quat plant · full state",
+        "method": method,
+        "role": role,
+        "run_id": run_id,
+        "run_id_by_mission": {MISSION_LAW_COMPARE: run_id},
+        "lesson": lesson,
+    }
+
+
+LAW_COMPARE_MATRIX: dict[str, Any] = {
+    "title": "Law comparison · aggressive path",
+    "description": (
+        "Same aggressive figure-eight (scheduled yaw, large altitude swing) and the "
+        "same higher-fidelity plant for every cell: aero vehicle (drag + prop H) and "
+        "unit-quaternion kinematics, ideal full state. Controllers differ only: "
+        "hover LQR, cascade PID, cascade NDI (vacuum inverse). Read RMSE and pass/fail "
+        "on the metrics — no preferred ranking is asserted in the copy."
+    ),
+    "columns": [
+        {
+            "id": "hifi",
+            "label": "Aero + quaternion plant",
+            "sensors": "body drag / prop H · quat kinematics · ideal state",
+        }
+    ],
+    "rows": [
+        {"id": "lqr", "label": "Hover LQR", "controller": "lqr"},
+        {"id": "pid", "label": "PID cascade", "controller": "pid"},
+        {"id": "ndi", "label": "NDI cascade", "controller": "ndi"},
+    ],
+    "scenarios": [
+        _law_compare_scenario(
+            sid="law_compare_lqr",
+            controller="lqr",
+            label="Hover LQR",
+            method="LQR",
+            role="law_compare_lqr",
+            run_id="law_compare_hifi_lqr",
+            lesson="Hover-linear design on a large-tilt scheduled-yaw path.",
+        ),
+        _law_compare_scenario(
+            sid="law_compare_pid",
+            controller="pid",
+            label="Cascade PID",
+            method="PID cascade",
+            role="law_compare_pid",
+            run_id="law_compare_hifi_pid",
+            lesson="Small-angle cascade maps on the same aggressive reference.",
+        ),
+        _law_compare_scenario(
+            sid="law_compare_ndi",
+            controller="ndi",
+            label="Cascade NDI",
+            method="NDI cascade",
+            role="law_compare_ndi",
+            run_id="law_compare_hifi_ndi",
+            lesson="Vacuum rigid-body inverse; plant includes aero + quat kinematics.",
+        ),
+    ],
+}
 
 
 PLANT_MATRIX: dict[str, Any] = {
@@ -711,7 +815,7 @@ ESTIMATION_MATRIX: dict[str, Any] = {
             role="ideal_ndi",
             run_baseline="figure_eight_ndi",
             run_edge="edge_figure_eight_ndi",
-            lesson="Vacuum rigid-body inverse; full-state upper bound for nonlinear law.",
+            lesson="Vacuum rigid-body inverse; full-state cascade NDI.",
         ),
         _scenario(
             sid="gps_imu_naive_ndi",
@@ -1107,6 +1211,7 @@ def generate_base_case_gallery(
     envelope_time_scales: tuple[float, ...] | None = None,
     skip_edge_mission: bool = False,
     skip_plant_mission: bool = False,
+    skip_law_compare_mission: bool = False,
 ) -> Path:
     """
     Run the portfolio base-case studies and write ``docs/showcase``.
@@ -1114,11 +1219,12 @@ def generate_base_case_gallery(
     Multi-mission portfolio:
       * **baseline** — calm constant-yaw figure-eight controller × sensor matrix
       * **envelope_edge** — τ★≈0.28 + scheduled yaw twin matrix (same cells)
-      * **plant_fidelity** — ideal LQR × plant/actuator variants (motors, aero, GE, quat)
+      * **plant_fidelity** — ideal LQR/NDI × plant/actuator variants
+      * **law_compare_hifi** — aggressive path, aero+quat plant, LQR vs PID vs NDI
       Plus Monte Carlo (per estimation mission) and the linearization envelope sweep.
 
     ``n_mc_trials`` overrides the study YAML when set (useful for smoke tests).
-    ``skip_edge_mission`` / ``skip_plant_mission`` drop those missions (faster smoke).
+    ``skip_*_mission`` flags drop those missions (faster smoke).
     """
     from uavsim.studies.envelope import (
         ENVELOPE_EDGE_TIME_SCALE,
@@ -1163,6 +1269,18 @@ def generate_base_case_gallery(
                 studies=PLANT_FIDELITY_STUDIES,
                 labels=_PLANT_LABELS,
                 mission_id=MISSION_PLANT_FIDELITY,
+                tmp=tmp,
+                max_points=max_points,
+                n_mc_trials=n_mc_trials,
+            )
+        )
+    if not skip_law_compare_mission:
+        entries.extend(
+            _run_study_batch(
+                root=root,
+                studies=LAW_COMPARE_STUDIES,
+                labels=_LAW_COMPARE_LABELS,
+                mission_id=MISSION_LAW_COMPARE,
                 tmp=tmp,
                 max_points=max_points,
                 n_mc_trials=n_mc_trials,
@@ -1241,8 +1359,7 @@ def generate_base_case_gallery(
                 "description": (
                     "Richer SIL plant under ideal full-state LQR and cascade NDI: vacuum "
                     "wrench baseline, mixer+motors, body drag/prop H, ground effect "
-                    "(low path), and unit-quaternion kinematics. NDI inverts vacuum "
-                    "rigid-body — mismatch is intentional teaching. Not a sensor matrix."
+                    "(low path), and unit-quaternion kinematics. Not a sensor matrix."
                 ),
                 "mission_file": "configs/missions/figure_eight.yaml",
                 "yaw_mode": "constant",
@@ -1254,38 +1371,56 @@ def generate_base_case_gallery(
                 "run_ids": [gid for _, gid, _ in PLANT_FIDELITY_STUDIES],
             }
         )
+    if not skip_law_compare_mission:
+        missions.append(
+            {
+                "id": MISSION_LAW_COMPARE,
+                "label": "Law comparison · aggressive + aero/quat",
+                "short_label": "Laws (hi-fi)",
+                "description": (
+                    "Aggressive elevated figure-eight with scheduled yaw on a shared "
+                    "aero + quaternion plant (ideal full state). Side-by-side hover LQR, "
+                    "cascade PID, and cascade NDI. Compare metrics and Flight paths."
+                ),
+                "mission_file": "configs/missions/law_compare_hifi.yaml",
+                "yaw_mode": "from_waypoints",
+                "time_scale": 1.0,
+                "matrix_kind": "law_compare",
+                "default_run": "law_compare_hifi_ndi",
+                "compare_ids": ["law_compare_hifi_lqr", "law_compare_hifi_ndi"],
+                "mc_run_id": None,
+                "run_ids": [gid for _, gid, _ in LAW_COMPARE_STUDIES],
+            }
+        )
     # Baseline mission catalog entry needs matrix_kind too
     if missions:
         missions[0].setdefault("matrix_kind", "estimation")
 
     about_paragraphs = [
         (
-            "Offline SIL results for a quadrotor figure-eight: the same path flown by "
-            "hover LQR, cascade PID, and cascade NDI under several sensor suites "
-            "(ideal full state, GPS+IMU naive, GPS+IMU + linear KF, AHRS, "
-            "optical-flow proxy + altitude, IMU-only)."
+            "Offline SIL for a quadrotor under hover LQR, cascade PID, and cascade NDI "
+            "with shared sensor suites (ideal state, GPS+IMU, AHRS, flow+alt, IMU-only)."
         ),
         (
-            "Missions: baseline (constant yaw), near-envelope (τ★≈0.28 + scheduled yaw), "
-            "and higher-fidelity dynamics (ideal LQR and NDI × motors / aero / GE / quat)."
+            "Missions: baseline (calm figure-eight), near-envelope (τ★ + scheduled yaw), "
+            "higher-fidelity plant variants, and a three-law comparison on an aggressive "
+            "path with aero + quaternion plant — same reference and plant, different laws."
         ),
         (
-            "Ideal full-state is the tracking upper bound. Stacks that do not observe "
-            "position (or feed an incomplete state bus) are expected to exceed the "
-            "position bound; those cases are included on purpose. NDI inverts a vacuum "
-            "rigid-body model — not adaptive / not INDI."
+            "Ideal full-state is the tracking upper bound on gentle paths. Incomplete "
+            "sensor buses are honesty cases. NDI inverts a vacuum rigid-body model "
+            "(not INDI / not adaptive)."
         ),
         (
-            "Also included: Monte Carlo on GPS+IMU LQG, a time-scale envelope over "
-            "estimation matrix stacks (including ideal NDI), and a System tab block "
-            "diagram per run. Simulation only — not flight software."
+            "Also: Monte Carlo (GPS+IMU LQG), τ-envelope (includes ideal NDI), and "
+            "System equations per run. Simulation only — not flight software."
         ),
     ]
     doc = build_gallery_document(
         entries,
         title="uavsim · controller × sensor flight study",
         description=" ".join(about_paragraphs),
-        # Primary compare: naive vs LQG on baseline (teaching win)
+        # Primary compare: naive vs LQG on baseline (estimation teaching)
         compare_ids=("gps_imu_naive", "gps_imu_lqg"),
         envelope=envelope_doc,
         estimation_matrix=ESTIMATION_MATRIX,
@@ -1293,12 +1428,18 @@ def generate_base_case_gallery(
         missions=missions,
         default_mission=MISSION_BASELINE,
     )
+    if not skip_law_compare_mission:
+        doc["law_compare_matrix"] = _attach_matrix_metrics(
+            LAW_COMPARE_MATRIX,
+            {r["id"]: r for r in entries},
+            default_mission_key=MISSION_LAW_COMPARE,
+        )
     # Portfolio UX copy (guided report shell)
     doc.setdefault("ui", {})
     doc["ui"]["display_title"] = "uavsim · controller × sensor flight study"
     doc["ui"]["value_prop"] = (
-        "SIL comparison of hover LQR, cascade PID, and cascade NDI under the same "
-        "sensor suites, plus higher-fidelity plant variants."
+        "SIL comparison of hover LQR, cascade PID, and cascade NDI under shared "
+        "sensor suites and plant variants — including an aggressive aero+quat path."
     )
     doc["ui"]["about_paragraphs"] = about_paragraphs
     write_gallery(doc, out, copy_app=True, template_dir=root / "docs" / "showcase")
