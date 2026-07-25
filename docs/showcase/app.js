@@ -1015,9 +1015,10 @@
         line3(g0.axes.x, "#f07178", 6, "body +x", true),
         line3(g0.axes.y, "#3ecf8e", 6, "body +y", true),
         line3(g0.axes.z, "#5b9fd4", 6, "body +z", true),
-        line3(g0.thrust, "rgba(79,209,255,0.35)", 6, "ΣF −z", true),
-        line3(g0.rotorThrust, "#4fd1ff", 10, "rotor fᵢ", true),
-        line3(g0.torque, "#e6b450", 10, "torque τ", true),
+        line3(g0.thrust, "rgba(232, 121, 249, 0.28)", 3, "ΣF −z", true),
+        // Magenta/violet — distinct from blue airframe (#8ab4e8) and gold τ
+        line3(g0.rotorThrust, "#e879f9", 3.5, "rotor fᵢ", true),
+        line3(g0.torque, "#e6b450", 8, "torque τ", true),
         line3(g0.tAx, "rgba(240,113,120,0.55)", 5, "τφ", false),
         line3(g0.tAy, "rgba(62,207,142,0.55)", 5, "τθ", false),
         line3(g0.tAz, "rgba(91,159,212,0.55)", 5, "τψ", false),
@@ -1623,7 +1624,7 @@
           e(
             "p",
             { className: "panel-sub" },
-            "X-quad at origin. Bright cyan = per-rotor fᵢ (inverse mix from u) · faint cyan = ΣF · gold = τ · RGB = body axes."
+            "X-quad at origin. Magenta = per-rotor fᵢ (length biased to Δ vs equal share) · faint ΣF · gold = τ · RGB = body axes."
           ),
           e(VehicleAttitudeView, {
             runId: run.id,
