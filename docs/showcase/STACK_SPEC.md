@@ -210,13 +210,14 @@ Relativize absolute mission/vehicle paths to `configs/...` when under repo root.
 |------|------|
 | Tab | After **Flight**, before **Estimation**: `{ id: "stack", label: "System" }` |
 | Binding | Active run (same picker as Flight / Metrics) |
-| Diagram | Horizontal (wrap on narrow) HTML/CSS blocks + arrows — no external diagram lib required |
-| Interaction | Click node → detail panel below or side with title, summary, structured fields |
+| Diagram | **Conventional closed-loop block diagram** (Simulink-style): rectangular blocks, directed wires with arrowheads, summing junction (⊕), feedforward row (mission→guidance→controller→actuators→plant→metrics) and feedback row (plant→sensors→observer→sum). Pure SVG in `app.js` — no external diagram lib |
+| Signal labels | \(x_r\), \(e\), \(u\), \(x\), \(y\), \(\hat x\) on wires |
+| Interaction | Click block → detail panel with title, summary, structured fields |
 | Matrices | Render `gains.K` as HTML table; Q/R diag as vectors; PID gains as labeled lists |
 | Empty | If `run.stack` missing: short message “Rebuild gallery for stack provenance” |
 | Walkthrough | Optional 5th step or keep 4; do not force System into strip for Phase 1 |
 
-Styles: match existing dark theme (`styles.css`). Accessible: buttons for nodes, `aria-selected` on active block.
+Styles: match existing dark theme (`styles.css`). Accessible: focusable blocks, keyboard Activate, `aria-pressed` on active block.
 
 ---
 

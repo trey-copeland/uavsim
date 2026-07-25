@@ -1957,68 +1957,360 @@
     return out;
   }
 
-  function StackDiagram({ nodes, edges, selectedId, onSelect }) {
-    const ordered = stackNodesOrdered(nodes);
-    const edgePairs = (edges || []).map(function (pair) {
-      if (Array.isArray(pair) && pair.length >= 2) return pair[0] + " → " + pair[1];
-      return null;
-    }).filter(Boolean);
+  /** Short label for a diagram block (Simulink-style title line). */
+  function stackBlockLabel(node, fallback) {
+    if (!node) return fallback;
+    const t = node.title || node.id || fallback;
+    // Prefer compact law names in the diagram; full title stays in the detail panel.
+    if (node.id === "controller") {
+      const b = (node.badges || []).join(" ");
+      if (/pid/i.test(b) || /pid/i.test(t)) return "Controller";
+      if (/lqr|lqg/i.test(b) || /lqr|lqg/i.test(t)) return "Controller";
+      return "Controller";
+    }
+    if (node.id === "observer") return "Observer";
+    if (node.id === "plant") return "Plant";
+    if (node.id === "actuators") return "Actuators";
+    if (node.id === "sensors") return "Sensors";
+    if (node.id === "guidance") return "Guidance";
+    if (node.id === "mission") return "Mission";
+    if (node.id === "metrics") return "Metrics";
+    return t.length > 14 ? t.slice(0, 13) + "…" : t;
+  }
+
+  function stackBlockSub(node) {
+    if (!node) return "";
+    const s = node.summary || "";
+    if (node.id === "controller" && node.badges && node.badges.length) {
+      return String(node.badges[0]);
+    }
+    if (node.id === "observer" && node.badges && node.badges.length) {
+      return node.badges.slice(0, 2).join(", ");
+    }
+    if (node.id === "plant" && node.badges && node.badges.length) {
+      return node.badges.slice(0, 2).join(", ");
+    }
+    if (node.id === "actuators" && node.badges && node.badges.length) {
+      return String(node.badges[0]);
+    }
+    // One short line for the box interior
+    if (s.length <= 22) return s;
+    return s.slice(0, 20) + "…";
+  }
+
+  /**
+   * Conventional closed-loop control block diagram (Simulink-style):
+   *   x_r → [Guidance] → ⊕ → [Controller] → [Actuators] → [Plant] → x
+   *                        ↑                                      │
+   *                        └──── [Observer] ← [Sensors] ←─────────┘
+   * Click a block to open provenance details (gains, channels, plant, …).
+   */
+  function StackDiagram({ nodes, selectedId, onSelect }) {
+    const byId = {};
+    (nodes || []).forEach(function (n) {
+      if (n && n.id) byId[n.id] = n;
+    });
+
+    // Layout units (viewBox coordinates)
+    const vb = { w: 1000, h: 360 };
+    // Feedforward row
+    const yFF = 72;
+    const hB = 58;
+    const mission = { x: 24, y: yFF, w: 88, h: hB };
+    const guidance = { x: 140, y: yFF, w: 100, h: hB };
+    const sum = { cx: 292, cy: yFF + hB / 2, r: 18 };
+    const controller = { x: 332, y: yFF, w: 118, h: hB };
+    const actuators = { x: 480, y: yFF, w: 108, h: hB };
+    const plant = { x: 618, y: yFF, w: 118, h: hB };
+    const metrics = { x: 860, y: yFF + 4, w: 100, h: hB - 8 };
+    // Feedback row
+    const yFB = 230;
+    const sensors = { x: 618, y: yFB, w: 118, h: hB };
+    const observer = { x: 400, y: yFB, w: 118, h: hB };
+
+    const plantOutX = plant.x + plant.w;
+    const plantMidY = plant.y + plant.h / 2;
+    const sumBotY = sum.cy + sum.r;
+    const fbY = sensors.y + sensors.h / 2;
+    const branchX = plantOutX + 36;
+
+    function blockG(id, box, fallbackTitle) {
+      const n = byId[id];
+      const active = selectedId === id;
+      const missing = !n;
+      const title = stackBlockLabel(n, fallbackTitle);
+      const sub = stackBlockSub(n);
+      return e(
+        "g",
+        {
+          key: id,
+          className:
+            "bd-block kind-" +
+            id +
+            (active ? " is-active" : "") +
+            (missing ? " is-missing" : ""),
+          transform: "translate(" + box.x + "," + box.y + ")",
+          role: "button",
+          tabIndex: missing ? -1 : 0,
+          "aria-pressed": active ? "true" : "false",
+          "aria-label": (n && (n.title || n.id)) || fallbackTitle,
+          "aria-disabled": missing ? "true" : "false",
+          onClick: function () {
+            if (!missing) onSelect(id);
+          },
+          onKeyDown: function (ev) {
+            if (missing) return;
+            if (ev.key === "Enter" || ev.key === " ") {
+              ev.preventDefault();
+              onSelect(id);
+            }
+          },
+        },
+        e("rect", {
+          className: "bd-block-rect",
+          width: box.w,
+          height: box.h,
+          rx: 3,
+          ry: 3,
+        }),
+        e(
+          "text",
+          {
+            className: "bd-block-title",
+            x: box.w / 2,
+            y: sub ? box.h / 2 - 6 : box.h / 2 + 4,
+            textAnchor: "middle",
+          },
+          title
+        ),
+        sub
+          ? e(
+              "text",
+              {
+                className: "bd-block-sub",
+                x: box.w / 2,
+                y: box.h / 2 + 12,
+                textAnchor: "middle",
+              },
+              sub
+            )
+          : null
+      );
+    }
+
+    function sigLabel(x, y, text, anchor) {
+      return e(
+        "text",
+        {
+          key: "sig-" + text + "-" + x + "-" + y,
+          className: "bd-sig",
+          x: x,
+          y: y,
+          textAnchor: anchor || "middle",
+        },
+        text
+      );
+    }
+
+    // Wires (drawn under blocks via paint order — wires first group)
+    const wires = e(
+      "g",
+      { className: "bd-wires", key: "wires", "aria-hidden": "true" },
+      // mission → guidance
+      e("line", {
+        className: "bd-wire",
+        x1: mission.x + mission.w,
+        y1: plantMidY,
+        x2: guidance.x,
+        y2: plantMidY,
+        markerEnd: "url(#bd-arrow)",
+      }),
+      // guidance → sum
+      e("line", {
+        className: "bd-wire",
+        x1: guidance.x + guidance.w,
+        y1: plantMidY,
+        x2: sum.cx - sum.r,
+        y2: plantMidY,
+        markerEnd: "url(#bd-arrow)",
+      }),
+      // sum → controller
+      e("line", {
+        className: "bd-wire",
+        x1: sum.cx + sum.r,
+        y1: plantMidY,
+        x2: controller.x,
+        y2: plantMidY,
+        markerEnd: "url(#bd-arrow)",
+      }),
+      // controller → actuators
+      e("line", {
+        className: "bd-wire",
+        x1: controller.x + controller.w,
+        y1: plantMidY,
+        x2: actuators.x,
+        y2: plantMidY,
+        markerEnd: "url(#bd-arrow)",
+      }),
+      // actuators → plant
+      e("line", {
+        className: "bd-wire",
+        x1: actuators.x + actuators.w,
+        y1: plantMidY,
+        x2: plant.x,
+        y2: plantMidY,
+        markerEnd: "url(#bd-arrow)",
+      }),
+      // plant → branch
+      e("line", {
+        className: "bd-wire",
+        x1: plantOutX,
+        y1: plantMidY,
+        x2: branchX,
+        y2: plantMidY,
+      }),
+      // branch → metrics
+      e("line", {
+        className: "bd-wire",
+        x1: branchX,
+        y1: plantMidY,
+        x2: metrics.x,
+        y2: plantMidY,
+        markerEnd: "url(#bd-arrow)",
+      }),
+      // branch down to feedback
+      e("line", {
+        className: "bd-wire",
+        x1: branchX,
+        y1: plantMidY,
+        x2: branchX,
+        y2: fbY,
+      }),
+      // branch → sensors (right edge of sensors is left of branch if sensors under plant)
+      e("line", {
+        className: "bd-wire",
+        x1: branchX,
+        y1: fbY,
+        x2: sensors.x + sensors.w,
+        y2: fbY,
+        markerEnd: "url(#bd-arrow)",
+      }),
+      // sensors → observer
+      e("line", {
+        className: "bd-wire",
+        x1: sensors.x,
+        y1: fbY,
+        x2: observer.x + observer.w,
+        y2: fbY,
+        markerEnd: "url(#bd-arrow)",
+      }),
+      // observer → under sum (left then up)
+      e("path", {
+        className: "bd-wire",
+        d:
+          "M " +
+          observer.x +
+          " " +
+          fbY +
+          " H " +
+          sum.cx +
+          " V " +
+          sumBotY,
+        markerEnd: "url(#bd-arrow)",
+      }),
+      // signal labels
+      sigLabel(guidance.x + guidance.w + 18, plantMidY - 10, "xᵣ"),
+      sigLabel(sum.cx + sum.r + 22, plantMidY - 10, "e"),
+      sigLabel(controller.x + controller.w + 14, plantMidY - 10, "u"),
+      sigLabel(actuators.x + actuators.w + 14, plantMidY - 10, "u"),
+      sigLabel(plantOutX + 14, plantMidY - 10, "x"),
+      sigLabel(branchX + 14, (plantMidY + fbY) / 2, "x"),
+      sigLabel(sensors.x + sensors.w / 2, fbY - 12, "y"),
+      sigLabel(observer.x + observer.w / 2, fbY - 12, "x̂"),
+      sigLabel(sum.cx + 22, sumBotY + 16, "x̂", "start")
+    );
+
+    const sumJunction = e(
+      "g",
+      {
+        key: "sum",
+        className: "bd-sum",
+        transform: "translate(" + sum.cx + "," + sum.cy + ")",
+        "aria-hidden": "true",
+      },
+      e("circle", { className: "bd-sum-circle", r: sum.r }),
+      e(
+        "text",
+        { className: "bd-sum-plus", x: -6, y: 5, textAnchor: "middle" },
+        "+"
+      ),
+      e(
+        "text",
+        { className: "bd-sum-minus", x: 0, y: sum.r - 4, textAnchor: "middle" },
+        "−"
+      )
+    );
 
     return e(
       "div",
       { className: "stack-diagram-wrap" },
       e(
         "div",
-        {
-          className: "stack-diagram",
-          role: "listbox",
-          "aria-label": "Closed-loop stack blocks",
-        },
-        ordered.map(function (node, i) {
-          const active = selectedId === node.id;
-          return e(
-            React.Fragment,
-            { key: node.id },
-            i > 0
-              ? e("span", { className: "stack-arrow", "aria-hidden": "true" }, "→")
-              : null,
-            e(
-              "button",
-              {
-                type: "button",
-                role: "option",
-                className: "stack-block kind-" + (node.kind || node.id) + (active ? " active" : ""),
-                "aria-selected": active ? "true" : "false",
-                onClick: function () {
-                  onSelect(node.id);
-                },
-              },
-              e("span", { className: "stack-block-kind" }, node.kind || node.id),
-              e("span", { className: "stack-block-title" }, node.title || node.id),
-              node.summary
-                ? e("span", { className: "stack-block-summary" }, node.summary)
-                : null,
-              node.badges && node.badges.length
-                ? e(
-                    "span",
-                    { className: "badge-row stack-block-badges" },
-                    node.badges.map(function (b) {
-                      return e("span", { key: b, className: "badge" }, b);
-                    })
-                  )
-                : null
-            )
-          );
-        })
+        { className: "bd-caption-row" },
+        e(
+          "p",
+          { className: "bd-caption" },
+          "Closed-loop SIL (classic control diagram). Feedforward on top; measurement feedback below. Click a block to inspect."
+        )
       ),
-      edgePairs.length
-        ? e(
-            "p",
-            { className: "stack-edges-caption" },
-            "Edges: ",
-            edgePairs.join(" · ")
+      e(
+        "svg",
+        {
+          className: "bd-svg",
+          viewBox: "0 0 " + vb.w + " " + vb.h,
+          role: "img",
+          "aria-label":
+            "Block diagram: mission and guidance feed a summing junction into controller, actuators, and plant; sensors and observer close the loop.",
+        },
+        e(
+          "defs",
+          null,
+          e(
+            "marker",
+            {
+              id: "bd-arrow",
+              viewBox: "0 0 10 10",
+              refX: 9,
+              refY: 5,
+              markerWidth: 7,
+              markerHeight: 7,
+              orient: "auto-start-reverse",
+            },
+            e("path", { d: "M 0 0 L 10 5 L 0 10 z", className: "bd-arrow-head" })
           )
-        : null
+        ),
+        // light rail lines for structure (optional grid-free)
+        wires,
+        sumJunction,
+        blockG("mission", mission, "Mission"),
+        blockG("guidance", guidance, "Guidance"),
+        blockG("controller", controller, "Controller"),
+        blockG("actuators", actuators, "Actuators"),
+        blockG("plant", plant, "Plant"),
+        blockG("metrics", metrics, "Metrics"),
+        blockG("sensors", sensors, "Sensors"),
+        blockG("observer", observer, "Observer")
+      ),
+      e(
+        "p",
+        { className: "bd-legend" },
+        e("span", null, "xᵣ reference"),
+        e("span", null, "e tracking error"),
+        e("span", null, "u body wrench"),
+        e("span", null, "x true state"),
+        e("span", null, "y measurements"),
+        e("span", null, "x̂ estimate (true x if identity)")
+      )
     );
   }
 
@@ -2163,19 +2455,23 @@
       e(
         "div",
         { className: "card" },
-        e("h2", { style: { marginTop: 0 } }, "Closed-loop stack — ", run.label),
+        e("h2", { style: { marginTop: 0 } }, "System block diagram — ", run.label),
         e(
           "p",
           { className: "matrix-lead", style: { marginBottom: "0.85rem" } },
-          "How this run was generated: mission → guidance → estimate → control → plant. ",
-          "Click a block for config, gains, and plant mode. ",
+          "Simulink-style closed loop for this run. Click ",
+          e("strong", null, "Controller"),
+          " for gains (K / PID), ",
+          e("strong", null, "Observer"),
+          " for channels, ",
+          e("strong", null, "Plant"),
+          " for dynamics mode. ",
           stack.topology
-            ? e("span", { className: "stack-muted" }, "Topology: ", stack.topology, ".")
+            ? e("span", { className: "stack-muted" }, "Payload: ", stack.topology, ".")
             : null
         ),
         e(StackDiagram, {
           nodes: nodes,
-          edges: stack.edges,
           selectedId: selectedNode ? selectedNode.id : null,
           onSelect: setSelectedId,
         })

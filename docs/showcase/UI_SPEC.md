@@ -115,8 +115,9 @@ Fallback constants live in `app.js` if JSON fields are missing.
 **Must have**
 
 - Bound to **active run** (same mission-filtered run picker as Flight / Metrics).
-- Horizontal wrapping **block diagram** from `run.stack.nodes` + `run.stack.edges` (HTML/CSS only; no diagram library).
-- Click node → detail panel for `run.stack.details[node.id]` (title, summary, structured fields).
+- **Conventional closed-loop block diagram** (Simulink-style SVG): rectangular blocks, arrowed signal wires, summing junction, feedforward path (mission → guidance → controller → actuators → plant → metrics) and feedback path (plant → sensors → observer → sum). Signal labels \(x_r, e, u, x, y, \hat x\).
+- Block subtitles from node badges/summary (e.g. `lqr_hover`, `linear_kf`, `wrench`).
+- Click block → detail panel for `run.stack.details[node.id]` (title, summary, structured fields).
 - Matrices (`gains.K`) as HTML tables; Q/R diagonals and PID gains as vectors / labeled lists.
 - Identity footer from `run.stack.details.identity` (`study_id`, `seed`, `git_commit`, … when present).
 - Empty state if `run.stack` missing: tell user to rebuild gallery (`uv run uavsim gallery --base-case`).
@@ -125,6 +126,7 @@ Fallback constants live in `app.js` if JSON fields are missing.
 
 - Require live simulation or a server.
 - Force System into the 4-step walkthrough strip (optional later).
+- Use a horizontal “card strip” as the primary diagram metaphor.
 
 Full field contract: [STACK_SPEC.md](STACK_SPEC.md).
 
