@@ -83,6 +83,11 @@ def test_ideal_lqr_from_study_config() -> None:
     assert any("ṗ" in ln or "p" in ln for ln in d["plant"]["equations"]["lines"])
     assert d["observer"]["equations"]["lines"]
     assert any("x̂" in ln or "true" in ln.lower() for ln in d["observer"]["equations"]["lines"])
+    assert d["plant"]["linearization"] is not None
+    assert len(d["plant"]["linearization"]["A"]) == 12
+    assert len(d["plant"]["linearization"]["B"][0]) == 4
+    assert d["controller"]["linearization"] is not None
+    assert d["controller"]["linearization"]["A"] == d["plant"]["linearization"]["A"]
     assert (
         d["observer"]["observer_type"] in (None, "none") or d["observer"]["observer_type"] == "none"
     )
@@ -105,6 +110,8 @@ def test_gps_imu_lqg_observer_channels() -> None:
     assert d["observer"]["channels"] == ["pos", "omega"]
     assert d["sensors"]["channels"] == ["pos", "omega"]
     assert any("Kalman" in ln or "K =" in ln for ln in d["observer"]["equations"]["lines"])
+    assert d["observer"]["linearization"] is not None
+    assert d["observer"]["linearization"]["shape_A"] == [12, 12]
     assert d["controller"]["type"] == "lqr_hover"
     obs_node = next(n for n in stack["nodes"] if n["id"] == "observer")
     assert "linear_kf" in (obs_node.get("badges") or [])

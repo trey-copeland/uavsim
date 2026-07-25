@@ -107,9 +107,16 @@ def build_stack_from_study_mapping(
     details_mission = _details_mission(mission, guidance, m_file_rel)
     details_guidance = _details_guidance(guidance, m_file_rel)
     details_sensors, details_observer = _details_sensors_observer(observer_cfg)
-    details_controller = _details_controller(controller_cfg, controller_artifact)
+    lin = _hover_linearization_detail(vehicle)
+    details_controller = _details_controller(controller_cfg, controller_artifact, linearization=lin)
     details_actuators = _details_actuators(sim, vehicle)
-    details_plant = _details_plant(sim, vehicle)
+    details_plant = _details_plant(sim, vehicle, linearization=lin)
+    if lin and str(observer_cfg.get("type") or "none").lower() in ("linear_kf", "kf"):
+        details_observer = {
+            **details_observer,
+            "linearization": lin,
+            "linearization_ref": "Same hover (A,B) as LQR design model",
+        }
     details_metrics = _details_metrics(metrics_cfg, metrics)
     details_identity = _details_identity(
         study=study,
@@ -478,9 +485,64 @@ def _details_sensors_observer(
     return sensors, shared_obs
 
 
+def _hover_linearization_detail(vehicle: dict[str, Any] | None) -> dict[str, Any] | None:
+    """A,B from hover_linearization — LQR design + linear KF model."""
+    if not vehicle:
+        return None
+    try:
+        import numpy as np
+
+        from uavsim.dynamics.linearize import hover_linearization
+        from uavsim.vehicles.params import VehicleParams
+
+        vp = VehicleParams.model_validate(vehicle)
+        a, b = hover_linearization(vp)
+        # Compact float precision for gallery JSON
+        a_list = np.round(np.asarray(a, dtype=float), 8).tolist()
+        b_list = np.round(np.asarray(b, dtype=float), 8).tolist()
+        return {
+            "model": "hover_linearization",
+            "about": (
+                "Continuous ẋ = A x + B (u − u_h) about hover / small angle. "
+                "Used for LQR CARE design and the linear KF. "
+                "Quadratic drag, prop H-force, and ground-effect κ are not in A,B."
+            ),
+            "state_order": [
+                "x",
+                "y",
+                "z",
+                "phi",
+                "theta",
+                "psi",
+                "vx",
+                "vy",
+                "vz",
+                "p",
+                "q",
+                "r",
+            ],
+            "control_order": ["F", "tau_phi", "tau_theta", "tau_psi"],
+            "structure_notes": [
+                "ṗ = v;  small-angle ėuler ≈ ω",
+                "ẍ ≈ −g θ,  ÿ ≈ +g φ  (NED, thrust −body z)",
+                "B: ż ← −F/m;  ṗ,q̇,ṙ ← τ / I_ii",
+                "Linear drag / rate damp enter A when vehicle.aero enables them",
+            ],
+            "A": a_list,
+            "B": b_list,
+            "shape_A": [12, 12],
+            "shape_B": [12, 4],
+        }
+    except Exception as exc:  # noqa: BLE001 — optional enrichment
+        logger.debug("hover linearization for stack failed: %s", exc)
+        return None
+
+
 def _details_controller(
     controller_cfg: dict[str, Any],
     artifact: dict[str, Any] | None,
+    *,
+    linearization: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     art = artifact or {}
     ctype = art.get("controller_type") or controller_cfg.get("type") or art.get("controller_id")
@@ -526,6 +588,8 @@ def _details_controller(
         "equation": equation,
         "equations": eqs,
     }
+    if linearization and str(ctype or "") == "lqr_hover":
+        out["linearization"] = linearization
     return out
 
 
@@ -586,7 +650,12 @@ def _details_actuators(sim: dict[str, Any], vehicle: dict[str, Any] | None) -> d
     }
 
 
-def _details_plant(sim: dict[str, Any], vehicle: dict[str, Any] | None) -> dict[str, Any]:
+def _details_plant(
+    sim: dict[str, Any],
+    vehicle: dict[str, Any] | None,
+    *,
+    linearization: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     plant_mode = sim.get("plant") or "wrench"
     attitude = sim.get("attitude") or "euler"
     vehicle = vehicle or {}
@@ -619,7 +688,19 @@ def _details_plant(sim: dict[str, Any], vehicle: dict[str, Any] | None) -> dict[
         "inertia": vehicle.get("inertia"),
         "limits": vehicle.get("limits"),
     }
-    return {
+    eqs = _plant_equations(
+        str(attitude),
+        str(plant_mode),
+        aero_enabled=bool(enabled),
+        ground_effect=ge,
+    )
+    # Point readers at design linearization (same A,B as LQR/KF)
+    if linearization:
+        lines = list(eqs.get("lines") or [])
+        lines.append("Design linearization (LQR/KF): ẋ = A x + B (u − u_h) — matrices below.")
+        eqs = {**eqs, "lines": lines}
+
+    out: dict[str, Any] = {
         "attitude": attitude,
         "plant_mode": plant_mode,
         "state_dim_bus": 12 if str(attitude).lower() != "quat" else 13,
@@ -633,13 +714,11 @@ def _details_plant(sim: dict[str, Any], vehicle: dict[str, Any] | None) -> dict[
             "atol": sim.get("atol"),
         },
         "notes": notes,
-        "equations": _plant_equations(
-            str(attitude),
-            str(plant_mode),
-            aero_enabled=bool(enabled),
-            ground_effect=ge,
-        ),
+        "equations": eqs,
     }
+    if linearization:
+        out["linearization"] = linearization
+    return out
 
 
 def _details_metrics(
