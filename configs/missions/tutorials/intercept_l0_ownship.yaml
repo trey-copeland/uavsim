@@ -1,0 +1,14 @@
+# L0 open-loop ownship: hard intercept (shorter transit) then ride-along.
+# Target: p=[20, -15+5*t, 3], v=[0,5,0]  (intercept_l0_target.yaml)
+# CPA t=3.0 → target at [20, 0, 3]; ownship transit ~2 s over ~20 m → high accel.
+schema_version: 1
+name: intercept_l0_ownship
+frame: NED
+description: >
+  Aggressive L0 intercept reference for high-T/W NDI plant.
+waypoints:
+  - {label: start, time: 0.0, x: 0.0, y: 0.0, z: 3.0, yaw: 0.0}
+  - {label: settle, time: 1.0, x: 0.0, y: 0.0, z: 3.0, yaw: 0.0}
+  - {label: cpa, time: 3.0, x: 20.0, y: 0.0, z: 3.0, yaw: 1.5708}
+  - {label: ride_mid, time: 5.5, x: 20.0, y: 12.5, z: 3.0, yaw: 1.5708}
+  - {label: end, time: 8.0, x: 20.0, y: 25.0, z: 3.0, yaw: 1.5708}
