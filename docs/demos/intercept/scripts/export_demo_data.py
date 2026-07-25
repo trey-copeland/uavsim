@@ -509,22 +509,44 @@ def compute_mc_bands(
             "p95": [float(x) for x in p95],
         }
 
+    # Joint horizontal radius about median path (m in plot N–E).
+    # This yields a tubular / conical CI that can grow along the mission —
+    # unlike independent N/E axis percentiles, which look "planar"/boxy.
+    med_n = np.nanpercentile(paths_n, 50, axis=0)
+    med_e = np.nanpercentile(paths_e, 50, axis=0)
+    med_u = np.nanpercentile(paths_u, 50, axis=0)
+    dn = paths_n - med_n
+    de = paths_e - med_e
+    r_horiz = np.sqrt(dn * dn + de * de)
+    r68 = np.nanpercentile(r_horiz, 68, axis=0)  # ~1σ for soft inner CI
+    r95 = np.nanpercentile(r_horiz, 95, axis=0)
+
     return {
         "frame": "plot",
         "percentiles": [5, 50, 95],
         "t": [float(x) for x in t_grid],
         "n_paths_used": int(n_ok),
         "n_paths_requested": int(sel.size),
-        "method": "axiswise_percentile",
+        "method": "median_path_plus_horiz_radius",
         "notes": (
-            "Ownship N/E/U percentiles from plant-param re-sim of success recipe; "
-            "fixed NDI gains (redesign_controller=false). Axis-wise percentiles are "
-            "not a joint spatial ellipsoid."
+            "Median ownship path from plant re-sim; horizontal radius percentiles "
+            "(distance in N–E from median) give a tubular CI (often conical as "
+            "uncertainty grows). Also stores axis-wise N/E/U for diagnostics. "
+            "Fixed NDI; redesign_controller=false."
         ),
         "ownship": {
             "N": axis_percentiles(paths_n),
             "E": axis_percentiles(paths_e),
             "U": axis_percentiles(paths_u),
+            "median": {
+                "N": [float(x) for x in med_n],
+                "E": [float(x) for x in med_e],
+                "U": [float(x) for x in med_u],
+            },
+            "radius_horiz_m": {
+                "p68": [float(x) for x in r68],
+                "p95": [float(x) for x in r95],
+            },
         },
     }
 

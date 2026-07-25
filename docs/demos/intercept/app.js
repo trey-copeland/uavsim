@@ -85,7 +85,11 @@
 
   function hasBands() {
     const b = demo && demo.mc && demo.mc.bands;
-    return !!(b && b.ownship && b.ownship.N && b.ownship.E && b.ownship.N.p5 && b.ownship.N.p5.length);
+    if (!b || !b.ownship) return false;
+    if (b.ownship.median && b.ownship.radius_horiz_m && b.ownship.radius_horiz_m.p95) {
+      return b.ownship.median.N && b.ownship.median.N.length > 0;
+    }
+    return !!(b.ownship.N && b.ownship.E && b.ownship.N.p5 && b.ownship.N.p5.length);
   }
 
   function hasFail() {
@@ -802,12 +806,111 @@
   }
 
   /**
-   * Soft MC cloud from axis-wise p5/p50/p95 (no hard envelope stroke).
-   * Nested translucent fills + faint scatter → cloud rather than wire outline.
+   * Seaborn-style CI ribbon in 2D: solid median path + soft translucent
+   * fill between ±r (horizontal radius percentiles from median).
+   * Falls back to axis-wise p5/p95 fill if radius_horiz missing.
    */
   function bandCloudTraces2d(bands) {
     if (!bands || !bands.ownship) return [];
     const own = bands.ownship;
+    const med = own.median;
+    const rad = own.radius_horiz_m;
+
+    // Preferred: tubular CI around median (conical when r grows along t)
+    if (
+      med &&
+      rad &&
+      med.N &&
+      med.E &&
+      rad.p95 &&
+      rad.p68 &&
+      med.N.length === rad.p95.length
+    ) {
+      return bandSeabornTube2d(med, rad);
+    }
+
+    // Legacy axis-wise soft fill (older packs)
+    return bandAxiswiseSoftFill2d(own);
+  }
+
+  /** Unit normals along a 2D polyline (smoothed). */
+  function pathNormals2d(x, y) {
+    const n = x.length;
+    const nx = new Array(n);
+    const ny = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const i0 = Math.max(0, i - 1);
+      const i1 = Math.min(n - 1, i + 1);
+      let tx = x[i1] - x[i0];
+      let ty = y[i1] - y[i0];
+      const len = Math.hypot(tx, ty) || 1;
+      tx /= len;
+      ty /= len;
+      nx[i] = -ty;
+      ny[i] = tx;
+    }
+    return { nx: nx, ny: ny };
+  }
+
+  function bandSeabornTube2d(med, rad) {
+    // Projection: NE uses E vs N; NU uses N vs U with vertical radius from U axis
+    let mx, my, r68, r95;
+    if (projection === "NE") {
+      mx = med.E;
+      my = med.N;
+    } else {
+      // N–Up: median N vs U; still use horizontal plant scatter radius for width
+      mx = med.N;
+      my = med.U;
+    }
+    r68 = rad.p68;
+    r95 = rad.p95;
+    const nrm = pathNormals2d(mx, my);
+    const traces = [];
+
+    function ribbon(rArr, alpha, name, legend) {
+      const xu = [];
+      const yu = [];
+      const xl = [];
+      const yl = [];
+      for (let i = 0; i < mx.length; i++) {
+        const r = Math.max(0, +rArr[i] || 0);
+        xu.push(mx[i] + r * nrm.nx[i]);
+        yu.push(my[i] + r * nrm.ny[i]);
+        xl.push(mx[i] - r * nrm.nx[i]);
+        yl.push(my[i] - r * nrm.ny[i]);
+      }
+      // Seaborn: soft fill, no hard stroke
+      return {
+        x: xu.concat(xl.slice().reverse()),
+        y: yu.concat(yl.slice().reverse()),
+        fill: "toself",
+        fillcolor: "rgba(91, 159, 212, " + alpha + ")",
+        line: { width: 0, color: "rgba(0,0,0,0)" },
+        mode: "lines",
+        name: name,
+        hoverinfo: "skip",
+        showlegend: !!legend,
+      };
+    }
+
+    // Outer CI then inner (seaborn multi-band look)
+    traces.push(ribbon(r95, 0.22, "MC 95% CI", true));
+    traces.push(ribbon(r68, 0.28, "MC ~68% CI", false));
+    // Solid median (seaborn mean/median line)
+    traces.push({
+      x: mx,
+      y: my,
+      mode: "lines",
+      name: "MC median",
+      line: { color: "rgba(70, 130, 180, 0.95)", width: 2.5 },
+      hoverinfo: "skip",
+      showlegend: true,
+    });
+    return traces;
+  }
+
+  function bandAxiswiseSoftFill2d(own) {
     let x5, x50, x95, y5, y50, y95;
     if (projection === "NE") {
       if (!own.E || !own.N) return [];
@@ -826,179 +929,111 @@
       y50 = own.U.p50;
       y95 = own.U.p95;
     }
-    if (!x5 || !x95 || !y5 || !y95) return [];
-
-    const traces = [];
-    // Nested lo–hi ribbons (outer → inner): soft fill, no hard stroke
-    // Outer: p5–p95; inner: blend toward p50 for denser core
-    const shells = [
-      { xL: x5, xH: x95, yL: y5, yH: y95, a: 0.11, name: "MC cloud", legend: true },
+    if (!x5 || !x95) return [];
+    return [
       {
-        xL: _lerpArr(x5, x50, 0.45),
-        xH: _lerpArr(x95, x50, 0.45),
-        yL: _lerpArr(y5, y50, 0.45),
-        yH: _lerpArr(y95, y50, 0.45),
-        a: 0.16,
-        name: "MC core",
-        legend: false,
-      },
-    ];
-    shells.forEach(function (sh) {
-      traces.push({
-        x: sh.xL.concat(sh.xH.slice().reverse()),
-        y: sh.yL.concat(sh.yH.slice().reverse()),
+        x: x5.concat(x95.slice().reverse()),
+        y: y5.concat(y95.slice().reverse()),
         fill: "toself",
-        fillcolor: "rgba(91, 159, 212, " + sh.a + ")",
-        line: { color: "rgba(91, 159, 212, 0)", width: 0 },
-        name: sh.name,
-        hoverinfo: "skip",
+        fillcolor: "rgba(91, 159, 212, 0.22)",
+        line: { width: 0, color: "rgba(0,0,0,0)" },
         mode: "lines",
-        showlegend: sh.legend,
-      });
-    });
-
-    // Soft centerline (very light)
-    if (x50 && y50) {
-      traces.push({
+        name: "MC 95% (axis-wise)",
+        hoverinfo: "skip",
+        showlegend: true,
+      },
+      {
         x: x50,
         y: y50,
         mode: "lines",
         name: "MC median",
-        line: { color: "rgba(180, 210, 235, 0.35)", width: 1.5 },
+        line: { color: "rgba(70, 130, 180, 0.95)", width: 2.5 },
         hoverinfo: "skip",
-        showlegend: false,
-      });
-    }
-
-    // Speckle cloud: sample points between p5 and p95
-    const xs = [];
-    const ys = [];
-    const n = x5.length;
-    const step = Math.max(1, Math.floor(n / 48));
-    for (let i = 0; i < n; i += step) {
-      for (let k = 0; k < 5; k++) {
-        const u = Math.random();
-        // Bias samples toward median for denser core
-        const t = u * u;
-        const side = Math.random() < 0.5;
-        if (side) {
-          xs.push((1 - t) * x5[i] + t * x50[i]);
-          ys.push((1 - t) * y5[i] + t * y50[i]);
-        } else {
-          xs.push((1 - t) * x95[i] + t * x50[i]);
-          ys.push((1 - t) * y95[i] + t * y50[i]);
-        }
-      }
-    }
-    traces.push({
-      x: xs,
-      y: ys,
-      mode: "markers",
-      name: "MC samples",
-      marker: {
-        size: 3,
-        color: "rgba(91, 159, 212, 0.22)",
-        line: { width: 0 },
+        showlegend: true,
       },
-      hoverinfo: "skip",
-      showlegend: false,
-    });
-
-    return traces;
-  }
-
-  /** @deprecated alias — drawTraj2d uses bandCloudTraces2d */
-  function bandTrace2d(bands) {
-    const tr = bandCloudTraces2d(bands);
-    if (!tr.length) return null;
-    return { fill: tr[0], med: tr.length > 2 ? tr[2] : null, all: tr };
+    ];
   }
 
   /**
-   * 3D MC cloud: interpolated ribbon strands + soft markers (no hard p5/p95 strokes).
+   * 3D: soft tubular CI about median (horizontal radius) + solid median path.
+   * Looks conical when r_horiz grows after takeoff / during chase.
    */
   function bandCloudTraces3d(bands) {
     if (!bands || !bands.ownship) return [];
     const o = bands.ownship;
-    if (!o.N || !o.E || !o.U) return [];
-    const n5 = o.N.p5;
-    const n50 = o.N.p50;
-    const n95 = o.N.p95;
-    const e5 = o.E.p5;
-    const e50 = o.E.p50;
-    const e95 = o.E.p95;
-    const u5 = o.U.p5;
-    const u50 = o.U.p50;
-    const u95 = o.U.p95;
-    if (!n5 || !n50 || !n95) return [];
-
-    const traces = [];
-    // Soft strands between p5–p50–p95 (percentile blends)
-    const strandTs = [0, 0.2, 0.4, 0.5, 0.6, 0.8, 1.0];
-    strandTs.forEach(function (t, idx) {
-      let Nx, Ex, Ux;
-      if (t <= 0.5) {
-        const a = t / 0.5;
-        Nx = _lerpArr(n5, n50, a);
-        Ex = _lerpArr(e5, e50, a);
-        Ux = _lerpArr(u5, u50, a);
-      } else {
-        const a = (t - 0.5) / 0.5;
-        Nx = _lerpArr(n50, n95, a);
-        Ex = _lerpArr(e50, e95, a);
-        Ux = _lerpArr(u50, u95, a);
-      }
-      const dist = Math.abs(t - 0.5);
-      const op = 0.12 + 0.28 * (1 - dist * 2); // denser near median
-      traces.push({
+    const med = o.median;
+    const rad = o.radius_horiz_m;
+    if (med && rad && med.N && med.E && med.U && rad.p95) {
+      return bandSeabornTube3d(med, rad);
+    }
+    // Legacy axis-wise soft strands
+    if (!o.N || !o.E || !o.U || !o.N.p50) return [];
+    return [
+      {
         type: "scatter3d",
         mode: "lines",
-        x: Nx,
-        y: Ex,
-        z: Ux,
-        line: { color: "rgba(91, 159, 212," + op.toFixed(3) + ")", width: dist < 0.05 ? 4 : 2 },
-        name: idx === 0 ? "MC cloud" : "MC strand",
-        showlegend: idx === 0,
+        x: o.N.p50,
+        y: o.E.p50,
+        z: o.U.p50,
+        line: { color: "rgba(70, 130, 180, 0.95)", width: 5 },
+        name: "MC median",
         hoverinfo: "skip",
-      });
-    });
+      },
+    ];
+  }
 
-    // Speckle volume along envelope
-    const xs = [];
-    const ys = [];
-    const zs = [];
-    const n = n5.length;
-    const step = Math.max(1, Math.floor(n / 40));
-    for (let i = 0; i < n; i += step) {
-      for (let k = 0; k < 6; k++) {
-        const u = Math.random();
-        const t = u * u;
-        if (Math.random() < 0.5) {
-          xs.push((1 - t) * n5[i] + t * n50[i]);
-          ys.push((1 - t) * e5[i] + t * e50[i]);
-          zs.push((1 - t) * u5[i] + t * u50[i]);
-        } else {
-          xs.push((1 - t) * n95[i] + t * n50[i]);
-          ys.push((1 - t) * e95[i] + t * e50[i]);
-          zs.push((1 - t) * u95[i] + t * u50[i]);
+  function bandSeabornTube3d(med, rad) {
+    const mn = med.N;
+    const me = med.E;
+    const mu = med.U;
+    const r68 = rad.p68;
+    const r95 = rad.p95;
+    const n = mn.length;
+    const traces = [];
+
+    // Soft "sausage" surface: several angular generators at r68 / r95
+    const nAng = 12;
+    function ringStrand(rArr, alpha, width, name, legend) {
+      for (let a = 0; a < nAng; a++) {
+        const th = (2 * Math.PI * a) / nAng;
+        const c = Math.cos(th);
+        const s = Math.sin(th);
+        const xs = [];
+        const ys = [];
+        const zs = [];
+        for (let i = 0; i < n; i++) {
+          const r = Math.max(0, +rArr[i] || 0);
+          xs.push(mn[i] + r * c);
+          ys.push(me[i] + r * s);
+          zs.push(mu[i]);
         }
+        traces.push({
+          type: "scatter3d",
+          mode: "lines",
+          x: xs,
+          y: ys,
+          z: zs,
+          line: { color: "rgba(91, 159, 212," + alpha + ")", width: width },
+          name: name,
+          showlegend: legend && a === 0,
+          hoverinfo: "skip",
+        });
       }
     }
+    ringStrand(r95, 0.18, 3, "MC 95% tube", true);
+    ringStrand(r68, 0.28, 2, "MC ~68% tube", false);
+
+    // Solid median (seaborn line)
     traces.push({
       type: "scatter3d",
-      mode: "markers",
-      x: xs,
-      y: ys,
-      z: zs,
-      marker: {
-        size: 2.2,
-        color: "rgba(91, 159, 212, 0.2)",
-        opacity: 0.85,
-        line: { width: 0 },
-      },
-      name: "MC samples",
-      showlegend: false,
+      mode: "lines",
+      x: mn,
+      y: me,
+      z: mu,
+      line: { color: "rgba(70, 130, 180, 0.95)", width: 6 },
+      name: "MC median",
       hoverinfo: "skip",
+      showlegend: true,
     });
     return traces;
   }
