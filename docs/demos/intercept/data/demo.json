@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "title": "uavsim \u00b7 intercept L0 (NDI + plant MC)",
+  "title": "uavsim \u00b7 intercept online (NDI + MEKF + plant MC)",
   "generated_at": "2026-07-25T17:39:17.957739+00:00",
   "uavsim_version": "0.1.0",
   "ui": {
-    "value_prop": "Pad climb (ground effect) \u2192 open-loop intercept path; scripted target; fixed NDI; plant mass / inertia / arm Monte Carlo; battery SOC/power when logged.",
+    "value_prop": "Pad climb (GE) \u00b7 online intercept_pursue \u00b7 MEKF GPS/IMU \u00b7 fixed NDI \u00b7 plant MC \u00b7 battery SOC",
     "about_paragraphs": [
       "Pad climb intercept: ownship takes off from a pad, climbs through ground effect (GE), then tracks an open-loop reference toward a scripted target with fixed NDI (redesign_controller=false under plant MC). L0 is not closed-loop replan.",
       "Capture criterion: min_t \u2016p_own \u2212 p_tgt\u2016 \u2264 r_capture (default r_capture = 1 m). KPI P(capture) uses intercept_success, not tracking success (attitude error bounds often fail).",

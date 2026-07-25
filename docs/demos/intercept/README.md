@@ -106,13 +106,14 @@ Arguments:
 
 P(capture) is `mean(intercept_success)`.
 
-Example used for the committed R3 pack:
+Example used for the committed **online** pack:
 
 ```bash
 uv run python docs/demos/intercept/scripts/export_demo_data.py \
-  --success-run runs/intercept_l0_success_mc_20260725T163635Z \
-  --fail-run runs/intercept_l0_fail_20260725T163623Z \
+  --success-run runs/intercept_online_success_mc_20260725T172303Z \
+  --fail-run runs/intercept_online_energy_fail_20260725T172234Z \
   --with-bands --band-max-trials 80
+# → p_capture ≈ 0.28; fail case = energy-depleted nominal
 ```
 
 ## Files
