@@ -11,6 +11,7 @@ import numpy as np
 from uavsim.control.export import write_controller_artifact
 from uavsim.control.factory import build_controller_from_mapping, controller_artifact_for
 from uavsim.control.lqr import LqrHoverController
+from uavsim.control.ndi import NdiCascadeController
 from uavsim.control.pid import PidCascadeController
 from uavsim.guidance import HoldGuidance, WaypointsGuidance
 from uavsim.metrics import compute_metrics
@@ -43,7 +44,7 @@ from uavsim.studies.config import (
 from uavsim.vehicles.params import VehicleParams, load_vehicle
 
 BackendName = Literal["local", "docker"]
-AnyController = LqrHoverController | PidCascadeController
+AnyController = LqrHoverController | PidCascadeController | NdiCascadeController
 
 
 @dataclass

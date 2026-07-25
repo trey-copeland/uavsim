@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|--------|
-| **Status** | Planned — implement on branch `ndi` |
+| **Status** | Phase A core landed on branch `ndi` — law + tests green; studies/UI next |
 | **Goal** | Third control-law family alongside hover LQR/LQG and cascade PID, with full side-by-side story: baseline, envelope-edge, estimation matrix, τ-envelope, and Hi-fi plant variants |
 | **Primary interface** | Existing `Controller` → body wrench \(u=[F,\tau_\phi,\tau_\theta,\tau_\psi]\) |
 | **Audience** | Hiring GNC reviewers + technical peers (honest SIL report, not black-box demo) |
@@ -179,35 +179,43 @@ Tune so that on **baseline figure-eight + ideal state**, NDI RMSE is in the same
 
 ## 4. Study matrix (build all)
 
-### 4.1 Naming
+### 4.1 Naming contract (sim agent ↔ UI agent)
 
-| Gallery role / id pattern | Meaning |
-|---------------------------|---------|
-| `ideal_ndi` | Full state → NDI |
-| `est_*_ndi` | Same sensors as LQR/PID siblings → NDI (naive / KF / AHRS / flow / IMU) |
-| `edge_*_ndi` | Envelope-edge mission twins |
-| `plant_*_ndi` | Hi-fi plant × ideal NDI |
+**Hard rule:** `study_id` in YAML == gallery `run_id` / matrix cell id (same string).  
+Config path: `configs/studies/<study_id>.yaml`.  
+Envelope scheme id for ideal full-state NDI: **`ideal_ndi`** (not a study file; matrix scheme key).
 
-Study files live under `configs/studies/` with clear `study_id`s.
+| Gallery role | study_id / run_id | Notes |
+|--------------|-------------------|--------|
+| Ideal full-state NDI (baseline) | `figure_eight_ndi` | Role key: `ideal_ndi` |
+| Ideal full-state NDI (edge) | `edge_figure_eight_ndi` | Role key: `edge_ideal_ndi` or `ideal_ndi` with edge mission map |
+| Est × NDI baseline | see §4.3 | suffix `_ndi` on LQR sibling stem |
+| Est × NDI edge | see §4.3 | `edge_*_ndi` |
+| Hi-fi plant × NDI | see §4.4 | `plant_*_ndi` preferred for matrix clarity |
+
+**Do not invent parallel ids** (e.g. no `ndi_figure_eight`). UI wires `run_id` / `run_id_by_mission` to these exact strings; sim agent only needs to produce runs whose manifest `study_id` matches.
 
 ### 4.2 Ideal full-state (law triangle)
 
-| Study | Mission | Compare to |
-|-------|---------|------------|
-| `figure_eight_ndi.yaml` | baseline figure-eight | `figure_eight.yaml` (LQR), `figure_eight_pid.yaml` |
-| `edge_figure_eight_ndi.yaml` | envelope edge | `edge_figure_eight.yaml`, `edge_figure_eight_pid.yaml` |
+| Study file / study_id | Mission | Compare to (existing) |
+|----------------------|---------|------------------------|
+| `figure_eight_ndi` | baseline figure-eight | `figure_eight` (LQR), `figure_eight_pid` |
+| `edge_figure_eight_ndi` | envelope edge | `edge_figure_eight`, `edge_figure_eight_pid` |
+
+**Landed:** `configs/studies/figure_eight_ndi.yaml` (Phase A).
 
 ### 4.3 Estimation × NDI (parity with LQR/PID rows)
 
-Mirror existing channels and observer configs from LQR/PID studies (same noise, seeds, channels):
+Mirror existing channels and observer configs from LQR/PID studies (same noise, seeds, channels).  
+**study_id = filename stem** for every row:
 
-| Sensors | Baseline study | Edge study |
-|---------|----------------|------------|
-| GPS+IMU naive | `figure_eight_gps_imu_naive_ndi.yaml` | `edge_gps_imu_naive_ndi.yaml` |
-| GPS+IMU + linear KF | `figure_eight_gps_imu_kf_ndi.yaml` | `edge_gps_imu_kf_ndi.yaml` |
-| AHRS | `figure_eight_ahrs_kf_ndi.yaml` | `edge_ahrs_kf_ndi.yaml` |
-| Flow+alt | `figure_eight_flow_alt_kf_ndi.yaml` | `edge_flow_alt_kf_ndi.yaml` |
-| IMU-only | `figure_eight_imu_only_kf_ndi.yaml` | `edge_imu_only_kf_ndi.yaml` |
+| Sensors | Baseline study_id | Edge study_id |
+|---------|-------------------|---------------|
+| GPS+IMU naive | `figure_eight_gps_imu_naive_ndi` | `edge_gps_imu_naive_ndi` |
+| GPS+IMU + linear KF | `figure_eight_gps_imu_kf_ndi` | `edge_gps_imu_kf_ndi` |
+| AHRS | `figure_eight_ahrs_kf_ndi` | `edge_ahrs_kf_ndi` |
+| Flow+alt | `figure_eight_flow_alt_kf_ndi` | `edge_flow_alt_kf_ndi` |
+| IMU-only | `figure_eight_imu_only_kf_ndi` | `edge_imu_only_kf_ndi` |
 
 **Note:** “LQG” remains **KF + LQR** only. NDI + KF is **not** called LQG in UI copy (method string: `linear_kf → NDI`).
 
@@ -215,13 +223,17 @@ Naive partial bus → NDI is an **intentional stress** (same teaching fail mode 
 
 ### 4.4 Hi-fi plant × ideal NDI
 
-| Plant | Study | Twin LQR study |
-|-------|--------|----------------|
-| Vacuum wrench | `plant_nominal` already ideal LQR; add NDI as `plant_nominal_ndi` **or** share nominal path with law switch | `figure_eight_ndi` may double as nominal |
-| Motors | `figure_eight_ndi_motors.yaml` | `figure_eight_motors.yaml` |
-| Aero | `figure_eight_ndi_aero.yaml` | `figure_eight_aero.yaml` |
-| GE (low path) | `figure_eight_ndi_ge.yaml` | `figure_eight_ge.yaml` |
-| Quat plant | `figure_eight_ndi_quat.yaml` | `figure_eight_quat.yaml` |
+Gallery `run_id`s for plant fidelity matrix (align with existing `plant_*_lqr` pattern):
+
+| Plant | study_id / run_id | Twin LQR run_id |
+|-------|-------------------|-----------------|
+| Vacuum wrench | `plant_nominal_ndi` | `plant_nominal_lqr` (or reuse `figure_eight_ndi` if gallery aliases) |
+| Motors | `plant_motors_ndi` | `plant_motors_lqr` |
+| Aero | `plant_aero_ndi` | `plant_aero_lqr` |
+| GE (low path) | `plant_ge_ndi` | `plant_ge_lqr` |
+| Quat plant | `plant_quat_ndi` | `plant_quat_lqr` |
+
+Config files may live as `configs/studies/plant_*_ndi.yaml` **or** `figure_eight_ndi_{motors,aero,ge,quat}.yaml` with `study_id` still equal to the gallery `run_id` above (prefer **plant_*_ndi** for UI symmetry).
 
 Hi-fi showcase matrix becomes **laws × plant variants** or **plants × laws**:
 

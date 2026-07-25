@@ -11,6 +11,7 @@ import yaml
 
 from uavsim import __version__
 from uavsim.control.lqr import LqrHoverController
+from uavsim.control.ndi import NdiCascadeController
 from uavsim.control.pid import PidCascadeController
 from uavsim.dynamics import CONTROL_DIM, STATE_DIM
 from uavsim.vehicles.params import VehicleParams, load_vehicle
@@ -110,6 +111,47 @@ def export_pid_artifact(
     return art
 
 
+def export_ndi_artifact(
+    controller: NdiCascadeController,
+    *,
+    vehicle: VehicleParams | None = None,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    vehicle = vehicle or controller.vehicle
+    art: dict[str, Any] = {
+        "schema_version": ARTIFACT_SCHEMA_VERSION,
+        "controller_type": "ndi_cascade",
+        "controller_id": controller.id,
+        "created_at": datetime.now(UTC).isoformat(),
+        "uavsim_version": __version__,
+        "frames": {
+            "state": "NED_FRD_12",
+            "control": "thrust_Nm_body",
+            "control_order": ["F", "tau_phi", "tau_theta", "tau_psi"],
+        },
+        "vehicle_id": vehicle.vehicle_id,
+        "vehicle": {
+            "mass_kg": vehicle.mass_kg,
+            "gravity_m_s2": vehicle.gravity_m_s2,
+            "arm_length_m": vehicle.arm_length_m,
+            "inertia": vehicle.inertia.model_dump(),
+            "limits": vehicle.limits.model_dump(),
+        },
+        "trim": {"u_hover": controller.u_hover.tolist()},
+        "gains": controller.gains_dict(),
+        "design": {
+            "invert_model": controller.invert_model,
+            "notes": (
+                "Vacuum rigid-body inverse; no aero/motors in inversion. "
+                "Not designed via hover linearization (no CARE / A,B)."
+            ),
+        },
+    }
+    if extra:
+        art["extra"] = extra
+    return art
+
+
 def write_controller_artifact(path: Path, artifact: dict[str, Any]) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -138,7 +180,7 @@ def controller_from_artifact(
     artifact: dict[str, Any],
     *,
     vehicle: VehicleParams | None = None,
-) -> LqrHoverController | PidCascadeController:
+) -> LqrHoverController | PidCascadeController | NdiCascadeController:
     """Rebuild an in-process controller from a versioned artifact (SIL round-trip)."""
     if vehicle is None:
         vdata = artifact.get("vehicle")
@@ -190,6 +232,29 @@ def controller_from_artifact(
             vehicle,
             gains=gains,
             controller_id=str(artifact.get("controller_id", "pid_cascade")),
+        )
+    if ctype == "ndi_cascade":
+        from uavsim.control.ndi import NdiGains, design_ndi_cascade
+
+        g = artifact["gains"]
+        gains = NdiGains(
+            kp_pos=np.asarray(g["kp_pos"], dtype=float),
+            kd_pos=np.asarray(g["kd_pos"], dtype=float),
+            k_R=np.asarray(g["k_R"], dtype=float),
+            k_omega=np.asarray(g["k_omega"], dtype=float),
+        )
+        max_tilt = g.get("max_tilt_rad", 0.7)
+        invert = g.get("invert_model") or artifact.get("design", {}).get(
+            "invert_model", "vacuum_rigid_body"
+        )
+        f_min_frac = g.get("f_min_frac_hover", 0.05)
+        return design_ndi_cascade(
+            vehicle,
+            gains=gains,
+            controller_id=str(artifact.get("controller_id", "ndi_cascade")),
+            max_tilt_rad=float(max_tilt),
+            invert_model=str(invert),
+            f_min_frac_hover=float(f_min_frac),
         )
     msg = f"Unknown controller_type in artifact: {ctype!r}"
     raise ValueError(msg)

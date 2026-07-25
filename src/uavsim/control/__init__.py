@@ -1,4 +1,4 @@
-"""Controller protocol and implementations (LQR + PID cascade)."""
+"""Controller protocol and implementations (LQR + PID cascade + NDI)."""
 
 from uavsim.control.base import Controller, saturate
 from uavsim.control.export import (
@@ -9,20 +9,30 @@ from uavsim.control.export import (
 )
 from uavsim.control.factory import build_controller_from_mapping, controller_artifact_for
 from uavsim.control.lqr import DEFAULT_Q_DIAG, DEFAULT_R_DIAG, LqrHoverController, design_lqr_hover
+from uavsim.control.ndi import (
+    DEFAULT_NDI_GAINS,
+    NdiCascadeController,
+    NdiGains,
+    design_ndi_cascade,
+)
 from uavsim.control.pid import DEFAULT_PID_GAINS, PidCascadeController, PidGains, design_pid_cascade
 
 __all__ = [
+    "DEFAULT_NDI_GAINS",
     "DEFAULT_PID_GAINS",
     "DEFAULT_Q_DIAG",
     "DEFAULT_R_DIAG",
     "Controller",
     "LqrHoverController",
+    "NdiCascadeController",
+    "NdiGains",
     "PidCascadeController",
     "PidGains",
     "build_controller_from_mapping",
     "controller_artifact_for",
     "controller_from_artifact",
     "design_lqr_hover",
+    "design_ndi_cascade",
     "design_pid_cascade",
     "export_from_run_dir",
     "load_controller_artifact",

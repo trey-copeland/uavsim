@@ -35,8 +35,23 @@ class PidControllerConfig(BaseModel):
     max_tilt_rad: float = Field(default=0.436, gt=0)  # ~25 deg
 
 
+class NdiControllerConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["ndi_cascade"] = "ndi_cascade"
+    kp_pos: list[float] = Field(default_factory=lambda: [4.0, 4.0, 9.0], min_length=3, max_length=3)
+    kd_pos: list[float] = Field(default_factory=lambda: [3.0, 3.0, 5.0], min_length=3, max_length=3)
+    k_R: list[float] = Field(default_factory=lambda: [12.0, 12.0, 3.0], min_length=3, max_length=3)
+    k_omega: list[float] = Field(
+        default_factory=lambda: [1.2, 1.2, 0.5], min_length=3, max_length=3
+    )
+    max_tilt_rad: float = Field(default=0.7, gt=0)
+    invert_model: str = "vacuum_rigid_body"
+    f_min_frac_hover: float = Field(default=0.05, ge=0.0, le=1.0)
+
+
 ControllerConfig = Annotated[
-    LqrControllerConfig | PidControllerConfig,
+    LqrControllerConfig | PidControllerConfig | NdiControllerConfig,
     Field(discriminator="type"),
 ]
 

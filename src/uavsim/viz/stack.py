@@ -338,6 +338,26 @@ def _controller_equations(ctype: str | None) -> dict[str, Any]:
                 "  u = [F, τ_φ, τ_θ, τ_ψ]ᵀ, then saturated",
             ],
         )
+    if t == "ndi_cascade":
+        return _equations_payload(
+            "Cascade NDI → body wrench (vacuum rigid-body inverse)",
+            [
+                "Outer loop (NED virtual acceleration):",
+                "  e_p = p_r − p,   e_v = v_r − v",
+                "  a_des = Kp_pos ⊙ e_p + Kd_pos ⊙ e_v   (a_r ≈ 0 in v1)",
+                "  horizontal a_des clamped so tilt ≤ max_tilt_rad",
+                "Collective thrust + desired attitude (NED z+ down):",
+                "  f_i = m (a_des − g e_z)   # inertial thrust force",
+                "  F = clip(‖f_i‖, F_min, F_max),   b₃_des ∥ −f_i",
+                "  R_des from b₃_des and ψ_r (yaw)",
+                "SO(3) + rate NDI (Euler equation inverse):",
+                "  e_R = vee(log(R_desᵀ R)),   e_ω = ω  (ω_des ≈ 0, memoryless / RK45-safe)",
+                "  α_des = −I⁻¹ (K_R ⊙ e_R + K_ω ⊙ e_ω)   # K_* are torque-space gains",
+                "  τ = ω × (I ω) + I α_des = ω×Iω − K_R e_R − K_ω e_ω",
+                "  u = saturate([F, τ]ᵀ)",
+                "Inversion model: vacuum_rigid_body (no aero/motors in inverse).",
+            ],
+        )
     return _equations_payload(
         f"Controller type: {ctype or 'unknown'}",
         ["See study controller: block and control export artifact."],
@@ -567,6 +587,8 @@ def _details_controller(
             equation = "u = u_h − K e"
         elif equation is None and ctype == "pid_cascade":
             equation = "cascade: a_cmd → F, tilt; τ = Kp e_att − Kd ω"
+        elif equation is None and ctype == "ndi_cascade":
+            equation = "NDI: F from a_des; τ = ω×Iω + I α_des"
     design = art.get("design") if isinstance(art.get("design"), dict) else None
     vehicle_trim = None
     if isinstance(art.get("vehicle"), dict):
@@ -605,6 +627,18 @@ def _gains_from_controller_cfg(cfg: dict[str, Any], ctype: Any) -> dict[str, Any
             g["R_diag"] = cfg["R_diag"]
         if "K" in cfg:
             g["K"] = cfg["K"]
+        return g or None
+    if t == "ndi_cascade" or ("k_R" in cfg and "k_omega" in cfg):
+        keys = (
+            "kp_pos",
+            "kd_pos",
+            "k_R",
+            "k_omega",
+            "max_tilt_rad",
+            "invert_model",
+            "f_min_frac_hover",
+        )
+        g = {k: cfg[k] for k in keys if k in cfg}
         return g or None
     if t == "pid_cascade" or any(k.startswith("kp_") for k in cfg):
         keys = (
@@ -825,6 +859,7 @@ def _node_controller(d: dict[str, Any]) -> dict[str, Any]:
     titles = {
         "lqr_hover": "Hover LQR",
         "pid_cascade": "PID cascade",
+        "ndi_cascade": "Cascade NDI",
     }
     title = titles.get(str(ctype), str(ctype).replace("_", " "))
     summary = d.get("equation") or str(ctype)
