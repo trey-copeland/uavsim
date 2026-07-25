@@ -4508,6 +4508,32 @@
             e("h1", null, displayTitle),
             e("p", { className: "value-prop" }, valueProp),
             e(
+              "nav",
+              {
+                className: "site-demos",
+                "aria-label": "uavsim demos",
+              },
+              e("span", { className: "site-demos-label" }, "Demos"),
+              e(
+                "a",
+                {
+                  href: "./",
+                  className: "site-demo-link is-current",
+                  "aria-current": "page",
+                },
+                "Portfolio showcase"
+              ),
+              e(
+                "a",
+                {
+                  href: "./intercept/",
+                  className: "site-demo-link",
+                  title: "Online intercept · pad climb · MEKF · plant MC",
+                },
+                "Intercept dashboard"
+              )
+            ),
+            e(
               "button",
               {
                 type: "button",
@@ -4533,6 +4559,17 @@
                     "p",
                     { className: "desktop-note" },
                     "Best on a wide display — the matrix and envelope tables are dense by design."
+                  ),
+                  e(
+                    "p",
+                    { className: "desktop-note" },
+                    "Also on this site: ",
+                    e(
+                      "a",
+                      { href: "./intercept/" },
+                      "intercept dashboard"
+                    ),
+                    " (online pursue, battery, plant MC)."
                   )
                 )
               : null
@@ -4605,7 +4642,13 @@
       e(
         "footer",
         { className: "footer" },
-        "Simulation only — not flight software. Source: ",
+        "Simulation only — not flight software. ",
+        e(
+          "a",
+          { href: "./intercept/" },
+          "Intercept dashboard"
+        ),
+        " · Source: ",
         e(
           "a",
           { href: "https://github.com/trey-copeland/uavsim" },

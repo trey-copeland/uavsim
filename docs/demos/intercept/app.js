@@ -329,6 +329,11 @@
         <header class="app-header">
           <h1>${escapeHtml(title)}</h1>
           <p class="tagline">${escapeHtml(valueProp)}</p>
+          <nav class="site-demos" aria-label="uavsim demos">
+            <span class="site-demos-label">Demos</span>
+            <a class="site-demo-link" href="../">Portfolio showcase</a>
+            <a class="site-demo-link is-current" href="./" aria-current="page">Intercept dashboard</a>
+          </nav>
           <div class="meta">
             generated ${escapeHtml(demo.generated_at || "—")}
             · uavsim ${escapeHtml(demo.uavsim_version || "—")}
@@ -482,7 +487,8 @@
 
       <footer>
         Simulation only — not flight software.
-        · <a href="../../../README.md">uavsim README</a>
+        · <a href="../">Portfolio showcase</a>
+        · <a href="https://github.com/trey-copeland/uavsim">Source</a>
         · data: <code>data/demo.json</code>
         · rebuild: see <a href="./README.md">demo README</a>
       </footer>
