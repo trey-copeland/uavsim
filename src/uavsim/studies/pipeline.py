@@ -13,7 +13,7 @@ from uavsim.control.factory import build_controller_from_mapping, controller_art
 from uavsim.control.lqr import LqrHoverController
 from uavsim.control.ndi import NdiCascadeController
 from uavsim.control.pid import PidCascadeController
-from uavsim.guidance import HoldGuidance, WaypointsGuidance
+from uavsim.guidance import HoldGuidance, InterceptPursueGuidance, WaypointsGuidance
 from uavsim.metrics import compute_metrics
 from uavsim.monte_carlo import (
     partition_trials,
@@ -33,9 +33,10 @@ from uavsim.results import (
     write_yaml,
 )
 from uavsim.sim import InProcessControllerAdapter, SimPlant, simulate_closed_loop
-from uavsim.sim.closed_loop import ClosedLoopResult
+from uavsim.sim.closed_loop import ClosedLoopResult, GuidanceLoop
 from uavsim.studies.config import (
     HoldGuidanceConfig,
+    InterceptPursueGuidanceConfig,
     StudyConfig,
     WaypointsGuidanceConfig,
     guidance_mission_dict,
@@ -70,6 +71,8 @@ class PreparedStudy:
     feasibility: Any
     plan_diagnostics: dict[str, Any]
     x0: np.ndarray
+    guidance_backend: Any | None = None
+    guidance_mission: dict[str, Any] | None = None
 
 
 def _build_guidance(cfg: StudyConfig) -> Any:
@@ -83,6 +86,19 @@ def _build_guidance(cfg: StudyConfig) -> Any:
             sample_dt_s=g.sample_dt_s,
             fail_on_infeasible=g.fail_on_infeasible,
         )
+    if isinstance(g, InterceptPursueGuidanceConfig):
+        return InterceptPursueGuidance(
+            replan_period_s=g.replan_period_s,
+            replan_start_s=g.replan_start_s,
+            lead_time_s=g.lead_time_s,
+            capture_radius_m=g.capture_radius_m,
+            horizon_s=g.horizon_s,
+            sample_dt_s=g.sample_dt_s,
+            seed_method=g.seed_method,
+            yaw_mode=g.yaw_mode,
+            state_source=g.state_source,
+            fail_on_infeasible=g.fail_on_infeasible,
+        )
     msg = f"Unsupported guidance type: {type(g)}"
     raise TypeError(msg)
 
@@ -91,7 +107,8 @@ def prepare_study(cfg: StudyConfig, vehicle_path: Path, cfg_hash: str) -> Prepar
     vehicle = load_vehicle(vehicle_path)
     controller = build_controller_from_mapping(cfg.controller, vehicle)
     backend = _build_guidance(cfg)
-    plan = backend.plan(guidance_mission_dict(cfg), vehicle)
+    mission = guidance_mission_dict(cfg)
+    plan = backend.plan(mission, vehicle)
     reference = plan.reference
     if cfg.initial_state is not None:
         x0 = cfg.initial_state.to_array()
@@ -107,6 +124,8 @@ def prepare_study(cfg: StudyConfig, vehicle_path: Path, cfg_hash: str) -> Prepar
         feasibility=plan.feasibility,
         plan_diagnostics=plan.diagnostics,
         x0=x0,
+        guidance_backend=backend,
+        guidance_mission=mission,
     )
 
 
@@ -129,29 +148,59 @@ def run_closed_loop_trial(
     # Observer on *nominal* vehicle (same story as redesign_controller=false):
     # fixed filter model, plant may be mass/inertia-perturbed in MC.
     observer, meas_model = build_observer(cfg.sim.observer, prepared.vehicle_nominal)
+
+    guidance_loop: GuidanceLoop | None = None
+    if isinstance(cfg.guidance, InterceptPursueGuidanceConfig):
+        backend = _build_guidance(cfg)
+        mission = prepared.guidance_mission or guidance_mission_dict(cfg)
+        plan = backend.plan(mission, prepared.vehicle_nominal)
+        adapter.set_reference(plan.reference)
+        guidance_loop = GuidanceLoop(
+            backend=backend,
+            mission=mission,
+            vehicle=prepared.vehicle_nominal,
+            replan_period_s=float(cfg.guidance.replan_period_s),
+            state_source=str(cfg.guidance.state_source),
+        )
+
+    t0 = float(adapter.reference.t0)
+    tf = float(adapter.reference.tf)
+    if isinstance(cfg.guidance, InterceptPursueGuidanceConfig) and cfg.guidance.duration_s:
+        tf = max(tf, float(cfg.guidance.duration_s))
+
     sim_result = simulate_closed_loop(
         plant,
         adapter,
-        t0=prepared.reference.t0,
-        tf=prepared.reference.tf,
+        t0=t0,
+        tf=tf,
         x0=prepared.x0,
         max_step=cfg.sim.dt_s,
         rtol=cfg.sim.rtol,
         atol=cfg.sim.atol,
         observer=observer,
         measurement_model=meas_model,
+        guidance_loop=guidance_loop,
     )
     metrics = compute_metrics(
         sim_result.t,
         sim_result.x,
         sim_result.u,
-        prepared.reference,
+        adapter.reference,
         position_bound_m=cfg.metrics.position_bound_m,
+        # Per-tick commanded x_r (survives online replan; do not re-eval last segment only)
+        x_ref=sim_result.x_ref,
     )
     metrics["sim_success"] = sim_result.success
     metrics["sim_message"] = sim_result.message
     metrics["observer_id"] = sim_result.observer_id
     metrics["sim_attitude"] = sim_result.attitude
+    if sim_result.replan_log is not None:
+        metrics["n_replans"] = len(sim_result.replan_log)
+    _maybe_add_capture_metrics(metrics, sim_result.t, sim_result.x, cfg)
+    from uavsim.vehicles.battery import battery_metrics, integrate_battery
+
+    bat_series = integrate_battery(sim_result.t, sim_result.u, plant_vehicle)
+    metrics.update(battery_metrics(bat_series))
     if sim_result.x_hat is not None and sim_result.x is not None:
         from uavsim.dynamics.attitude_error import geodesic_attitude_error_rad
 
@@ -167,7 +216,20 @@ def run_closed_loop_trial(
     return sim_result, metrics
 
 
-def _write_reference_artifacts(run_dir: Path, prepared: PreparedStudy) -> None:
+def _write_reference_artifacts(
+    run_dir: Path,
+    prepared: PreparedStudy,
+    *,
+    commanded_t: np.ndarray | None = None,
+    commanded_x_ref: np.ndarray | None = None,
+) -> None:
+    """Write reference artifacts for viz / provenance.
+
+    When ``commanded_x_ref`` is provided (closed-loop log of the sample used at
+    each control tick), write that grid so Flight 3D / RMSE overlays match the
+    controller under online replan. Otherwise fall back to the prepared plan
+    reference (correct for fixed open-loop trajectories).
+    """
     reference = prepared.reference
     write_yaml(
         run_dir / "guidance" / "backend.yaml",
@@ -183,7 +245,39 @@ def _write_reference_artifacts(run_dir: Path, prepared: PreparedStudy) -> None:
         run_dir / "guidance" / "feasibility.json",
         prepared.feasibility.to_dict(),
     )
-    if isinstance(reference, SampledReference):
+
+    t_cmd = x_cmd = None
+    if commanded_t is not None and commanded_x_ref is not None:
+        t_cmd = np.asarray(commanded_t, dtype=float).reshape(-1)
+        x_cmd = np.asarray(commanded_x_ref, dtype=float)
+        if t_cmd.size < 2 or x_cmd.shape[0] != t_cmd.size:
+            t_cmd = x_cmd = None
+
+    if t_cmd is not None and x_cmd is not None:
+        write_json(
+            run_dir / "reference" / "sampled.json",
+            {
+                "backend_id": reference.backend_id,
+                "t0": float(t_cmd[0]),
+                "tf": float(t_cmd[-1]),
+                "n_samples": int(t_cmd.size),
+                "dt_s": float(np.mean(np.diff(t_cmd))) if t_cmd.size > 1 else None,
+                "metadata": {
+                    **(reference.metadata or {}),
+                    "commanded_reference_source": "closed_loop_samples",
+                    "note": (
+                        "Piecewise commanded x_r at each sim sample "
+                        "(online replan safe; not the final segment alone)"
+                    ),
+                },
+            },
+        )
+        np.savez_compressed(
+            run_dir / "reference" / "grid.npz",
+            t=t_cmd,
+            x=x_cmd,
+        )
+    elif isinstance(reference, SampledReference):
         write_json(
             run_dir / "reference" / "sampled.json",
             {
@@ -212,6 +306,44 @@ def _write_reference_artifacts(run_dir: Path, prepared: PreparedStudy) -> None:
         )
 
 
+def _maybe_add_capture_metrics(
+    metrics: dict[str, Any],
+    t: np.ndarray,
+    x: np.ndarray,
+    cfg: StudyConfig,
+) -> None:
+    """If study metrics name a target mission, record min range / capture flag."""
+    path = getattr(cfg.metrics, "capture_target_mission", None)
+    radius = float(getattr(cfg.metrics, "capture_radius_m", 1.0))
+    if not path and isinstance(cfg.guidance, InterceptPursueGuidanceConfig):
+        path = cfg.guidance.target_mission_file
+        radius = float(cfg.guidance.capture_radius_m)
+    if not path:
+        return
+    from uavsim.guidance.waypoints.backend import WaypointsGuidance
+
+    backend = WaypointsGuidance(method="interp", yaw_mode="from_waypoints", sample_dt_s=0.01)
+    plan = backend.plan({"mission_file": str(path)}, prepared_vehicle_for_capture(cfg))
+    p_t = np.vstack([plan.reference.evaluate(float(ti)).x_ref[0:3] for ti in t])
+    range_m = np.linalg.norm(x[:, 0:3] - p_t, axis=1)
+    i_min = int(np.argmin(range_m))
+    min_range = float(range_m[i_min])
+    metrics["min_range_m"] = min_range
+    metrics["time_of_min_range_s"] = float(t[i_min])
+    metrics["capture_radius_m"] = radius
+    metrics["intercept_success"] = bool(min_range <= radius)
+
+
+def prepared_vehicle_for_capture(cfg: StudyConfig):
+    """Load nominal vehicle for target planning (mass-independent trajectory)."""
+    from uavsim.vehicles.params import default_vehicle, load_vehicle
+
+    try:
+        return load_vehicle(cfg.vehicle)
+    except Exception:
+        return default_vehicle()
+
+
 def _metric_row(metrics: dict[str, Any]) -> dict[str, Any]:
     """Flatten metrics for trial tables (skip nested/large fields)."""
     keys = (
@@ -225,9 +357,21 @@ def _metric_row(metrics: dict[str, Any]) -> dict[str, Any]:
         "control_effort_proxy",
         "peak_thrust_n",
         "peak_torque_nm",
+        "peak_tilt_rad",
         "success",
         "sim_success",
         "sim_message",
+        "min_range_m",
+        "time_of_min_range_s",
+        "capture_radius_m",
+        "intercept_success",
+        "soc_final",
+        "soc_min",
+        "energy_used_wh",
+        "energy_depleted",
+        "peak_power_w",
+        "battery_enabled",
+        "n_replans",
     )
     return {k: metrics[k] for k in keys if k in metrics}
 
@@ -504,13 +648,21 @@ def run_nominal_study(
 
     run_dir = create_run_directory(output_root, cfg.study_id)
     write_yaml(run_dir / "study_config.yaml", cfg.model_dump())
-    _write_reference_artifacts(run_dir, prepared)
+    _write_reference_artifacts(
+        run_dir,
+        prepared,
+        commanded_t=sim_result.t,
+        commanded_x_ref=sim_result.x_ref,
+    )
     write_nominal_timeseries(
         run_dir,
         sim_result.t,
         sim_result.x,
         sim_result.u,
         x_hat=sim_result.x_hat,
+        power_w=sim_result.power_w,
+        soc=sim_result.soc,
+        energy_wh_remaining=sim_result.energy_wh_remaining,
     )
     write_json(run_dir / "nominal" / "metrics.json", metrics)
     ctrl_summary: dict[str, Any] = {

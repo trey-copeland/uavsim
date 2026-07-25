@@ -24,6 +24,7 @@ YAML fields map 1:1 to the Pydantic model `VehicleParams`:
 | `limits.torque_max_nm` | Symmetric body torque limit on each axis | N·m |
 | `propulsion.*` | Mixer / motors (`ct`, `cq`, τ_m, ω limits) | see default YAML |
 | `aero.*` | Optional drag / prop H / ground effect (**off** by default) | see [dynamics.md](dynamics.md) |
+| `battery.*` | Optional energy bookkeeping (**off** by default) | see below |
 
 Helpers on the loaded model:
 
@@ -108,11 +109,26 @@ print(v.mass_kg, v.u_hover())
 | Gap | Why it matters | Status |
 |-----|----------------|--------|
 | Off-diagonal inertia products | Real CAD inertia tensors | **TODO** — model is diagonal-only |
-| Battery / extra mission params | Endurance studies | **TODO** — `extra="forbid"` until schema extended |
+| Battery / energy bookkeeping | Endurance / intercept demos | **Done** — opt-in `battery:` (`enabled: false` default); proxy power map; no cell physics / thrust derate |
 | Propulsion `ct` / `cq` / motor τ / ω limits | Mixer + motor plant | **Done** — optional `propulsion:` block |
 | Aero drag / prop H / ground effect | Nonlinear \(f\) | **Done** — `aero:` defaults off; demos `*_aero.yaml`, `*_ge.yaml` |
 | Control allocation / mixer | Map wrench ↔ motor forces; arm length used | **Done** — `sim.plant: motors` |
 | Multi-vehicle / heterogeneous fleets | Formation, different platforms | **Out of core scope** |
 | Validation \(F_\max \ge mg\) as hard error | Catch bad configs early | **TODO** (soft today) |
+
+### Battery (opt-in)
+
+```yaml
+battery:
+  enabled: true
+  capacity_wh: 8.0
+  initial_soc: 1.0
+  model: hover_scaled          # P = idle + P_hover * (F / mg)^k
+  hover_power_w: 220.0
+  thrust_power_exp: 1.5
+  idle_power_w: 8.0
+```
+
+When enabled, closed-loop attaches `soc`, `power_w`, `energy_wh_remaining` to `timeseries.npz` and metrics (`soc_final`, `energy_depleted`, …). **Does not** derate thrust when empty (log / fail flag only).
 
 See also [EXTENSIBILITY_TODO.md](EXTENSIBILITY_TODO.md).

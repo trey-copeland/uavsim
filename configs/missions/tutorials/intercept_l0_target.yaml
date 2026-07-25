@@ -1,0 +1,9 @@
+# Scripted point-mass target at cruise altitude z=1.0 (ownship climbs from pad).
+# v = [0, 5, 0] m/s. CPA with ownship design: t=5 → [20, 10, 1].
+schema_version: 1
+name: intercept_l0_target
+frame: NED
+waypoints:
+  - {label: t0, time: 0.0, x: 20.0, y: -15.0, z: 1.0, yaw: 1.5708}
+  - {label: t4, time: 4.0, x: 20.0, y: 5.0, z: 1.0, yaw: 1.5708}
+  - {label: t10, time: 10.0, x: 20.0, y: 35.0, z: 1.0, yaw: 1.5708}

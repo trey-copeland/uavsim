@@ -72,7 +72,7 @@ Demos: GPS+IMU / AHRS / **flow+alt** / IMU-only matrix; `figure_eight_mekf.yaml`
 | G-3 | `register_guidance` registry | **Done** | |
 | G-4 | Study config open to registered backends only via registry | **Partial** | Pipeline **hard-codes** hold/waypoints |
 | G-5 | Drive `_build_guidance` from registry + pydantic plugins | **TODO** | High leverage |
-| G-6 | `guidance.update` in closed-loop sim | **TODO** | Protocol only |
+| G-6 | `guidance.update` in closed-loop sim | **Done** | `GuidanceLoop` + `intercept_pursue`; fixed-step rebind |
 | G-7 | First non-waypoint backend (geometric) | **TODO** | Phase 6 |
 | G-8 | Multi-segment / mixed backends | **TODO** | |
 | G-9 | Swappable min-snap QP (CasADi/OSQP) | **TODO** | Boundary ready |

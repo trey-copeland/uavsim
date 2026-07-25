@@ -49,7 +49,7 @@ Default SIL (`sim.observer.type: none`) has **no measurement noise** and perfect
 
 ### Tracking `success`
 
-Peak position error ≤ **3×** study `position_bound_m` and peak attitude error &lt; 45° (SO(3) geodesic). Older looser floors that marked multi-meter AHRS runs as “success” were removed. Details: `uavsim.metrics.tracking`.
+Peak position error ≤ **3×** study `position_bound_m` and peak attitude error &lt; 45° (SO(3) geodesic), relative to the **commanded** reference samples used by the controller (see Metrics table). Older looser floors that marked multi-meter AHRS runs as “success” were removed. Details: `uavsim.metrics.tracking`.
 
 ---
 
@@ -61,7 +61,8 @@ Peak position error ≤ **3×** study `position_bound_m` and peak attitude error
 | **Attitude feedforward** | Hover-thrust inversion at ψ=0: \(\phi=\mathrm{asin}(a_y/g)\), \(\theta=-\mathrm{asin}(a_x/(g\cos\phi))\). Not full differential flatness / geometric tracking (yaw coupling, variable thrust). |
 | **PID cascade** | Underactuated small-angle outer loop + attitude PD — comparison baseline, not a geometric controller. |
 | **NDI cascade** | Vacuum rigid-body inverse only (no aero/motors in inverse); not INDI / not adaptive; memoryless feedforward (`a_ref`, \(x_r\) rates); tilt cone safety. |
-| **Motors plant** | First-order \(\omega\) lag + X-quad mixer \(f=c_T\omega^2\). No battery, ESC, or inflow dynamics. |
+| **Motors plant** | First-order \(\omega\) lag + X-quad mixer \(f=c_T\omega^2\). No ESC or inflow dynamics. |
+| **Battery** | Opt-in **power proxy** (`hover_scaled`): integrates Wh from thrust command. Not electrochemical; **no thrust derate** when empty (SOC/metrics only). |
 | **Mixer** | Allocation matches FRD \(r \times [0,0,-f]\) for the documented motor map; reaction yaw via \(c_Q/c_T\). Self-consistent SIL; not a drop-in for every airframe mixer. |
 | **Aero / GE** | Opt-in, teaching-scale coeffs. LQR linearization includes **linear** drag/rate damping only; quadratic drag, prop H, and ground-effect \(\kappa\) are **not** in \(A,B\). Hover with GE is not trimmed at \(mg\). |
 | **Flexible body / multi-rotor families** | Not implemented (see backlog). |
@@ -80,6 +81,8 @@ Peak position error ≤ **3×** study `position_bound_m` and peak attitude error
 | **`partial_raw`** | Unmeasured states set to **0** — deliberate bad baseline. |
 | **`mekf`** | Error-state / multiplicative attitude path for demos. The discrete error-state \(F\) is **simplified**: position–velocity coupling and attitude kinematics are present, but the **thrust-tilt block** \(\delta\dot v \leftarrow -R[0,0,-F/m]\times\delta\theta\) is omitted (hover-teaching filter, not full multiplicative EKF). Accel-aided / true IMU physics is backlog (**EST-8**). |
 | **Min-snap guidance** | Mellinger-style per-axis QP in code; not independently re-derived against an external reference solver in CI. |
+| **Online intercept (`intercept_pursue`)** | Scripted **target** (not a second plant). Lead-point CV prediction + short linear segments; not PN / clutter / target estimation. Replan uses truth or \(\hat x\) per config. |
+| **Intercept capture metric** | Success = \(\min_t \|p-p_{\mathrm{tgt}}\| \le r\) (default 1 m). **Independent of tracking RMSE / `success`.** Do not equate capture with path-tracking pass/fail. |
 
 ---
 
@@ -87,11 +90,14 @@ Peak position error ≤ **3×** study `position_bound_m` and peak attitude error
 
 | Topic | Limitation |
 |-------|------------|
-| **RMSE / success** | Relative to the **reference trajectory** and the **plant as modeled**. Cross-run comparisons need the same mission, vehicle, and code revision. |
+| **RMSE / tracking `success`** | Diff vs the **commanded** \(x_r\) at each control sample (logged through the adapter), and the **plant as modeled**. For fixed open-loop missions this matches re-evaluating the plan trajectory. For **online replan**, metrics use the piecewise commanded reference — **not** a post-hoc evaluate of the *final* segment alone (that path clamps out-of-range \(t\) and was historically garbage). Flag `tracking_vs_commanded_reference` is true when the log was used. Cross-run comparisons still need the same mission, vehicle, and code revision. |
+| **Tracking vs intercept** | Online pursue can have modest tracking RMSE (lag/overshoot on short segments) while `intercept_success` is true, or the reverse under bad geometry. **Capture KPIs** (`min_range_m`, `intercept_success`) are the intercept story; tracking metrics diagnose controller–segment quality (plan G3), not capture. |
 | **Estimate attitude RMSE** | SO(3) geodesic angle between \(\hat x\) and truth (not raw Euler subtraction). |
 | **Monte Carlo** | Parameter scatter (mass / inertia / arm, etc.) as configured — not a full uncertainty budget. |
 | **MC observer model** | With default `redesign_controller: false`, the **controller and the observer** are built on the **nominal** vehicle; only the **plant** is perturbed. That matches “fixed law + fixed filter model, uncertain plant.” If the observer were redesigned on the trial vehicle, LQG MC would understate model mismatch. |
 | **Showcase JSON** | Built by `uavsim gallery` from study configs. **Can lag code** after plant/control fixes; rebuild before external demos. |
+| **Intercept demo pack** | Static `docs/demos/intercept/data/demo.json` from offline export; rebuild after online MC / mission changes. Shipped packs may still show pre-fix tracking RMSE (~30 m class) until re-exported — trust **P(capture) / `intercept_success`** for the capture story. MC bands are plant re-sims (median path + horizontal radius percentiles), not sensor noise clouds. |
+| **Battery empty** | SOC / energy metrics only — **no thrust derate or crash model** when depleted (see plant table). Underpowered “fail” cases are geometry/authority stories, not fuel-cut plant failures. |
 | **Docker MC** | Image must match the tree under test (stale images produce misleading “extra” failures). |
 
 ---

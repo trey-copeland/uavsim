@@ -3,12 +3,25 @@
 **Software-in-the-loop (SIL) quadrotor GNC** — configure a vehicle and mission, close the loop with **LQR**, cascade **PID**, or cascade **NDI**, run Monte Carlo, estimate state with optional KF/MEKF, and compare runs. Portfolio-grade analysis report (GitHub Pages showcase). Not flight-critical software.
 
 <p align="center">
-  <img src="docs/uavsim.gif" alt="uavsim closed-loop figure-eight Flight 3D showcase" width="720" />
+  <a href="https://trey-copeland.github.io/uavsim/">
+    <img src="docs/uavsim.gif" alt="uavsim portfolio showcase — figure-eight Flight 3D (click for live showcase)" width="720" />
+  </a>
+  <br />
+  <sub><a href="https://trey-copeland.github.io/uavsim/"><strong>Live portfolio showcase</strong></a> — controller × sensor matrix, Flight 3D, MC, envelope</sub>
+</p>
+
+<p align="center">
+  <a href="https://trey-copeland.github.io/uavsim/intercept/">
+    <img src="docs/demo-intercept.gif" alt="uavsim intercept demo — pad climb, online pursue, MC cloud (click for live dashboard)" width="720" />
+  </a>
+  <br />
+  <sub><a href="https://trey-copeland.github.io/uavsim/intercept/"><strong>Live intercept dashboard</strong></a> — online G-6 pursue, MEKF, battery, plant MC · <a href="docs/tutorials/01_online_intercept.md">tutorial</a></sub>
 </p>
 
 | | |
 |--|--|
-| **Live results showcase** | **[trey-copeland.github.io/uavsim](https://trey-copeland.github.io/uavsim/)** |
+| **Live portfolio showcase** | **[trey-copeland.github.io/uavsim](https://trey-copeland.github.io/uavsim/)** |
+| **Live intercept dashboard** | **[…/uavsim/intercept/](https://trey-copeland.github.io/uavsim/intercept/)** |
 | **Install** | Python 3.11+ · [uv](https://docs.astral.sh/uv/) · `uv sync --extra dev` |
 | **Heritage** | Redesign of **[quad_uav](https://github.com/trey-copeland/quad_uav)** (ME590 MATLAB) — not a line-for-line port |
 | **License** | [MIT](LICENSE) |
@@ -29,6 +42,7 @@
 
 ### Guidance
 - **Hold** and **waypoint** missions (interp / min-snap / auto)
+- **Online intercept** (`intercept_pursue`, G-6 replan) toward a scripted target — [tutorial](docs/tutorials/01_online_intercept.md)
 - Feasibility checks (yaw rates, trajectory stress cases)
 - Config-driven missions under `configs/missions/` — [guidance guide](docs/developer/guidance.md)
 
@@ -109,6 +123,8 @@ uv run uavsim --help
 | [Extensibility backlog](docs/developer/EXTENSIBILITY_TODO.md) | What works today vs TODO |
 | [Visualization](docs/viz.md) | Report figure pack (§11A) |
 | [Showcase / Pages](docs/showcase/README.md) | React demo hosting + study matrix |
+| [Tutorials](docs/tutorials/README.md) | Online intercept + battery guides |
+| [Intercept demo](docs/demos/intercept/README.md) | SPA + export pack for `/intercept/` |
 | [Containers](docs/containers.md) | Docker + sharded MC |
 
 ### Process
@@ -120,21 +136,21 @@ uv run uavsim --help
 
 ---
 
-## Live showcase
+## Live showcase & demos
 
-Interactive React rollup of the portfolio studies (controller × sensor matrix, multi-mission stress, plant fidelity, **LQR / PID / NDI**, envelope, MC):
+**→ [Open the live showcase](https://trey-copeland.github.io/uavsim/)** · **[Open the intercept dashboard](https://trey-copeland.github.io/uavsim/intercept/)**
 
-**→ [Open the live showcase](https://trey-copeland.github.io/uavsim/)**
+| | Portfolio showcase | Intercept dashboard |
+|--|--------------------|---------------------|
+| **Preview** | [`docs/uavsim.gif`](docs/uavsim.gif) (linked above) | [`docs/demo-intercept.gif`](docs/demo-intercept.gif) (linked above) |
+| **Live** | [trey-copeland.github.io/uavsim](https://trey-copeland.github.io/uavsim/) | […/uavsim/intercept/](https://trey-copeland.github.io/uavsim/intercept/) |
+| **Local** | `python -m http.server 8765 --directory docs/showcase` | `python -m http.server 8765 --directory docs/demos/intercept` |
+| **Source** | [`docs/showcase/`](docs/showcase/) | [`docs/demos/intercept/`](docs/demos/intercept/) |
+| **How-to** | [showcase README](docs/showcase/README.md) | [tutorials](docs/tutorials/README.md) · [demo README](docs/demos/intercept/README.md) |
+| **Pages CI** | [`.github/workflows/pages-site.yml`](.github/workflows/pages-site.yml) publishes **both** | same |
 
-| | |
-|--|--|
-| **Live** | [trey-copeland.github.io/uavsim](https://trey-copeland.github.io/uavsim/) |
-| **Local** | `python -m http.server 8765 --directory docs/showcase` → http://127.0.0.1:8765/ |
-| **Regenerate** | `uv run uavsim gallery --base-case` · source in [`docs/showcase/`](docs/showcase/) |
-
-**Missions:** baseline · near-envelope (τ★) · hi-fi plant · law-compare (aggressive aero+quat).  
-**Tabs:** overview matrix · estimation · Flight 3D · System · metrics · MC · envelope · compare.  
-Details: [showcase README](docs/showcase/README.md).
+**Showcase:** controller × sensor matrix, multi-mission stress, plant fidelity, **LQR / PID / NDI**, envelope, MC — Flight 3D · System · metrics · envelope · compare.  
+**Intercept:** pad climb + GE, **online** `intercept_pursue`, MEKF, battery SOC, plant MC cloud — [T-GUIDE-ONLINE](docs/tutorials/01_online_intercept.md).
 
 ---
 

@@ -9,12 +9,15 @@ from uavsim.guidance.base import (
     register_guidance,
 )
 from uavsim.guidance.hold import HoldGuidance
+from uavsim.guidance.intercept import InterceptPursueGuidance  # noqa: F401 — register
+from uavsim.guidance.intercept import backend as _intercept_backend  # noqa: F401
 from uavsim.guidance.waypoints import WaypointsGuidance, load_mission
 from uavsim.guidance.waypoints import backend as _wp_backend  # noqa: F401 — register
 
 __all__ = [
     "GuidanceBackend",
     "HoldGuidance",
+    "InterceptPursueGuidance",
     "PlanResult",
     "WaypointsGuidance",
     "create_guidance",

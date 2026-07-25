@@ -64,12 +64,21 @@ def write_nominal_timeseries(
     u: np.ndarray,
     *,
     x_hat: np.ndarray | None = None,
+    power_w: np.ndarray | None = None,
+    soc: np.ndarray | None = None,
+    energy_wh_remaining: np.ndarray | None = None,
 ) -> Path:
-    """Write nominal timeseries. Optional ``x_hat`` is the observer estimate."""
+    """Write nominal timeseries. Optional ``x_hat`` / battery series when present."""
     path = run_dir / "nominal" / "timeseries.npz"
     payload: dict[str, Any] = {"t": t, "x": x, "u": u}
     if x_hat is not None:
         payload["x_hat"] = np.asarray(x_hat, dtype=float)
+    if power_w is not None:
+        payload["power_w"] = np.asarray(power_w, dtype=float)
+    if soc is not None:
+        payload["soc"] = np.asarray(soc, dtype=float)
+    if energy_wh_remaining is not None:
+        payload["energy_wh_remaining"] = np.asarray(energy_wh_remaining, dtype=float)
     np.savez_compressed(path, **payload)
     return path
 

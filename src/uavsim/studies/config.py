@@ -78,8 +78,29 @@ class WaypointsGuidanceConfig(BaseModel):
     fail_on_infeasible: bool = False
 
 
+class InterceptPursueGuidanceConfig(BaseModel):
+    """Online lead-point intercept (G-6); seed + scripted target mission files."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["intercept_pursue"] = "intercept_pursue"
+    seed_mission_file: str
+    target_mission_file: str
+    replan_period_s: float = Field(default=0.2, gt=0)
+    replan_start_s: float = Field(default=2.5, ge=0)
+    lead_time_s: float = Field(default=1.5, ge=0)
+    capture_radius_m: float = Field(default=1.0, gt=0)
+    horizon_s: float = Field(default=3.0, gt=0)
+    sample_dt_s: float = Field(default=0.01, gt=0)
+    duration_s: float | None = Field(default=None, gt=0)
+    seed_method: Literal["auto", "interp", "minsnap"] = "minsnap"
+    yaw_mode: Literal["constant", "path_tangent", "from_waypoints"] = "from_waypoints"
+    state_source: Literal["truth", "estimate"] = "truth"
+    fail_on_infeasible: bool = False
+
+
 GuidanceConfig = Annotated[
-    HoldGuidanceConfig | WaypointsGuidanceConfig,
+    HoldGuidanceConfig | WaypointsGuidanceConfig | InterceptPursueGuidanceConfig,
     Field(discriminator="type"),
 ]
 
@@ -122,6 +143,9 @@ class MetricsConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     position_bound_m: float = Field(gt=0, default=0.1)
+    # Optional intercept / pursuit capture metrics vs a scripted target mission
+    capture_target_mission: str | None = None
+    capture_radius_m: float = Field(default=1.0, gt=0)
 
 
 class InitialStateConfig(BaseModel):
@@ -211,6 +235,14 @@ def load_study(path: str | Path) -> tuple[StudyConfig, Path, str, Path | None]:
         mission_path = _resolve_path(cfg.guidance.mission_file, path.parent)
         # Rewrite so pipeline can open a real path
         cfg.guidance.mission_file = str(mission_path)
+    if isinstance(cfg.guidance, InterceptPursueGuidanceConfig):
+        cfg.guidance.seed_mission_file = str(
+            _resolve_path(cfg.guidance.seed_mission_file, path.parent)
+        )
+        cfg.guidance.target_mission_file = str(
+            _resolve_path(cfg.guidance.target_mission_file, path.parent)
+        )
+        mission_path = Path(cfg.guidance.seed_mission_file)
     cfg_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
     return cfg, vehicle_path, cfg_hash, mission_path
 
@@ -226,5 +258,19 @@ def guidance_mission_dict(cfg: StudyConfig) -> dict[str, Any]:
         }
     if isinstance(g, WaypointsGuidanceConfig):
         return {"mission_file": g.mission_file}
+    if isinstance(g, InterceptPursueGuidanceConfig):
+        out: dict[str, Any] = {
+            "seed_mission_file": g.seed_mission_file,
+            "target_mission_file": g.target_mission_file,
+            "replan_period_s": g.replan_period_s,
+            "replan_start_s": g.replan_start_s,
+            "lead_time_s": g.lead_time_s,
+            "capture_radius_m": g.capture_radius_m,
+            "horizon_s": g.horizon_s,
+            "state_source": g.state_source,
+        }
+        if g.duration_s is not None:
+            out["duration_s"] = g.duration_s
+        return out
     msg = f"Unsupported guidance config type: {type(g)}"
     raise TypeError(msg)

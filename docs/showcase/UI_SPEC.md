@@ -279,7 +279,7 @@ If the builder cannot assemble provenance, gallery may set `stack: null` / omit 
 | Smoke | `--n-mc-trials N --skip-envelope` and/or `--skip-edge-mission` |
 | Local serve | `python -m http.server 8765 --directory docs/showcase` |
 | Cache bust | Query string on `app.js` / `styles.css` in `index.html` (bump on SPA edits) |
-| Pages | `.github/workflows/pages-showcase.yml` → `gh-pages` |
+| Pages | `.github/workflows/pages-site.yml` → `gh-pages` |
 
 **Stale-data risk:** `showcase.json` can lag code. Rebuild before demos ([LIMITATIONS.md](../LIMITATIONS.md)).
 

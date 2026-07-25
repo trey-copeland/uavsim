@@ -1,0 +1,55 @@
+# Climb-from-pad intercept success + 500-trial plant MC (sharded).
+schema_version: 1
+study_id: intercept_l0_success_mc
+seed: 42
+
+vehicle: configs/vehicles/tutorials/intercept_quadrotor.yaml
+
+controller:
+  type: ndi_cascade
+  kp_pos: [12.0, 12.0, 18.0]
+  kd_pos: [8.0, 8.0, 10.0]
+  k_R: [24.0, 24.0, 6.0]
+  k_omega: [2.0, 2.0, 0.8]
+  max_tilt_rad: 1.45
+  invert_model: vacuum_rigid_body
+  f_min_frac_hover: 0.05
+
+guidance:
+  type: waypoints
+  mission_file: configs/missions/tutorials/intercept_l0_ownship.yaml
+  method: minsnap
+  yaw_mode: from_waypoints
+  sample_dt_s: 0.01
+  fail_on_infeasible: false
+
+sim:
+  dt_s: 0.01
+  method: rk45
+  rtol: 1.0e-5
+  atol: 1.0e-7
+  attitude: quat
+  plant: wrench
+  observer:
+    type: none
+
+metrics:
+  position_bound_m: 1.0
+  capture_target_mission: configs/missions/tutorials/intercept_l0_target.yaml
+  capture_radius_m: 1.0
+
+initial_state:
+  position_ned_m: [0.0, 0.0, 3.05]
+  euler_rad: [0.0, 0.0, 0.0]
+  velocity_ned_m_s: [0.0, 0.0, 0.0]
+  omega_body_rad_s: [0.0, 0.0, 0.0]
+
+monte_carlo:
+  enabled: true
+  n_trials: 500
+  backend: local
+  shards: 8
+  redesign_controller: false
+  mass_rel_sigma: 0.10
+  inertia_rel_sigma: 0.10
+  arm_rel_sigma: 0.02

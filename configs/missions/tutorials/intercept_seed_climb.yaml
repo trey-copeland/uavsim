@@ -1,0 +1,10 @@
+# Seed only: pad + climb to cruise altitude. Online intercept_pursue takes over.
+# NED z+ down; ground_z≈3.10 on intercept vehicle → pad AGL≈0.05 m.
+schema_version: 1
+name: intercept_seed_climb
+frame: NED
+waypoints:
+  - {label: pad, time: 0.0, x: 0.0, y: 0.0, z: 3.05, yaw: 0.0}
+  - {label: lift, time: 1.0, x: 0.0, y: 0.0, z: 2.5, yaw: 0.0}
+  - {label: cruise, time: 2.5, x: 0.0, y: 0.0, z: 1.0, yaw: 0.5}
+  - {label: hold, time: 10.0, x: 0.0, y: 0.0, z: 1.0, yaw: 0.5}

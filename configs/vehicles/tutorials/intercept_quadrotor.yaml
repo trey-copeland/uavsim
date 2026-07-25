@@ -1,0 +1,49 @@
+# Intercept-class X-quadrotor (~1.5 kg, high T/W) with pad GE + battery.
+# NED z+ down: pad near ground_z; climb decreases z (higher AGL).
+schema_version: 1
+vehicle_id: intercept_quadrotor
+
+mass_kg: 1.5
+gravity_m_s2: 9.81
+arm_length_m: 0.32
+
+inertia:
+  ixx_kg_m2: 0.035
+  iyy_kg_m2: 0.035
+  izz_kg_m2: 0.060
+
+# T/W ≈ 4.5
+limits:
+  thrust_min_n: 0.0
+  thrust_max_n: 66.2
+  torque_max_nm: 4.0
+
+propulsion:
+  layout: x
+  ct_n_s2: 1.02e-5
+  cq_nm_s2: 1.6e-7
+  motor_time_const_s: 0.05
+  omega_min_rad_s: 0.0
+  omega_max_rad_s: 1400.0
+
+aero:
+  drag_lin_ns_m: 0.02
+  drag_quad_ns2_m2: 0.0
+  rate_damp_nm_s: 0.001
+  prop_h_s_per_m: 0.0
+  ground_effect: cheeseman
+  rotor_radius_m: 0.12
+  # Pad plane; AGL = ground_z - z. Pad z≈3.05 → AGL≈0.05 m (GE on).
+  ground_z_ned_m: 3.10
+  ge_exp_a: 0.5
+  ge_exp_b: 2.0
+  ge_kappa_max: 3.0
+
+battery:
+  enabled: true
+  capacity_wh: 8.0
+  initial_soc: 1.0
+  model: hover_scaled
+  hover_power_w: 220.0
+  thrust_power_exp: 1.5
+  idle_power_w: 8.0

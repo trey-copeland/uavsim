@@ -7,7 +7,7 @@ Guides for **using** and **extending** `uavsim` without reading the whole tree.
 | [Vehicles](vehicles.md) | Define mass properties, limits, point studies at a vehicle YAML |
 | [Control](control.md) | LQR, PID, **NDI**; SIL artifacts; HIL export TODO |
 | [Airframe families](airframes.md) | Quad today; tilt-rotor / multi-airframe vision; HIL rig tie-in |
-| [Guidance & navigation](guidance.md) | Hold / waypoints, missions, adding a guidance backend |
+| [Guidance & navigation](guidance.md) | Hold / waypoints / **intercept_pursue** (G-6 online), missions, adding a backend |
 | [Dynamics](dynamics.md) | Euler/quat/motors plants, aero/GE, `DynamicsModel`, SO(3); flex next |
 | [Estimation](estimation.md) | KF/MEKF/partial_raw, channels (GPS, AHRS, **flow+alt**), `sim.observer` |
 | [Extensibility backlog](EXTENSIBILITY_TODO.md) | Consolidated **TODOs** (plugins, flex, airframes, HIL) |
@@ -17,6 +17,8 @@ Guides for **using** and **extending** `uavsim` without reading the whole tree.
 | Doc | Role |
 |-----|------|
 | [`docs/LIMITATIONS.md`](../LIMITATIONS.md) | **Scope & known limitations** (interview / portfolio honesty) |
+| [`docs/demos/intercept/`](../demos/intercept/) | Intercept SPA (online pursue + MC + battery); Pages `/intercept/` |
+| [`docs/tutorials/`](../tutorials/) | **T-GUIDE-ONLINE**, **T-ENERGY** (how to run / extend intercept + battery) |
 | [`SPEC.md`](../../SPEC.md) | Requirements and MoSCoW |
 | [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) | Package map, import rules, data flow |
 | [`docs/viz.md`](../viz.md) | Reports and figures |
@@ -26,10 +28,10 @@ Guides for **using** and **extending** `uavsim` without reading the whole tree.
 
 ```text
 Study YAML
-  ├─ vehicle        → VehicleParams (configs/vehicles/)
+  ├─ vehicle        → VehicleParams (configs/vehicles/; optional battery / aero)
   ├─ controller     → Controller protocol (lqr_hover | pid_cascade | ndi_cascade | …)
-  ├─ guidance       → GuidanceBackend.plan → ReferenceTrajectory
-  └─ sim            → plant (wrench|motors × euler|quat) → optional observer → control → metrics
+  ├─ guidance       → plan → ReferenceTrajectory; optional update (G-6 intercept_pursue)
+  └─ sim            → plant → optional observer → control → metrics (+ capture / SOC)
 ```
 
 **Hard rules (do not violate when extending)**
