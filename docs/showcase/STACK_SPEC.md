@@ -145,7 +145,8 @@ Prefer **`nominal/controller_artifact.yaml`** when present; else study `controll
 | `gains` | LQR: `{K, Q_diag, R_diag}`; PID: kp/kd blocks |
 | `design` | LQR poles if present |
 | `vehicle_trim` | mass, arm, inertia snapshot if in artifact |
-| `equation` | short string for UI caption |
+| `equation` | short one-line caption |
+| `equations` | `{caption, lines[]}` — full control law (CARE / cascade) |
 
 ### 2.7 `details.actuators`
 
