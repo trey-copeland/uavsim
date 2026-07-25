@@ -563,6 +563,7 @@ select, input[type="range"] {
 .badge.ahrs { background: #1e3040; color: #9ec8e8; }
 .badge.weak { background: #3a3020; color: #d0b090; }
 .badge.pid { background: #3a2a1e; color: #ffc07e; }
+.badge.ndi { background: #1e3a2a; color: #7ee6b0; }
 .badge.mc { background: #1e3a2f; color: #7dffb3; }
 .badge-row { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; vertical-align: middle; }
 

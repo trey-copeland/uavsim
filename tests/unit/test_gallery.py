@@ -74,3 +74,15 @@ def test_generate_base_case_gallery_smoke(tmp_path: Path) -> None:
     assert "run_id_by_mission" in by_id["flow_alt_lqg"]
     assert by_id["flow_alt_lqg"]["run_id_by_mission"]["envelope_edge"] == "edge_flow_alt_lqg"
     assert "envelope_edge" in by_id["flow_alt_lqg"]["metrics_by_mission"]
+    # NDI third row wired on both missions
+    assert "figure_eight_ndi" in ids
+    assert "edge_figure_eight_ndi" in ids
+    assert "ideal_ndi" in by_id
+    assert by_id["ideal_ndi"]["run_id_by_mission"]["baseline"] == "figure_eight_ndi"
+    assert by_id["ideal_ndi"]["run_id_by_mission"]["envelope_edge"] == "edge_figure_eight_ndi"
+    assert "plant_nominal_ndi" in ids
+    plant_ids = {s["id"] for s in (doc.get("plant_matrix") or {}).get("scenarios") or []}
+    assert "plant_nominal_ndi" in plant_ids
+    assert any(
+        r.get("controller") == "ndi" for r in (doc.get("plant_matrix") or {}).get("rows") or []
+    )

@@ -11,7 +11,7 @@ Deep guides still own the detail: [estimation](developer/estimation.md) · [dyna
 ## What this *is*
 
 - Config-driven **software-in-the-loop** quadrotor GNC: plant → (optional sensors/observer) → control → metrics → run dirs / showcase.
-- Teaching-quality **comparisons**: ideal full-state vs partial sensors, LQR vs PID, motors lag, aero/GE, Monte Carlo scatter.
+- Teaching-quality **comparisons**: ideal full-state vs partial sensors, LQR vs PID vs NDI, motors lag, aero/GE, Monte Carlo scatter.
 - Explicit **honesty cases** (e.g. gyro-only: position not observable) so bad sensor stacks fail loudly.
 
 ## What this is *not*
@@ -29,7 +29,7 @@ Deep guides still own the detail: [estimation](developer/estimation.md) · [dyna
 
 ## Naming & portfolio narrative
 
-### LQR vs LQG vs PID+KF
+### LQR vs LQG vs PID+KF vs NDI
 
 | Label in docs / showcase | Meaning |
 |--------------------------|---------|
@@ -37,6 +37,8 @@ Deep guides still own the detail: [estimation](developer/estimation.md) · [dyna
 | **LQG** | Same LQR gains on **linear KF** \(\hat x\) |
 | **PID** | Cascade PD on true full state |
 | **KF → PID** | Same cascade on \(\hat x\) — **not** classical LQG |
+| **NDI** | Cascade nonlinear dynamic inversion (vacuum inverse) on full state |
+| **KF → NDI** | Linear KF \(\hat x\) → NDI — **not** LQG |
 
 See [estimation.md](developer/estimation.md) and [showcase README](showcase/README.md).
 
@@ -57,6 +59,7 @@ Peak position error ≤ **3×** study `position_bound_m` and peak attitude error
 | **Linearization** | Hover / small-angle \(A,B\) for LQR design and linear KF. Aggressive flight is outside the design model (envelope tab explores that). |
 | **Attitude feedforward** | Hover-thrust inversion at ψ=0: \(\phi=\mathrm{asin}(a_y/g)\), \(\theta=-\mathrm{asin}(a_x/(g\cos\phi))\). Not full differential flatness / geometric tracking (yaw coupling, variable thrust). |
 | **PID cascade** | Underactuated small-angle outer loop + attitude PD — comparison baseline, not a geometric controller. |
+| **NDI cascade** | Vacuum rigid-body inverse only (no aero/motors in inverse); not INDI / not adaptive; \(\omega_\mathrm{des}\approx 0\) (memoryless, RK45-safe). |
 | **Motors plant** | First-order \(\omega\) lag + X-quad mixer \(f=c_T\omega^2\). No battery, ESC, or inflow dynamics. |
 | **Mixer** | Allocation matches FRD \(r \times [0,0,-f]\) for the documented motor map; reaction yaw via \(c_Q/c_T\). Self-consistent SIL; not a drop-in for every airframe mixer. |
 | **Aero / GE** | Opt-in, teaching-scale coeffs. LQR linearization includes **linear** drag/rate damping only; quadratic drag, prop H, and ground-effect \(\kappa\) are **not** in \(A,B\). Hover with GE is not trimmed at \(mg\). |
@@ -107,7 +110,7 @@ Track open work in [`EXTENSIBILITY_TODO.md`](developer/EXTENSIBILITY_TODO.md) an
 
 ## How to read results in an interview
 
-1. **Ideal LQR/PID** → “Does the closed-loop plant + law work with perfect state?”
+1. **Ideal LQR/PID/NDI** → “Does the closed-loop plant + law work with perfect state?”
 2. **Sensor matrix** → “How does the *same* law degrade when the bus is incomplete or filtered?”
 3. **Motors / aero / GE** → “What changes when actuators and simple aero are not ideal?”
 4. **MC / envelope** → “How sensitive are we to mass/inertia and linearization stretch?”
@@ -123,7 +126,7 @@ If a number looks too good or too bad, check: observer type, channels, plant mod
 | [README](../README.md) | Product entry |
 | [estimation.md](developer/estimation.md) | Observers, channels, success metric |
 | [dynamics.md](developer/dynamics.md) | Plant, motors, aero |
-| [control.md](developer/control.md) | LQR / PID |
+| [control.md](developer/control.md) | LQR / PID / NDI |
 | [showcase/README.md](showcase/README.md) | Matrix naming and rebuild |
 | [SPEC.md](../SPEC.md) | Requirements / MoSCoW |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Package boundaries |

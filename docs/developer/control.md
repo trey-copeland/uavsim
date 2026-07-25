@@ -1,4 +1,4 @@
-# Control: LQR, PID, and extending the control set
+# Control: LQR, PID, NDI, and extending the control set
 
 **Package:** `uavsim.control`  
 **Protocol:** `Controller` in `control/base.py`  
@@ -127,6 +127,62 @@ uv run uavsim compare runs/<lqr_*> runs/<pid_*> --interactive
 ```
 
 Also: `configs/studies/hover_pid.yaml`.
+
+---
+
+## Using built-in cascade NDI (`ndi_cascade`)
+
+Nonlinear dynamic inversion: position PD → desired inertial accel → collective thrust + \(R_\mathrm{des}\) from thrust direction + yaw; attitude via SO(3) error and **Euler equation inverse**
+
+\[
+\tau = \omega \times (I\omega) - K_R e_R - K_\omega \omega
+\]
+
+(\(K_R, K_\omega\) are **torque-space** gains; equivalent to \(\alpha_\mathrm{des} = -I^{-1}(K_R e_R + K_\omega\omega)\)).
+
+**Inversion model (v1):** vacuum rigid body (mass, diagonal \(I\), gravity). No aero or motors in the inverse — plant may still include them (Hi-fi teaching mismatch).
+
+**Frames:** NED / FRD, thrust along \(-\)body-\(z\), same as the plant and PID.
+
+Controller is **memoryless** (safe under SciPy RK45, which re-enters the law at intermediate times). \(\omega_\mathrm{des}\approx 0\); keep rate gains modest.
+
+### Study YAML
+
+```yaml
+controller:
+  type: ndi_cascade
+  kp_pos: [4.0, 4.0, 9.0]
+  kd_pos: [3.0, 3.0, 5.0]
+  k_R: [12.0, 12.0, 3.0]
+  k_omega: [1.2, 1.2, 0.5]
+  max_tilt_rad: 0.7
+  invert_model: vacuum_rigid_body
+  f_min_frac_hover: 0.05
+```
+
+### Python
+
+```python
+from uavsim.control import design_ndi_cascade, NdiGains
+from uavsim.vehicles.params import default_vehicle
+
+ctrl = design_ndi_cascade(default_vehicle())
+```
+
+### Portfolio studies
+
+| study_id / gallery run | Role |
+|------------------------|------|
+| `figure_eight_ndi` | Ideal baseline (`ideal_ndi`) |
+| `edge_figure_eight_ndi` | Envelope-edge ideal |
+| `figure_eight_*_ndi` / `edge_*_ndi` | Estimation matrix NDI row |
+| `plant_*_ndi` | Hi-fi plant × ideal NDI |
+
+Envelope scheme id: `ideal_ndi`. See `plan/NDI.md` for the full run-id contract.
+
+```bash
+uv run uavsim simulate configs/studies/figure_eight_ndi.yaml
+```
 
 ---
 

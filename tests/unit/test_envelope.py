@@ -58,8 +58,10 @@ def test_build_envelope_study_from_scheme_pid() -> None:
 
 
 def test_envelope_sweep_smoke(tmp_path: Path) -> None:
-    # Small subset: ideal LQR + ideal PID + GPS+IMU LQG at two τ
-    subset = [s for s in MATRIX_SCHEMES if s.id in ("ideal_lqr", "ideal_pid", "gps_imu_lqg")]
+    # Small subset: ideal LQR + ideal PID + ideal NDI + GPS+IMU LQG at two τ
+    subset = [
+        s for s in MATRIX_SCHEMES if s.id in ("ideal_lqr", "ideal_pid", "ideal_ndi", "gps_imu_lqg")
+    ]
     doc = run_linearization_envelope(
         repo_root=ROOT,
         time_scales=(1.0, 0.25),
@@ -68,15 +70,26 @@ def test_envelope_sweep_smoke(tmp_path: Path) -> None:
     )
     assert doc["kind"] == "linearization_envelope"
     assert doc["schema_version"] >= 2
-    assert len(doc["points"]) == 6  # 2 scales × 3 schemes
+    assert len(doc["points"]) == 8  # 2 scales × 4 schemes
     laws = {p["law"] for p in doc["points"]}
-    assert laws == {"ideal_lqr", "ideal_pid", "gps_imu_lqg"}
-    assert all(p.get("family") in ("lqr", "pid") for p in doc["points"])
+    assert laws == {"ideal_lqr", "ideal_pid", "ideal_ndi", "gps_imu_lqg"}
+    assert all(p.get("family") in ("lqr", "pid", "ndi") for p in doc["points"])
     gentle = [p for p in doc["points"] if p["time_scale"] == 1.0 and p["law"] == "ideal_lqr"][0]
     assert gentle["success"] is True
     assert gentle["label"] == "Ideal LQR"
+    ndi_gentle = [p for p in doc["points"] if p["time_scale"] == 1.0 and p["law"] == "ideal_ndi"][0]
+    assert ndi_gentle["success"] is True
     assert "ideal_lqr" in doc["boundary"]
-    assert len(doc["schemes"]) == 3
+    assert "ideal_ndi" in doc["boundary"]
+    assert len(doc["schemes"]) == 4
+
+
+def test_matrix_schemes_include_ideal_ndi() -> None:
+    ids = {s.id for s in MATRIX_SCHEMES}
+    assert "ideal_ndi" in ids
+    sch = next(s for s in MATRIX_SCHEMES if s.id == "ideal_ndi")
+    assert sch.family == "ndi"
+    assert "ndi" in sch.study_rel
 
 
 def test_envelope_legacy_laws_map(tmp_path: Path) -> None:

@@ -182,6 +182,15 @@ MATRIX_SCHEMES: tuple[EnvelopeScheme, ...] = (
         study_rel="configs/studies/figure_eight_imu_only_kf_pid.yaml",
         method="linear_kf → PID",
     ),
+    # NDI family (ideal full-state minimum; est schemes optional Phase E)
+    EnvelopeScheme(
+        id="ideal_ndi",
+        label="Ideal NDI",
+        family="ndi",
+        sensors="x_true",
+        study_rel="configs/studies/figure_eight_ndi.yaml",
+        method="NDI cascade",
+    ),
 )
 
 # Backward-compat aliases used by older call sites / docs

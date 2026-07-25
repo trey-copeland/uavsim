@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|--------|
-| **Status** | Phase A core landed on branch `ndi` — law + tests green; studies/UI next |
+| **Status** | Phases A–D wired on branch `ndi` (law, full study matrix, gallery/envelope/UI); rebuild gallery for metrics |
 | **Goal** | Third control-law family alongside hover LQR/LQG and cascade PID, with full side-by-side story: baseline, envelope-edge, estimation matrix, τ-envelope, and Hi-fi plant variants |
 | **Primary interface** | Existing `Controller` → body wrench \(u=[F,\tau_\phi,\tau_\theta,\tau_\psi]\) |
 | **Audience** | Hiring GNC reviewers + technical peers (honest SIL report, not black-box demo) |

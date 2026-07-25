@@ -7,8 +7,10 @@
     if (!role) return e("span", { className: "badge" }, "run");
     if (role.includes("monte_carlo") || role.includes("mc"))
       return e("span", { className: "badge mc" }, "MC");
-    // Plant-fidelity roles
+    // Plant-fidelity roles (plant_* or plant_*_ndi)
     if (role.startsWith("plant_")) {
+      const isNdi = role.endsWith("_ndi") || role.includes("ndi");
+      const base = role.replace(/_ndi$/, "");
       const plantLabel = {
         plant_nominal: "vacuum",
         plant_motors: "motors",
@@ -21,10 +23,10 @@
         { className: "badge-row" },
         e(
           "span",
-          { className: "badge lqr" },
-          plantLabel[role] || role.replace("plant_", "")
+          { className: isNdi ? "badge ndi" : "badge lqr" },
+          plantLabel[base] || base.replace("plant_", "")
         ),
-        e("span", { className: "badge" }, "LQR")
+        e("span", { className: isNdi ? "badge ndi" : "badge" }, isNdi ? "NDI" : "LQR")
       );
     }
     const parts = [];
@@ -41,7 +43,9 @@
     else if (role.includes("kf"))
       parts.push(e("span", { key: "k", className: "badge lqg" }, "KF"));
 
-    if (role.includes("pid"))
+    if (role.includes("ndi"))
+      parts.push(e("span", { key: "d", className: "badge ndi" }, "NDI"));
+    else if (role.includes("pid"))
       parts.push(e("span", { key: "p", className: "badge pid" }, "PID"));
     else if (!role.includes("lqg") && (role.includes("lqr") || role.includes("ideal")))
       parts.push(e("span", { key: "l", className: "badge lqr" }, "LQR"));
@@ -2069,7 +2073,7 @@
     if (isNumericVector(gains.R_diag)) {
       children.push(e(VectorList, { key: "R", values: gains.R_diag, label: "R_diag" }));
     }
-    // PID-style: kp_pos, kd_pos, kp_att, kd_rate, …
+    // Cascade gains (PID / NDI): list remaining scalar / vector fields
     const pidKeys = Object.keys(gains).filter(function (k) {
       return k !== "K" && k !== "Q_diag" && k !== "R_diag";
     });
@@ -2141,6 +2145,7 @@
     // Prefer compact law names in the diagram; full title stays in the detail panel.
     if (node.id === "controller") {
       const b = (node.badges || []).join(" ");
+      if (/ndi/i.test(b) || /ndi/i.test(t)) return "Controller";
       if (/pid/i.test(b) || /pid/i.test(t)) return "Controller";
       if (/lqr|lqg/i.test(b) || /lqr|lqg/i.test(t)) return "Controller";
       return "Controller";

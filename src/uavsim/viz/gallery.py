@@ -78,6 +78,33 @@ BASE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
         "imu_only_kf_pid",
         "est_imu_only_kf_pid",
     ),
+    # NDI row (same sensors / observers; not called LQG)
+    ("configs/studies/figure_eight_ndi.yaml", "figure_eight_ndi", "ideal_ndi"),
+    (
+        "configs/studies/figure_eight_gps_imu_naive_ndi.yaml",
+        "gps_imu_naive_ndi",
+        "est_gps_imu_naive_ndi",
+    ),
+    (
+        "configs/studies/figure_eight_gps_imu_kf_ndi.yaml",
+        "gps_imu_kf_ndi",
+        "est_gps_imu_kf_ndi",
+    ),
+    (
+        "configs/studies/figure_eight_ahrs_kf_ndi.yaml",
+        "ahrs_kf_ndi",
+        "est_ahrs_kf_ndi",
+    ),
+    (
+        "configs/studies/figure_eight_flow_alt_kf_ndi.yaml",
+        "flow_alt_kf_ndi",
+        "est_flow_alt_kf_ndi",
+    ),
+    (
+        "configs/studies/figure_eight_imu_only_kf_ndi.yaml",
+        "imu_only_kf_ndi",
+        "est_imu_only_kf_ndi",
+    ),
     (
         "configs/studies/figure_eight_gps_imu_lqg_mc.yaml",
         "gps_imu_lqg_mc",
@@ -139,6 +166,37 @@ EDGE_CASE_STUDIES: tuple[tuple[str, str, str], ...] = (
         "edge_imu_only_kf_pid",
         "est_imu_only_kf_pid",
     ),
+    # NDI row (edge twins)
+    (
+        "configs/studies/edge_figure_eight_ndi.yaml",
+        "edge_figure_eight_ndi",
+        "ideal_ndi",
+    ),
+    (
+        "configs/studies/edge_gps_imu_naive_ndi.yaml",
+        "edge_gps_imu_naive_ndi",
+        "est_gps_imu_naive_ndi",
+    ),
+    (
+        "configs/studies/edge_gps_imu_kf_ndi.yaml",
+        "edge_gps_imu_kf_ndi",
+        "est_gps_imu_kf_ndi",
+    ),
+    (
+        "configs/studies/edge_ahrs_kf_ndi.yaml",
+        "edge_ahrs_kf_ndi",
+        "est_ahrs_kf_ndi",
+    ),
+    (
+        "configs/studies/edge_flow_alt_kf_ndi.yaml",
+        "edge_flow_alt_kf_ndi",
+        "est_flow_alt_kf_ndi",
+    ),
+    (
+        "configs/studies/edge_imu_only_kf_ndi.yaml",
+        "edge_imu_only_kf_ndi",
+        "est_imu_only_kf_ndi",
+    ),
     (
         "configs/studies/edge_gps_imu_lqg_mc.yaml",
         "edge_gps_imu_lqg_mc",
@@ -150,13 +208,18 @@ MISSION_BASELINE = "baseline"
 MISSION_ENVELOPE_EDGE = "envelope_edge"
 MISSION_PLANT_FIDELITY = "plant_fidelity"
 
-# Ideal-LQR plant variants (same control law; vary actuators / aero / attitude plant)
+# Plant variants × ideal laws (LQR + NDI); vary actuators / aero / attitude plant
 PLANT_FIDELITY_STUDIES: tuple[tuple[str, str, str], ...] = (
     ("configs/studies/figure_eight.yaml", "plant_nominal_lqr", "plant_nominal"),
     ("configs/studies/figure_eight_motors.yaml", "plant_motors_lqr", "plant_motors"),
     ("configs/studies/figure_eight_aero.yaml", "plant_aero_lqr", "plant_aero"),
     ("configs/studies/figure_eight_ge.yaml", "plant_ge_lqr", "plant_ge"),
     ("configs/studies/figure_eight_quat.yaml", "plant_quat_lqr", "plant_quat"),
+    ("configs/studies/plant_nominal_ndi.yaml", "plant_nominal_ndi", "plant_nominal_ndi"),
+    ("configs/studies/plant_motors_ndi.yaml", "plant_motors_ndi", "plant_motors_ndi"),
+    ("configs/studies/plant_aero_ndi.yaml", "plant_aero_ndi", "plant_aero_ndi"),
+    ("configs/studies/plant_ge_ndi.yaml", "plant_ge_ndi", "plant_ge_ndi"),
+    ("configs/studies/plant_quat_ndi.yaml", "plant_quat_ndi", "plant_quat_ndi"),
 )
 
 _PLANT_LABELS: dict[str, str] = {
@@ -165,6 +228,11 @@ _PLANT_LABELS: dict[str, str] = {
     "plant_aero_lqr": "Body drag + prop H · LQR",
     "plant_ge_lqr": "Ground effect (low path) · LQR",
     "plant_quat_lqr": "Quaternion plant · LQR",
+    "plant_nominal_ndi": "Nominal vacuum wrench · NDI",
+    "plant_motors_ndi": "Mixer + motors · NDI",
+    "plant_aero_ndi": "Body drag + prop H · NDI",
+    "plant_ge_ndi": "Ground effect (low path) · NDI",
+    "plant_quat_ndi": "Quaternion plant · NDI",
 }
 
 _PLANT_COLUMNS: list[dict[str, str]] = [
@@ -200,6 +268,7 @@ def _plant_scenario(
     *,
     sid: str,
     column: str,
+    controller: str,
     label: str,
     method: str,
     role: str,
@@ -209,7 +278,7 @@ def _plant_scenario(
     return {
         "id": sid,
         "column": column,
-        "controller": "lqr",
+        "controller": controller,
         "label": label,
         "sensors": next(
             (c["sensors"] for c in _PLANT_COLUMNS if c["id"] == column),
@@ -226,61 +295,118 @@ def _plant_scenario(
 PLANT_MATRIX: dict[str, Any] = {
     "title": "Higher-fidelity dynamics",
     "description": (
-        "Same ideal hover LQR and (mostly) the same figure-eight path; only the "
-        "dynamics / actuator model is richer. Nominal vacuum wrench is the portfolio "
-        "baseline cell. Motors add mixer lag; aero adds drag/prop H; ground effect "
+        "Ideal full-state laws (hover LQR vs cascade NDI) on the same figure-eight; "
+        "only the dynamics / actuator model is richer. Nominal vacuum wrench is the "
+        "portfolio baseline. Motors add mixer lag; aero adds drag/prop H; ground effect "
         "uses a low path + Cheeseman–Bennett κ(h); quaternion uses the 13-state plant "
-        "with the same Euler-bus controller. Click a cell → Flight / System diagram."
+        "with the Euler control bus. NDI inverts vacuum rigid-body — model mismatch is "
+        "the teaching point under motors/aero/GE. Click a cell → Flight / System diagram."
     ),
     "columns": _PLANT_COLUMNS,
     "rows": [
         {"id": "lqr", "label": "Ideal LQR (full state)", "controller": "lqr"},
+        {"id": "ndi", "label": "Ideal NDI (full state)", "controller": "ndi"},
     ],
     "scenarios": [
         _plant_scenario(
-            sid="plant_nominal",
+            sid="plant_nominal_lqr",
             column="nominal",
-            label="Nominal vacuum wrench",
+            controller="lqr",
+            label="Nominal vacuum wrench · LQR",
             method="wrench plant",
             role="plant_nominal",
             run_id="plant_nominal_lqr",
             lesson="Baseline SIL plant: instantaneous body wrench, aero off.",
         ),
         _plant_scenario(
-            sid="plant_motors",
+            sid="plant_motors_lqr",
             column="motors",
-            label="Mixer + first-order motors",
+            controller="lqr",
+            label="Mixer + motors · LQR",
             method="plant: motors",
             role="plant_motors",
             run_id="plant_motors_lqr",
             lesson="Allocation + motor lag between u_cmd and delivered wrench.",
         ),
         _plant_scenario(
-            sid="plant_aero",
+            sid="plant_aero_lqr",
             column="aero",
-            label="Body drag + prop H",
+            controller="lqr",
+            label="Body drag + prop H · LQR",
             method="aero vehicle",
             role="plant_aero",
             run_id="plant_aero_lqr",
             lesson="LQR linearization omits quadratic/H terms; energy dissipates.",
         ),
         _plant_scenario(
-            sid="plant_ge",
+            sid="plant_ge_lqr",
             column="ge",
-            label="Ground effect (low path)",
+            controller="lqr",
+            label="Ground effect · LQR",
             method="GE vehicle",
             role="plant_ge",
             run_id="plant_ge_lqr",
             lesson="κ(h) boost near deck; vacuum hover LQR is untrimmed for GE.",
         ),
         _plant_scenario(
-            sid="plant_quat",
+            sid="plant_quat_lqr",
             column="quat",
-            label="Quaternion plant",
+            controller="lqr",
+            label="Quaternion plant · LQR",
             method="sim.attitude: quat",
             role="plant_quat",
             run_id="plant_quat_lqr",
             lesson="Native unit-quat kinematics; control/metrics stay Euler 12-state.",
+        ),
+        _plant_scenario(
+            sid="plant_nominal_ndi",
+            column="nominal",
+            controller="ndi",
+            label="Nominal vacuum wrench · NDI",
+            method="wrench plant",
+            role="plant_nominal_ndi",
+            run_id="plant_nominal_ndi",
+            lesson="Vacuum inverse matches vacuum plant — NDI upper bound on this path.",
+        ),
+        _plant_scenario(
+            sid="plant_motors_ndi",
+            column="motors",
+            controller="ndi",
+            label="Mixer + motors · NDI",
+            method="plant: motors",
+            role="plant_motors_ndi",
+            run_id="plant_motors_ndi",
+            lesson="NDI commands wrench; plant lags via mixer + first-order motors.",
+        ),
+        _plant_scenario(
+            sid="plant_aero_ndi",
+            column="aero",
+            controller="ndi",
+            label="Body drag + prop H · NDI",
+            method="aero vehicle",
+            role="plant_aero_ndi",
+            run_id="plant_aero_ndi",
+            lesson="Vacuum inverse omits drag/H; mismatch under translational speed.",
+        ),
+        _plant_scenario(
+            sid="plant_ge_ndi",
+            column="ge",
+            controller="ndi",
+            label="Ground effect · NDI",
+            method="GE vehicle",
+            role="plant_ge_ndi",
+            run_id="plant_ge_ndi",
+            lesson="κ(h) not inverted; thrust bias near deck vs vacuum NDI model.",
+        ),
+        _plant_scenario(
+            sid="plant_quat_ndi",
+            column="quat",
+            controller="ndi",
+            label="Quaternion plant · NDI",
+            method="sim.attitude: quat",
+            role="plant_quat_ndi",
+            run_id="plant_quat_ndi",
+            lesson="NDI on Euler bus; plant integrates unit quaternion.",
         ),
     ],
 }
@@ -298,6 +424,12 @@ _BASELINE_LABELS: dict[str, str] = {
     "ahrs_kf_pid": "AHRS KF → PID",
     "flow_alt_kf_pid": "Flow+alt KF → PID",
     "imu_only_kf_pid": "IMU-only KF → PID",
+    "figure_eight_ndi": "Ideal NDI (full state)",
+    "gps_imu_naive_ndi": "GPS+IMU naive → NDI",
+    "gps_imu_kf_ndi": "GPS+IMU KF → NDI",
+    "ahrs_kf_ndi": "AHRS KF → NDI",
+    "flow_alt_kf_ndi": "Flow+alt KF → NDI",
+    "imu_only_kf_ndi": "IMU-only KF → NDI",
     "gps_imu_lqg_mc": "GPS+IMU LQG Monte Carlo",
 }
 
@@ -314,6 +446,12 @@ _EDGE_LABELS: dict[str, str] = {
     "edge_ahrs_kf_pid": "AHRS KF → PID · edge",
     "edge_flow_alt_kf_pid": "Flow+alt KF → PID · edge",
     "edge_imu_only_kf_pid": "IMU-only KF → PID · edge",
+    "edge_figure_eight_ndi": "Ideal NDI · edge",
+    "edge_gps_imu_naive_ndi": "GPS+IMU naive → NDI · edge",
+    "edge_gps_imu_kf_ndi": "GPS+IMU KF → NDI · edge",
+    "edge_ahrs_kf_ndi": "AHRS KF → NDI · edge",
+    "edge_flow_alt_kf_ndi": "Flow+alt KF → NDI · edge",
+    "edge_imu_only_kf_ndi": "IMU-only KF → NDI · edge",
     "edge_gps_imu_lqg_mc": "GPS+IMU LQG MC · edge",
 }
 
@@ -391,10 +529,11 @@ ESTIMATION_MATRIX: dict[str, Any] = {
         "Baseline: calm constant-yaw figure-eight. "
         "Envelope edge: τ★≈0.28 time scale + scheduled yaw — plant stress near "
         "hover-LQR linearization limits. "
-        "Rows: hover LQR (with KF = classic LQG) vs PID cascade. "
+        "Rows: hover LQR (with KF = classic LQG), PID cascade, and cascade NDI. "
         "Columns: full-state ideal, GPS+IMU naive, GPS+IMU + KF, AHRS-like (att+ω), "
         "optical-flow proxy + altitude + gyro (body_vel+alt+ω), IMU-only (ω). "
         "KF uses the hover linear model; it does not invent GPS. "
+        "NDI + KF is not LQG (method: linear_kf → NDI). "
         "Flow+alt is the practical GPS-denied win over AHRS/IMU-only. "
         "Compare laws down a column — and missions via the selector."
     ),
@@ -402,6 +541,7 @@ ESTIMATION_MATRIX: dict[str, Any] = {
     "rows": [
         {"id": "lqr", "label": "LQR / LQG", "controller": "lqr"},
         {"id": "pid", "label": "PID cascade", "controller": "pid"},
+        {"id": "ndi", "label": "NDI cascade", "controller": "ndi"},
     ],
     "scenarios": [
         # —— LQR row ——
@@ -559,6 +699,79 @@ ESTIMATION_MATRIX: dict[str, Any] = {
             run_baseline="imu_only_kf_pid",
             run_edge="edge_imu_only_kf_pid",
             lesson="Same observability wall as LQG: rates alone cannot hold position.",
+        ),
+        # —— NDI row ——
+        _scenario(
+            sid="ideal_ndi",
+            column="ideal",
+            controller="ndi",
+            label="Ideal NDI",
+            sensors="x_true (no noise)",
+            method="NDI cascade",
+            role="ideal_ndi",
+            run_baseline="figure_eight_ndi",
+            run_edge="edge_figure_eight_ndi",
+            lesson="Vacuum rigid-body inverse; full-state upper bound for nonlinear law.",
+        ),
+        _scenario(
+            sid="gps_imu_naive_ndi",
+            column="gps_imu_naive",
+            controller="ndi",
+            label="GPS+IMU naive → NDI",
+            sensors="pos + omega (noisy)",
+            method="partial_raw → NDI",
+            role="est_gps_imu_naive_ndi",
+            run_baseline="gps_imu_naive_ndi",
+            run_edge="edge_gps_imu_naive_ndi",
+            lesson="Incomplete bus (zeros for att/vel) stresses NDI like other laws.",
+        ),
+        _scenario(
+            sid="gps_imu_kf_ndi",
+            column="gps_imu_filter",
+            controller="ndi",
+            label="GPS+IMU KF → NDI",
+            sensors="pos + omega (noisy)",
+            method="linear_kf → NDI",
+            role="est_gps_imu_kf_ndi",
+            run_baseline="gps_imu_kf_ndi",
+            run_edge="edge_gps_imu_kf_ndi",
+            lesson="KF reconstructs x̂ for NDI (not LQG — law is nonlinear inverse).",
+        ),
+        _scenario(
+            sid="ahrs_kf_ndi",
+            column="ahrs",
+            controller="ndi",
+            label="AHRS KF → NDI",
+            sensors="att + omega (noisy)",
+            method="linear_kf → NDI",
+            role="est_ahrs_kf_ndi",
+            run_baseline="ahrs_kf_ndi",
+            run_edge="edge_ahrs_kf_ndi",
+            lesson="GPS-denied attitude+rates; compare path error to AHRS LQG/PID.",
+        ),
+        _scenario(
+            sid="flow_alt_kf_ndi",
+            column="flow_alt",
+            controller="ndi",
+            label="Flow+alt KF → NDI",
+            sensors="body_vel + alt + omega",
+            method="linear_kf → NDI",
+            role="est_flow_alt_kf_ndi",
+            run_baseline="flow_alt_kf_ndi",
+            run_edge="edge_flow_alt_kf_ndi",
+            lesson="Same flow+alt sensors; NDI on x̂ (hover-linear KF H).",
+        ),
+        _scenario(
+            sid="imu_only_kf_ndi",
+            column="imu_only",
+            controller="ndi",
+            label="IMU-only KF → NDI",
+            sensors="omega only (noisy)",
+            method="linear_kf → NDI",
+            role="est_imu_only_kf_ndi",
+            run_baseline="imu_only_kf_ndi",
+            run_edge="edge_imu_only_kf_ndi",
+            lesson="Same observability wall: rates alone cannot hold position.",
         ),
     ],
 }
@@ -1026,16 +1239,17 @@ def generate_base_case_gallery(
                 "label": "Higher-fidelity dynamics",
                 "short_label": "Hi-fi",
                 "description": (
-                    "Richer SIL plant under ideal full-state LQR: vacuum wrench baseline, "
-                    "mixer+motors, body drag/prop H, ground effect (low path), and "
-                    "unit-quaternion kinematics. Not a controller×sensor matrix."
+                    "Richer SIL plant under ideal full-state LQR and cascade NDI: vacuum "
+                    "wrench baseline, mixer+motors, body drag/prop H, ground effect "
+                    "(low path), and unit-quaternion kinematics. NDI inverts vacuum "
+                    "rigid-body — mismatch is intentional teaching. Not a sensor matrix."
                 ),
                 "mission_file": "configs/missions/figure_eight.yaml",
                 "yaw_mode": "constant",
                 "time_scale": 1.0,
                 "matrix_kind": "plant",
                 "default_run": "plant_nominal_lqr",
-                "compare_ids": ["plant_nominal_lqr", "plant_motors_lqr"],
+                "compare_ids": ["plant_nominal_lqr", "plant_nominal_ndi"],
                 "mc_run_id": None,
                 "run_ids": [gid for _, gid, _ in PLANT_FIDELITY_STUDIES],
             }
@@ -1047,23 +1261,24 @@ def generate_base_case_gallery(
     about_paragraphs = [
         (
             "Offline SIL results for a quadrotor figure-eight: the same path flown by "
-            "hover LQR and cascade PID under several sensor suites (ideal full state, "
-            "GPS+IMU naive, GPS+IMU + linear KF, AHRS, optical-flow proxy + altitude, "
-            "IMU-only)."
+            "hover LQR, cascade PID, and cascade NDI under several sensor suites "
+            "(ideal full state, GPS+IMU naive, GPS+IMU + linear KF, AHRS, "
+            "optical-flow proxy + altitude, IMU-only)."
         ),
         (
             "Missions: baseline (constant yaw), near-envelope (τ★≈0.28 + scheduled yaw), "
-            "and higher-fidelity dynamics (ideal LQR × motors / aero / ground effect / quaternion)."
+            "and higher-fidelity dynamics (ideal LQR and NDI × motors / aero / GE / quat)."
         ),
         (
             "Ideal full-state is the tracking upper bound. Stacks that do not observe "
             "position (or feed an incomplete state bus) are expected to exceed the "
-            "position bound; those cases are included on purpose."
+            "position bound; those cases are included on purpose. NDI inverts a vacuum "
+            "rigid-body model — not adaptive / not INDI."
         ),
         (
             "Also included: Monte Carlo on GPS+IMU LQG, a time-scale envelope over "
-            "every estimation matrix stack, and a System tab block diagram per run. "
-            "Simulation only — not flight software."
+            "estimation matrix stacks (including ideal NDI), and a System tab block "
+            "diagram per run. Simulation only — not flight software."
         ),
     ]
     doc = build_gallery_document(
@@ -1082,8 +1297,8 @@ def generate_base_case_gallery(
     doc.setdefault("ui", {})
     doc["ui"]["display_title"] = "uavsim · controller × sensor flight study"
     doc["ui"]["value_prop"] = (
-        "SIL comparison of hover LQR and cascade PID under the same sensor suites, "
-        "plus higher-fidelity plant variants."
+        "SIL comparison of hover LQR, cascade PID, and cascade NDI under the same "
+        "sensor suites, plus higher-fidelity plant variants."
     )
     doc["ui"]["about_paragraphs"] = about_paragraphs
     write_gallery(doc, out, copy_app=True, template_dir=root / "docs" / "showcase")

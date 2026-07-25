@@ -35,6 +35,32 @@ def test_figure_eight_ndi_tracks(tmp_path: Path) -> None:
     assert art.is_file()
 
 
+def test_edge_figure_eight_ndi_finite(tmp_path: Path) -> None:
+    """Edge mission: NDI must not NaN/explode; soft RMSE band (stress case)."""
+    result = run_nominal_study(
+        ROOT / "configs" / "studies" / "edge_figure_eight_ndi.yaml",
+        output_root=tmp_path / "runs",
+        run_mc=False,
+    )
+    m = result.metrics
+    rmse = float(m["rmse_position_m"])
+    assert np.isfinite(rmse)
+    assert rmse < 2.0, f"edge NDI RMSE {rmse} m exploded"
+    max_e = float(m["max_position_error_m"])
+    assert np.isfinite(max_e) and max_e < 5.0
+
+
+def test_ndi_study_catalog_loads() -> None:
+    """All portfolio NDI YAMLs validate as ndi_cascade studies."""
+    from uavsim.studies.config import load_study
+
+    studies = sorted((ROOT / "configs" / "studies").glob("*ndi*.yaml"))
+    assert len(studies) >= 16
+    for path in studies:
+        cfg, *_ = load_study(path)
+        assert cfg.controller.type == "ndi_cascade", path.name
+
+
 def test_ndi_stack_equations_from_study() -> None:
     from uavsim.studies.config import load_study
 
