@@ -427,214 +427,22 @@
   }
 
   // --- 3D attitude helpers (ZYX Euler body→NED, plot frame N/E/up) ---
-  function deg2rad(d) {
-    return (d * Math.PI) / 180;
+  // Geometry + attitude mesh: shared module (docs/shared/flight_viz.js → lib/)
+  const FV = window.UavFlightViz;
+  if (!FV) {
+    throw new Error("UavFlightViz missing — load ./lib/flight_viz.js before app.js");
   }
-  function matMulVec(R, v) {
-    return [
-      R[0][0] * v[0] + R[0][1] * v[1] + R[0][2] * v[2],
-      R[1][0] * v[0] + R[1][1] * v[1] + R[1][2] * v[2],
-      R[2][0] * v[0] + R[2][1] * v[1] + R[2][2] * v[2],
-    ];
-  }
-  /** Body→NED rotation, ZYX (φ, θ, ψ) in radians. */
-  function rotationBodyToNed(phi, theta, psi) {
-    const cph = Math.cos(phi);
-    const sph = Math.sin(phi);
-    const cth = Math.cos(theta);
-    const sth = Math.sin(theta);
-    const cps = Math.cos(psi);
-    const sps = Math.sin(psi);
-    // Rz(psi) @ Ry(theta) @ Rx(phi)
-    return [
-      [cps * cth, cps * sth * sph - sps * cph, cps * sth * cph + sps * sph],
-      [sps * cth, sps * sth * sph + cps * cph, sps * sth * cph - cps * sph],
-      [-sth, cth * sph, cth * cph],
-    ];
-  }
-  function bodyToPlot(R, vb) {
-    const ned = matMulVec(R, vb);
-    return [ned[0], ned[1], -ned[2]];
-  }
-  function arrowSeg(R, originBody, dirBody, length) {
-    const o = bodyToPlot(R, originBody);
-    const d = bodyToPlot(R, dirBody);
-    const n = Math.hypot(d[0], d[1], d[2]) || 1;
-    return {
-      x: [o[0], o[0] + (d[0] / n) * length],
-      y: [o[1], o[1] + (d[1] / n) * length],
-      z: [o[2], o[2] + (d[2] / n) * length],
-    };
-  }
-
-  /**
-   * Default-vehicle X-quad inverse mixer (matches uavsim.dynamics.mixer).
-   * u = [F, τφ, τθ, τψ] → nonnegative motor forces f[4].
-   * arm_length_m=0.25, ct/cq from default_quadrotor.yaml.
-   */
-  function wrenchToMotorForces(u) {
-    const arm = 0.25;
-    const ell = arm / Math.SQRT2;
-    const ct = 3.405e-6;
-    const cq = 5.4e-8;
-    const k = cq / Math.max(ct, 1e-18);
-    // B columns = motors 1..4 (FR, FL, RL, RR in geometry: (+ℓ,+ℓ), (−ℓ,+ℓ), (−ℓ,−ℓ), (+ℓ,−ℓ))
-    // Matches allocation_matrix roll/pitch/yaw rows in mixer.py.
-    const B = [
-      [1, 1, 1, 1],
-      [-ell, -ell, ell, ell],
-      [ell, -ell, -ell, ell],
-      [k, -k, k, -k],
-    ];
-    // Solve B f = u (4×4 Gaussian elimination)
-    const a = B.map(function (row, i) {
-      return row.concat([+(u[i] || 0)]);
-    });
-    for (let col = 0; col < 4; col++) {
-      let piv = col;
-      for (let r = col + 1; r < 4; r++) {
-        if (Math.abs(a[r][col]) > Math.abs(a[piv][col])) piv = r;
-      }
-      const tmp = a[col];
-      a[col] = a[piv];
-      a[piv] = tmp;
-      const diag = a[col][col];
-      if (Math.abs(diag) < 1e-14) return [0, 0, 0, 0];
-      for (let c = col; c < 5; c++) a[col][c] /= diag;
-      for (let r = 0; r < 4; r++) {
-        if (r === col) continue;
-        const f = a[r][col];
-        for (let c = col; c < 5; c++) a[r][c] -= f * a[col][c];
-      }
-    }
-    return a.map(function (row) {
-      return Math.max(0, row[4]);
-    });
-  }
-
-  /**
-   * X-quad mesh + wrench arrows + per-rotor thrust in plot frame.
-   */
+  const deg2rad = FV.deg2rad;
+  const matMulVec = FV.matMulVec;
+  const rotationBodyToNed = FV.rotationBodyToNed;
+  const bodyToPlot = FV.bodyToPlot;
+  const arrowSeg = FV.arrowSeg;
+  const wrenchToMotorForces = FV.wrenchToMotorForces;
   function vehicleGeom(eulerDeg, u, limits) {
-    const phi = deg2rad(eulerDeg[0]);
-    const theta = deg2rad(eulerDeg[1]);
-    const psi = deg2rad(eulerDeg[2]);
-    const R = rotationBodyToNed(phi, theta, psi);
-    const L = 0.38; // visual arm (body x/y); mix uses physical ℓ separately
-    // Motor hubs match mixer column order (positions consistent with B)
-    const motorsB = [
-      [L, L, 0],
-      [-L, L, 0],
-      [-L, -L, 0],
-      [L, -L, 0],
-    ];
-    // Frame: cross arms + short body box outline
-    const segs = [
-      // diagonal arms
-      [motorsB[0], motorsB[2]],
-      [motorsB[1], motorsB[3]],
-      // body square
-      [
-        [0.1, 0.1, 0],
-        [-0.1, 0.1, 0],
-      ],
-      [
-        [-0.1, 0.1, 0],
-        [-0.1, -0.1, 0],
-      ],
-      [
-        [-0.1, -0.1, 0],
-        [0.1, -0.1, 0],
-      ],
-      [
-        [0.1, -0.1, 0],
-        [0.1, 0.1, 0],
-      ],
-    ];
-    const fx = [];
-    const fy = [];
-    const fz = [];
-    segs.forEach(function (pair) {
-      const a = bodyToPlot(R, pair[0]);
-      const b = bodyToPlot(R, pair[1]);
-      fx.push(a[0], b[0], null);
-      fy.push(a[1], b[1], null);
-      fz.push(a[2], b[2], null);
-    });
-    const motors = motorsB.map(function (m) {
-      return bodyToPlot(R, m);
-    });
-
-    // Body axes triad (unit length ~0.22)
-    const axLen = 0.28;
-    const axes = {
-      x: arrowSeg(R, [0, 0, 0], [1, 0, 0], axLen),
-      y: arrowSeg(R, [0, 0, 0], [0, 1, 0], axLen),
-      z: arrowSeg(R, [0, 0, 0], [0, 0, 1], axLen),
-    };
-
-    const F = +u[0] || 0;
-    const tx = +u[1] || 0;
-    const ty = +u[2] || 0;
-    const tz = +u[3] || 0;
-    const tNorm = Math.hypot(tx, ty, tz);
-    const Fmax = (limits && limits.thrust_max_n) || 10;
-    const Tmax = (limits && limits.torque_max_nm) || 1;
-    // Total thrust (resultant) — short / faint so rotor fᵢ stay readable
-    const thrustLen = 0.08 + 0.18 * Math.min(1.0, Math.max(0, F / Fmax));
-    const thrust = arrowSeg(R, [0, 0, 0], [0, 0, -1], thrustLen);
-
-    // Per-rotor forces from inverse mix; short arrows, length bias on Δf vs equal share
-    // so roll/pitch differentials read clearly (common-mode hover is subtle).
-    const fMotors = wrenchToMotorForces(u);
-    const fEq = Math.max(Math.abs(F), 1e-6) / 4; // equal-share for this F
-    const fRef = 0.5 * 9.81 / 4; // ~hover per motor (m=0.5 kg)
-    const rotorX = [];
-    const rotorY = [];
-    const rotorZ = [];
-    fMotors.forEach(function (fi, i) {
-      const common = Math.min(1.2, Math.max(0, fi / fRef));
-      const delta = (fi - fEq) / fRef;
-      // base + small common + amplified differential (clamped)
-      const len = Math.max(
-        0.04,
-        0.05 + 0.1 * common + 0.28 * Math.max(-0.4, Math.min(1.4, delta))
-      );
-      const seg = arrowSeg(R, motorsB[i], [0, 0, -1], len);
-      rotorX.push(seg.x[0], seg.x[1], null);
-      rotorY.push(seg.y[0], seg.y[1], null);
-      rotorZ.push(seg.z[0], seg.z[1], null);
-    });
-    const rotorThrust = { x: rotorX, y: rotorY, z: rotorZ };
-
-    // Resultant torque in body frame
-    let torque = { x: [0, 0], y: [0, 0], z: [0, 0] };
-    if (tNorm > 1e-9) {
-      const tLen = 0.15 + 0.65 * Math.min(1.2, tNorm / Math.max(Tmax, 1e-6));
-      torque = arrowSeg(R, [0, 0, 0], [tx, ty, tz], tLen);
-    }
-    // Per-axis torque ticks (body axes, signed length)
-    const tScale = 0.55 / Math.max(Tmax, 1e-6);
-    const tAx = arrowSeg(R, [0, 0, 0], [1, 0, 0], tx * tScale);
-    const tAy = arrowSeg(R, [0, 0, 0], [0, 1, 0], ty * tScale);
-    const tAz = arrowSeg(R, [0, 0, 0], [0, 0, 1], tz * tScale);
-
-    return {
-      frame: { x: fx, y: fy, z: fz },
-      motors: motors,
-      axes: axes,
-      thrust: thrust,
-      rotorThrust: rotorThrust,
-      fMotors: fMotors,
-      torque: torque,
-      tAx: tAx,
-      tAy: tAy,
-      tAz: tAz,
-      F: F,
-      tau: [tx, ty, tz],
-      tNorm: tNorm,
-    };
+    return FV.vehicleGeom(eulerDeg, u, limits, null);
   }
+  // cornerTrace stays local if already defined earlier — only replace deg2rad..vehicleGeom block
+  // Note: cornerTrace is defined BEFORE deg2rad in file — leave it.
 
   /**
    * Flight path 3D: newPlot once per run (fixed FOV), restyle-only on scrub.
@@ -861,90 +669,14 @@
   function VehicleAttitudeView({ runId, ts, frame, limits }) {
     const ref = useRef(null);
     const ready = useRef(false);
-    // 0 bounds, 1 frame, 2 motors, 3–5 axes, 6 total F, 7 rotor thrusts, 8 torque, 9–11 tau axes
-    const IDX = {
-      frame: 1,
-      motors: 2,
-      ax: 3,
-      ay: 4,
-      az: 5,
-      thrust: 6,
-      rotors: 7,
-      torque: 8,
-      tAx: 9,
-      tAy: 10,
-      tAz: 11,
-    };
 
     function applyFrame(i) {
       if (!ref.current || !window.Plotly || !ready.current || !ts) return;
       const n = ts.t.length;
       const ii = Math.max(0, Math.min(i, n - 1));
       const g = vehicleGeom(ts.euler_deg[ii], ts.u[ii], limits);
-      const m = g.motors;
-      Plotly.restyle(
-        ref.current,
-        {
-          x: [
-            g.frame.x,
-            m.map(function (p) {
-              return p[0];
-            }),
-            g.axes.x.x,
-            g.axes.y.x,
-            g.axes.z.x,
-            g.thrust.x,
-            g.rotorThrust.x,
-            g.torque.x,
-            g.tAx.x,
-            g.tAy.x,
-            g.tAz.x,
-          ],
-          y: [
-            g.frame.y,
-            m.map(function (p) {
-              return p[1];
-            }),
-            g.axes.x.y,
-            g.axes.y.y,
-            g.axes.z.y,
-            g.thrust.y,
-            g.rotorThrust.y,
-            g.torque.y,
-            g.tAx.y,
-            g.tAy.y,
-            g.tAz.y,
-          ],
-          z: [
-            g.frame.z,
-            m.map(function (p) {
-              return p[2];
-            }),
-            g.axes.x.z,
-            g.axes.y.z,
-            g.axes.z.z,
-            g.thrust.z,
-            g.rotorThrust.z,
-            g.torque.z,
-            g.tAx.z,
-            g.tAy.z,
-            g.tAz.z,
-          ],
-        },
-        [
-          IDX.frame,
-          IDX.motors,
-          IDX.ax,
-          IDX.ay,
-          IDX.az,
-          IDX.thrust,
-          IDX.rotors,
-          IDX.torque,
-          IDX.tAx,
-          IDX.tAy,
-          IDX.tAz,
-        ]
-      );
+      const xyz = FV.attitudeRestyleXYZ(g);
+      Plotly.restyle(ref.current, xyz, FV.ATTITUDE_RESTYLE_IDS);
     }
 
     useEffect(() => {
@@ -957,98 +689,13 @@
         y: [-span, span],
         z: [-span, span],
       };
-      const ax = function (title) {
-        return {
-          title: title,
-          range: [-span, span],
-          autorange: false,
-          gridcolor: "#243044",
-          zerolinecolor: "#3a4a60",
-          showbackground: true,
-          backgroundcolor: "rgba(10,14,22,0.95)",
-          showspikes: false,
-        };
-      };
-      const line3 = function (seg, color, width, name, showleg) {
-        return {
-          type: "scatter3d",
-          mode: "lines",
-          x: seg.x,
-          y: seg.y,
-          z: seg.z,
-          line: { color: color, width: width },
-          name: name,
-          showlegend: !!showleg,
-          hoverinfo: "name",
-        };
-      };
-      const m0 = g0.motors;
-      const traces = [
-        cornerTrace(bounds),
-        {
-          type: "scatter3d",
-          mode: "lines",
-          x: g0.frame.x,
-          y: g0.frame.y,
-          z: g0.frame.z,
-          line: { color: "#8ab4e8", width: 8 },
-          name: "airframe",
-          hoverinfo: "skip",
-        },
-        {
-          type: "scatter3d",
-          mode: "markers",
-          x: m0.map(function (p) {
-            return p[0];
-          }),
-          y: m0.map(function (p) {
-            return p[1];
-          }),
-          z: m0.map(function (p) {
-            return p[2];
-          }),
-          marker: {
-            size: 8,
-            color: ["#5b9fd4", "#e6b450", "#5b9fd4", "#e6b450"],
-            symbol: "circle",
-            line: { width: 1, color: "#0a0e16" },
-          },
-          name: "motors",
-          hoverinfo: "skip",
-        },
-        line3(g0.axes.x, "#f07178", 6, "body +x", true),
-        line3(g0.axes.y, "#3ecf8e", 6, "body +y", true),
-        line3(g0.axes.z, "#5b9fd4", 6, "body +z", true),
-        line3(g0.thrust, "rgba(232, 121, 249, 0.28)", 3, "ΣF −z", true),
-        // Magenta/violet — distinct from blue airframe (#8ab4e8) and gold τ
-        line3(g0.rotorThrust, "#e879f9", 3.5, "rotor fᵢ", true),
-        line3(g0.torque, "#e6b450", 8, "torque τ", true),
-        line3(g0.tAx, "rgba(240,113,120,0.55)", 5, "τφ", false),
-        line3(g0.tAy, "rgba(62,207,142,0.55)", 5, "τθ", false),
-        line3(g0.tAz, "rgba(91,159,212,0.55)", 5, "τψ", false),
-      ];
-      const layout = {
-        paper_bgcolor: "#0a0e16",
-        plot_bgcolor: "#0a0e16",
-        font: { color: "#e7ecf3", size: 11 },
-        margin: { l: 0, r: 0, t: 8, b: 0 },
+      const traces = FV.buildAttitudeTraces(g0, bounds);
+      const layout = FV.defaultAttitudeLayout({
+        span: span,
         uirevision: "veh-static-" + runId,
-        scene: {
-          xaxis: ax("N"),
-          yaxis: ax("E"),
-          zaxis: ax("up"),
-          aspectmode: "cube",
-          bgcolor: "#0a0e16",
-          camera: {
-            eye: { x: 1.55, y: 1.55, z: 1.15 },
-            center: { x: 0, y: 0, z: 0 },
-            up: { x: 0, y: 0, z: 1 },
-          },
-        },
-        showlegend: true,
-        legend: { orientation: "h", y: 1.12, font: { size: 10 } },
         height: 480,
-      };
+        legendY: 1.12,
+      });
       Plotly.newPlot(ref.current, traces, layout, {
         responsive: true,
         displayModeBar: "hover",

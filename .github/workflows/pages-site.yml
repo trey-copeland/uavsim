@@ -79,7 +79,16 @@ jobs:
                 docs/demos/intercept/app.js \
                 docs/demos/intercept/styles.css \
                 _site/intercept/
-          mkdir -p _site/intercept/data
+          mkdir -p _site/intercept/lib _site/intercept/data
+          # Prefer canonical shared module; fall back to app lib copy
+          if [ -f docs/shared/flight_viz.js ]; then
+            cp -a docs/shared/flight_viz.js _site/intercept/lib/flight_viz.js
+            mkdir -p _site/lib
+            cp -a docs/shared/flight_viz.js _site/lib/flight_viz.js
+          fi
+          if [ -d docs/demos/intercept/lib ]; then
+            cp -a docs/demos/intercept/lib/. _site/intercept/lib/
+          fi
           cp -a docs/demos/intercept/data/demo.json _site/intercept/data/
           # Do not ship design/checklist md or exporter scripts on Pages
           #
@@ -100,6 +109,11 @@ jobs:
           t = idx.read_text(encoding="utf-8")
           t = re.sub(r'href="\./styles\.css(?:\?v=[^"]*)?"', f'href="./styles.css?v={sha}"', t)
           t = re.sub(r'src="\./app\.js(?:\?v=[^"]*)?"', f'src="./app.js?v={sha}"', t)
+          t = re.sub(
+              r'src="\./lib/flight_viz\.js(?:\?v=[^"]*)?"',
+              f'src="./lib/flight_viz.js?v={sha}"',
+              t,
+          )
           idx.write_text(t, encoding="utf-8")
           app = Path("_site/intercept/app.js")
           a = app.read_text(encoding="utf-8")

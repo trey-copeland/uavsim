@@ -152,108 +152,38 @@
     );
   }
 
-  /* ── Attitude helpers (showcase VehicleAttitudeView patterns) ── */
+  /* ── Attitude helpers via shared UavFlightViz ── */
 
-  function deg2rad(d) {
-    return (d * Math.PI) / 180;
+  // Shared geometry (docs/shared/flight_viz.js → ./lib/)
+  const FV = window.UavFlightViz;
+  if (!FV) {
+    throw new Error("UavFlightViz missing — load ./lib/flight_viz.js before app.js");
   }
+  const deg2rad = FV.deg2rad;
+  const rotationBodyToNed = FV.rotationBodyToNed;
+  const bodyToPlot = FV.bodyToPlot;
 
-  function matMulVec(R, v) {
-    return [
-      R[0][0] * v[0] + R[0][1] * v[1] + R[0][2] * v[2],
-      R[1][0] * v[0] + R[1][1] * v[1] + R[1][2] * v[2],
-      R[2][0] * v[0] + R[2][1] * v[1] + R[2][2] * v[2],
-    ];
-  }
-
-  /** Body→NED rotation, ZYX (φ, θ, ψ) in radians. */
-  function rotationBodyToNed(phi, theta, psi) {
-    const cph = Math.cos(phi);
-    const sph = Math.sin(phi);
-    const cth = Math.cos(theta);
-    const sth = Math.sin(theta);
-    const cps = Math.cos(psi);
-    const sps = Math.sin(psi);
-    return [
-      [cps * cth, cps * sth * sph - sps * cph, cps * sth * cph + sps * sph],
-      [sps * cth, sps * sth * sph + cps * cph, sps * sth * cph - cps * sph],
-      [-sth, cth * sph, cth * cph],
-    ];
-  }
-
-  function bodyToPlot(R, vb) {
-    const ned = matMulVec(R, vb);
-    return [ned[0], ned[1], -ned[2]];
-  }
-
-  function arrowSeg(R, originBody, dirBody, length) {
-    const o = bodyToPlot(R, originBody);
-    const d = bodyToPlot(R, dirBody);
-    const n = Math.hypot(d[0], d[1], d[2]) || 1;
+  /** Actuator limits for thrust scaling (from pack ui or defaults). */
+  function attitudeLimits() {
+    const ui = DATA && DATA.ui ? DATA.ui : {};
     return {
-      x: [o[0], o[0] + (d[0] / n) * length],
-      y: [o[1], o[1] + (d[1] / n) * length],
-      z: [o[2], o[2] + (d[2] / n) * length],
+      thrust_max_n: +(ui.thrust_max_n || 66.2),
+      torque_max_nm: +(ui.torque_max_nm || 4.0),
     };
   }
 
-  /** X-quad mesh + body axes at origin (wrench optional). */
-  function vehicleGeom(eulerDeg) {
-    const eu = eulerDeg || [0, 0, 0];
-    const phi = deg2rad(+eu[0] || 0);
-    const theta = deg2rad(+eu[1] || 0);
-    const psi = deg2rad(+eu[2] || 0);
-    const R = rotationBodyToNed(phi, theta, psi);
-    const L = 0.38;
-    const motorsB = [
-      [L, L, 0],
-      [-L, L, 0],
-      [-L, -L, 0],
-      [L, -L, 0],
-    ];
-    const segs = [
-      [motorsB[0], motorsB[2]],
-      [motorsB[1], motorsB[3]],
-      [
-        [0.1, 0.1, 0],
-        [-0.1, 0.1, 0],
-      ],
-      [
-        [-0.1, 0.1, 0],
-        [-0.1, -0.1, 0],
-      ],
-      [
-        [-0.1, -0.1, 0],
-        [0.1, -0.1, 0],
-      ],
-      [
-        [0.1, -0.1, 0],
-        [0.1, 0.1, 0],
-      ],
-    ];
-    const fx = [];
-    const fy = [];
-    const fz = [];
-    segs.forEach(function (pair) {
-      const a = bodyToPlot(R, pair[0]);
-      const b = bodyToPlot(R, pair[1]);
-      fx.push(a[0], b[0], null);
-      fy.push(a[1], b[1], null);
-      fz.push(a[2], b[2], null);
-    });
-    const motors = motorsB.map(function (m) {
-      return bodyToPlot(R, m);
-    });
-    const axLen = 0.28;
+  function mixParams() {
+    const ui = DATA && DATA.ui ? DATA.ui : {};
     return {
-      frame: { x: fx, y: fy, z: fz },
-      motors: motors,
-      axes: {
-        x: arrowSeg(R, [0, 0, 0], [1, 0, 0], axLen),
-        y: arrowSeg(R, [0, 0, 0], [0, 1, 0], axLen),
-        z: arrowSeg(R, [0, 0, 0], [0, 0, 1], axLen),
-      },
+      arm_length_m: +(ui.arm_length_m || 0.32),
+      ct_n_s2: +(ui.ct_n_s2 || 1.02e-5),
+      cq_nm_s2: +(ui.cq_nm_s2 || 1.6e-7),
+      mass_kg: +(ui.mass_kg || 1.5),
     };
+  }
+
+  function vehicleGeom(eulerDeg, u) {
+    return FV.vehicleGeom(eulerDeg, u || [0, 0, 0, 0], attitudeLimits(), mixParams());
   }
 
   /* ── Scene bounds ──────────────────────────────────── */
@@ -1113,44 +1043,20 @@
 
   /* ── Attitude ──────────────────────────────────────── */
 
+  function frameControl(ts, i) {
+    if (!ts || !ts.u || !ts.u.length) return [0, 0, 0, 0];
+    const ii = Math.max(0, Math.min(i, ts.u.length - 1));
+    const row = ts.u[ii];
+    if (!row || !row.length) return [0, 0, 0, 0];
+    return [+row[0] || 0, +row[1] || 0, +row[2] || 0, +row[3] || 0];
+  }
+
   function applyAttitudeFrame(host, ts, i) {
-    if (!attReady || !attIdx || !host || !ts || !ts.euler_deg) return;
+    if (!attReady || !host || !ts || !ts.euler_deg) return;
     const ii = Math.max(0, Math.min(i, ts.euler_deg.length - 1));
-    const g = vehicleGeom(ts.euler_deg[ii]);
-    const m = g.motors;
-    Plotly.restyle(
-      host,
-      {
-        x: [
-          g.frame.x,
-          m.map(function (p) {
-            return p[0];
-          }),
-          g.axes.x.x,
-          g.axes.y.x,
-          g.axes.z.x,
-        ],
-        y: [
-          g.frame.y,
-          m.map(function (p) {
-            return p[1];
-          }),
-          g.axes.x.y,
-          g.axes.y.y,
-          g.axes.z.y,
-        ],
-        z: [
-          g.frame.z,
-          m.map(function (p) {
-            return p[2];
-          }),
-          g.axes.x.z,
-          g.axes.y.z,
-          g.axes.z.z,
-        ],
-      },
-      [attIdx.frame, attIdx.motors, attIdx.ax, attIdx.ay, attIdx.az]
-    );
+    const g = vehicleGeom(ts.euler_deg[ii], frameControl(ts, ii));
+    const xyz = FV.attitudeRestyleXYZ(g);
+    Plotly.restyle(host, xyz, FV.ATTITUDE_RESTYLE_IDS);
   }
 
   function drawAttitude(forceFull) {
@@ -1173,105 +1079,18 @@
 
     attReady = false;
     attKey = key;
-    const g0 = vehicleGeom(ts.euler_deg[0]);
+    const g0 = vehicleGeom(ts.euler_deg[0], frameControl(ts, 0));
     const span = 1.05;
     const bounds = { x: [-span, span], y: [-span, span], z: [-span, span] };
-
-    function ax(title) {
-      return {
-        title: title,
-        range: [-span, span],
-        autorange: false,
-        gridcolor: "#243044",
-        zerolinecolor: "#3a4a60",
-        showbackground: true,
-        backgroundcolor: "rgba(10,14,22,0.95)",
-        showspikes: false,
-      };
-    }
-
-    function line3(seg, color, width, name, showleg) {
-      return {
-        type: "scatter3d",
-        mode: "lines",
-        x: seg.x,
-        y: seg.y,
-        z: seg.z,
-        line: { color: color, width: width },
-        name: name,
-        showlegend: !!showleg,
-        hoverinfo: "name",
-      };
-    }
-
-    const m0 = g0.motors;
-    const traces = [
-      cornerTrace(bounds),
-      {
-        type: "scatter3d",
-        mode: "lines",
-        x: g0.frame.x,
-        y: g0.frame.y,
-        z: g0.frame.z,
-        line: { color: "#8ab4e8", width: 8 },
-        name: "airframe",
-        hoverinfo: "skip",
-      },
-      {
-        type: "scatter3d",
-        mode: "markers",
-        x: m0.map(function (p) {
-          return p[0];
-        }),
-        y: m0.map(function (p) {
-          return p[1];
-        }),
-        z: m0.map(function (p) {
-          return p[2];
-        }),
-        marker: {
-          size: 8,
-          color: ["#5b9fd4", "#e6b450", "#5b9fd4", "#e6b450"],
-          symbol: "circle",
-          line: { width: 1, color: "#0a0e16" },
-        },
-        name: "motors",
-        hoverinfo: "skip",
-      },
-      line3(g0.axes.x, "#f07178", 6, "body +x", true),
-      line3(g0.axes.y, "#3ecf8e", 6, "body +y", true),
-      line3(g0.axes.z, "#5b9fd4", 6, "body +z", true),
-    ];
-
-    attIdx = { frame: 1, motors: 2, ax: 3, ay: 4, az: 5 };
-
-    const layout = {
-      paper_bgcolor: COLORS.scene,
-      plot_bgcolor: COLORS.scene,
-      font: { color: COLORS.text, size: 11 },
-      margin: { l: 0, r: 0, t: 8, b: 0 },
+    const traces = FV.buildAttitudeTraces(g0, bounds);
+    const layout = FV.defaultAttitudeLayout({
+      span: span,
       uirevision: "att-" + caseId,
-      scene: {
-        xaxis: ax("N"),
-        yaxis: ax("E"),
-        zaxis: ax("up"),
-        aspectmode: "cube",
-        bgcolor: COLORS.scene,
-        camera: {
-          eye: { x: 1.55, y: 1.55, z: 1.15 },
-          center: { x: 0, y: 0, z: 0 },
-          up: { x: 0, y: 0, z: 1 },
-        },
-      },
-      showlegend: true,
-      legend: {
-        orientation: "h",
-        y: 1.08,
-        x: 0,
-        font: { size: 10, color: COLORS.muted },
-        bgcolor: "rgba(0,0,0,0)",
-      },
-    };
+      sceneBg: COLORS.scene,
+      fontColor: COLORS.text,
+      mutedColor: COLORS.muted,
+      legendY: 1.08,
+    });
 
     Plotly.react(host, traces, layout, PLOTLY_CFG).then(function () {
       attReady = true;
