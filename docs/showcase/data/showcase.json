@@ -287735,9 +287735,9 @@
     },
     {
       "id": "plant_fidelity",
-      "label": "Plant fidelity (ideal LQR)",
-      "short_label": "Plant",
-      "description": "Ideal full-state LQR with plant/actuator upgrades: vacuum wrench, mixer+motors, body drag/prop H, ground effect (low path), and unit-quaternion plant. Estimation matrix is not used here.",
+      "label": "Higher-fidelity dynamics",
+      "short_label": "Hi-fi",
+      "description": "Richer SIL plant under ideal full-state LQR: vacuum wrench baseline, mixer+motors, body drag/prop H, ground effect (low path), and unit-quaternion kinematics. Not a controller\u00d7sensor matrix.",
       "mission_file": "configs/missions/figure_eight.yaml",
       "yaw_mode": "constant",
       "time_scale": 1.0,
@@ -293254,17 +293254,17 @@
       "metrics"
     ],
     "display_title": "uavsim \u00b7 controller \u00d7 sensor flight study",
-    "value_prop": "SIL comparison of hover LQR and cascade PID under the same sensor suites, plus plant-fidelity variants.",
+    "value_prop": "SIL comparison of hover LQR and cascade PID under the same sensor suites, plus higher-fidelity plant variants.",
     "about_paragraphs": [
       "Offline SIL results for a quadrotor figure-eight: the same path flown by hover LQR and cascade PID under several sensor suites (ideal full state, GPS+IMU naive, GPS+IMU + linear KF, AHRS, optical-flow proxy + altitude, IMU-only).",
-      "Missions: baseline (constant yaw), near-envelope (\u03c4\u2605\u22480.28 + scheduled yaw), and plant fidelity (ideal LQR \u00d7 motors / aero / ground effect / quaternion).",
+      "Missions: baseline (constant yaw), near-envelope (\u03c4\u2605\u22480.28 + scheduled yaw), and higher-fidelity dynamics (ideal LQR \u00d7 motors / aero / ground effect / quaternion).",
       "Ideal full-state is the tracking upper bound. Stacks that do not observe position (or feed an incomplete state bus) are expected to exceed the position bound; those cases are included on purpose.",
       "Also included: Monte Carlo on GPS+IMU LQG, and a time-scale envelope over every matrix stack. Simulation only \u2014 not flight software."
     ]
   },
   "plant_matrix": {
-    "title": "Plant fidelity matrix",
-    "description": "Same ideal hover LQR and (mostly) the same figure-eight path; only the plant / actuator model changes. Nominal vacuum wrench is the portfolio baseline cell. Motors add mixer lag; aero adds drag/prop H; ground effect uses a low path + Cheeseman\u2013Bennett \u03ba(h); quaternion uses the 13-state plant with the same Euler-bus controller. Click a cell \u2192 Flight / System diagram.",
+    "title": "Higher-fidelity dynamics",
+    "description": "Same ideal hover LQR and (mostly) the same figure-eight path; only the dynamics / actuator model is richer. Nominal vacuum wrench is the portfolio baseline cell. Motors add mixer lag; aero adds drag/prop H; ground effect uses a low path + Cheeseman\u2013Bennett \u03ba(h); quaternion uses the 13-state plant with the same Euler-bus controller. Click a cell \u2192 Flight / System diagram.",
     "columns": [
       {
         "id": "nominal",

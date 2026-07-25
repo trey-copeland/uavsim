@@ -59,7 +59,7 @@ Stack schema source of truth: [STACK_SPEC.md](STACK_SPEC.md).
 |------------|-------------|-------------|------|
 | `baseline` | Baseline | `figure_eight_lqr` | Constant-yaw portfolio path (`matrix_kind: estimation`) |
 | `envelope_edge` | Envelope edge | `edge_figure_eight_lqr` | τ★≈0.28 + scheduled yaw (`matrix_kind: estimation`) |
-| `plant_fidelity` | Plant | `plant_nominal_lqr` | Ideal LQR × plant variants (`matrix_kind: plant`) |
+| `plant_fidelity` | Hi-fi | `plant_nominal_lqr` | Higher-fidelity dynamics under ideal LQR (`matrix_kind: plant`) |
 
 - **Primary control:** segmented buttons in the sticky header only.
 - **In-tab:** `Active mission · …` chip (no second full selector).

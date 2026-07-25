@@ -1,6 +1,6 @@
 # uavsim flight results (React)
 
-Single-page React app for the portfolio base case: a **guided technical report** with a **controller × sensor** matrix (LQR/LQG and PID) on **baseline** and **near-envelope** missions, a **plant fidelity** mission (ideal LQR × motors / aero / GE / quat), Flight 3D, System block diagram, Monte Carlo, and a **tracking envelope**.
+Single-page React app for the portfolio base case: a **guided technical report** with a **controller × sensor** matrix (LQR/LQG and PID) on **baseline** and **near-envelope** missions, a **higher-fidelity dynamics** mission (ideal LQR × motors / aero / GE / quat), Flight 3D, System block diagram, Monte Carlo, and a **tracking envelope**.
 
 **UI product spec (as-built):** [UI_SPEC.md](UI_SPEC.md) — IA, screens, data contract, copy slots, sync policy. Keep it updated when the SPA or `showcase.json` shape changes.
 
@@ -33,7 +33,7 @@ Single-page React app for the portfolio base case: a **guided technical report**
 
 Mission: [`configs/missions/figure_eight.yaml`](../../configs/missions/figure_eight.yaml) — constant yaw, ≥4 s segments, altitude undulation.
 
-### Plant fidelity mission
+### Higher-fidelity dynamics mission (UI: **Hi-fi**)
 
 | Cell | Study | Notes |
 |------|--------|--------|
@@ -43,7 +43,7 @@ Mission: [`configs/missions/figure_eight.yaml`](../../configs/missions/figure_ei
 | Ground effect | `figure_eight_ge.yaml` | Low path + `default_quadrotor_ge` |
 | Quaternion plant | `figure_eight_quat.yaml` | `sim.attitude: quat` |
 
-Overview uses `plant_matrix` when Mission = **Plant**. CLI: `--skip-plant-mission` on `uavsim gallery --base-case`.
+Overview uses `plant_matrix` when Mission = **Hi-fi**. CLI: `--skip-plant-mission` on `uavsim gallery --base-case`.
 
 **Naming:** LQG = linear KF + hover LQR. PID+KF is the cascade on \(\hat x\), not classical LQG.  
 **Full honesty list:** [docs/LIMITATIONS.md](../LIMITATIONS.md).  

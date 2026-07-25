@@ -224,10 +224,10 @@ def _plant_scenario(
 
 
 PLANT_MATRIX: dict[str, Any] = {
-    "title": "Plant fidelity matrix",
+    "title": "Higher-fidelity dynamics",
     "description": (
         "Same ideal hover LQR and (mostly) the same figure-eight path; only the "
-        "plant / actuator model changes. Nominal vacuum wrench is the portfolio "
+        "dynamics / actuator model is richer. Nominal vacuum wrench is the portfolio "
         "baseline cell. Motors add mixer lag; aero adds drag/prop H; ground effect "
         "uses a low path + Cheeseman–Bennett κ(h); quaternion uses the 13-state plant "
         "with the same Euler-bus controller. Click a cell → Flight / System diagram."
@@ -1023,12 +1023,12 @@ def generate_base_case_gallery(
         missions.append(
             {
                 "id": MISSION_PLANT_FIDELITY,
-                "label": "Plant fidelity (ideal LQR)",
-                "short_label": "Plant",
+                "label": "Higher-fidelity dynamics",
+                "short_label": "Hi-fi",
                 "description": (
-                    "Ideal full-state LQR with plant/actuator upgrades: vacuum wrench, "
+                    "Richer SIL plant under ideal full-state LQR: vacuum wrench baseline, "
                     "mixer+motors, body drag/prop H, ground effect (low path), and "
-                    "unit-quaternion plant. Estimation matrix is not used here."
+                    "unit-quaternion kinematics. Not a controller×sensor matrix."
                 ),
                 "mission_file": "configs/missions/figure_eight.yaml",
                 "yaw_mode": "constant",
@@ -1053,7 +1053,7 @@ def generate_base_case_gallery(
         ),
         (
             "Missions: baseline (constant yaw), near-envelope (τ★≈0.28 + scheduled yaw), "
-            "and plant fidelity (ideal LQR × motors / aero / ground effect / quaternion)."
+            "and higher-fidelity dynamics (ideal LQR × motors / aero / ground effect / quaternion)."
         ),
         (
             "Ideal full-state is the tracking upper bound. Stacks that do not observe "
@@ -1083,7 +1083,7 @@ def generate_base_case_gallery(
     doc["ui"]["display_title"] = "uavsim · controller × sensor flight study"
     doc["ui"]["value_prop"] = (
         "SIL comparison of hover LQR and cascade PID under the same sensor suites, "
-        "plus plant-fidelity variants."
+        "plus higher-fidelity plant variants."
     )
     doc["ui"]["about_paragraphs"] = about_paragraphs
     write_gallery(doc, out, copy_app=True, template_dir=root / "docs" / "showcase")

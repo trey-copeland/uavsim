@@ -239,11 +239,12 @@ Styles: match existing dark theme (`styles.css`). Accessible: focusable blocks, 
 - Link from `docs/showcase/README.md`
 - This file is the schema source of truth for Phase 0–1
 
-## 7. Plant fidelity mission
+## 7. Higher-fidelity dynamics mission
 
 | Field | Value |
 |-------|--------|
-| Mission id | `plant_fidelity` |
+| Mission id | `plant_fidelity` (stable id) |
+| UI labels | `short_label`: **Hi-fi** · `label`: **Higher-fidelity dynamics** |
 | `matrix_kind` | `plant` |
 | Matrix field | `plant_matrix` on `showcase.json` |
 | Studies | `PLANT_FIDELITY_STUDIES` in `gallery.py` (nominal / motors / aero / GE / quat) |

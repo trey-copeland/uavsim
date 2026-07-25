@@ -1180,7 +1180,7 @@
                 { style: { margin: 0, flex: "1 1 auto" } },
                 matrix.title ||
                   (isPlantMatrix
-                    ? "Plant fidelity matrix"
+                    ? "Higher-fidelity dynamics"
                     : "Controller × sensor matrix")
               ),
               e(ActiveMissionChip, { doc: doc, missionId: missionId })
@@ -1189,7 +1189,7 @@
               "p",
               { className: "matrix-lead" },
               isPlantMatrix
-                ? "Position RMSE for each plant/actuator variant under ideal full-state LQR. Click a cell → Flight 3D; System tab shows the closed-loop diagram with plant badges."
+                ? "Position RMSE when the plant/actuator model is richer (same ideal LQR). Click a cell → Flight 3D; System tab shows which dynamics are on."
                 : null,
               !isPlantMatrix
                 ? e(
@@ -3194,9 +3194,9 @@
           "p",
           null,
           "The active mission is ",
-          e("strong", null, "plant fidelity"),
-          " — plant/actuator variants under ideal LQR, not controller×sensor stacks. ",
-          "Use Overview for the plant matrix, or switch Mission to Baseline / Envelope edge for this tab."
+          e("strong", null, mission.short_label || mission.label || "Hi-fi"),
+          " — richer plant/actuator models under ideal LQR, not controller×sensor stacks. ",
+          "Use Overview for that matrix, or switch Mission to Baseline / Envelope edge for this tab."
         )
       );
     }
