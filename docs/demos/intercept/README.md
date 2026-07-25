@@ -2,6 +2,8 @@
 
 Dashboard for the **pad climb + ground-effect** intercept story: online `intercept_pursue` (G-6) + NDI + MEKF GPS/IMU + battery + plant Monte Carlo (pack rebuilt from online MC runs).
 
+**Tutorials (how we built / how to run):** [T-GUIDE-ONLINE](../tutorials/01_online_intercept.md) · [T-ENERGY](../tutorials/02_battery_energy.md) · [tutorials index](../tutorials/README.md)
+
 - **Spec:** [`UX_SPEC.md`](UX_SPEC.md) (**R3**)
 - **Checklist:** [`IMPLEMENT_CHECKLIST.md`](IMPLEMENT_CHECKLIST.md)
 - **R3 brief:** [`UX_REVIEW_R3_BRIEF.md`](UX_REVIEW_R3_BRIEF.md)

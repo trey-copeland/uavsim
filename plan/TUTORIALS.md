@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|--------|
-| **Status** | Draft — packaging + teaching track for intercept epic and future extension guides |
+| **Status** | **T-GUIDE-ONLINE + T-ENERGY shipped** on intercept branch; T0 + full track polish deferred to a separate tutorials branch |
 | **Goal** | Ship **runnable configs**, **developer Markdown where useful**, and **interactive hosted demos** (GitHub Pages) that teach how to use and extend `uavsim` |
 | **Priority product** | Online intercept + battery + live demo — [`ONLINE_INTERCEPT_AND_BATTERY.md`](ONLINE_INTERCEPT_AND_BATTERY.md) |
 | **Airframe for hero demo** | **Sized-up X-quadrotor** (not trirotor) |
@@ -58,9 +58,9 @@ Layer A is **required** for the intercept epic done criteria. Layer B supports �
 | ID | Surface | Depends on | Status intent |
 |----|---------|------------|----------------|
 | **D-INTERCEPT** | Live interactive intercept demo | ONLINE_INTERCEPT_AND_BATTERY Phases B–E | **Hero — must ship** |
-| **T-GUIDE-ONLINE** | Markdown: online guidance / G-6 / config | Same product | Ship with or right after D-INTERCEPT |
-| **T-ENERGY** | Markdown: battery opt-in / proxies | Battery phase | Sibling short guide |
-| **T0** | First run CLI (Markdown) | Nothing | Thin on-ramp |
+| **T-GUIDE-ONLINE** | Markdown: online guidance / G-6 / config | Same product | **Done** — `docs/tutorials/01_online_intercept.md` |
+| **T-ENERGY** | Markdown: battery opt-in / proxies | Battery phase | **Done** — `docs/tutorials/02_battery_energy.md` |
+| **T0** | First run CLI (Markdown) | Nothing | **Deferred** — separate tutorial-track branch |
 | **T-VEH-YAML** | Optional short: “point a study at a new quad YAML” | Nothing | Optional contrast; **not** a layout plugin story — may fold into intercept vehicle section of T-GUIDE-ONLINE |
 | **T-GUIDE-PLUGIN** | How intercept (or a stub) registers as guidance | G-5 preferred | Extension appendix |
 | ~~T-EXT-AIR trirotor~~ | Multi-layout extension map | — | **Out of this track** (revisit only under a future airframe plan) |
