@@ -152,6 +152,7 @@ def run_closed_loop_trial(
     metrics["sim_message"] = sim_result.message
     metrics["observer_id"] = sim_result.observer_id
     metrics["sim_attitude"] = sim_result.attitude
+    _maybe_add_capture_metrics(metrics, sim_result.t, sim_result.x, cfg)
     if sim_result.x_hat is not None and sim_result.x is not None:
         from uavsim.dynamics.attitude_error import geodesic_attitude_error_rad
 
@@ -212,6 +213,41 @@ def _write_reference_artifacts(run_dir: Path, prepared: PreparedStudy) -> None:
         )
 
 
+def _maybe_add_capture_metrics(
+    metrics: dict[str, Any],
+    t: np.ndarray,
+    x: np.ndarray,
+    cfg: StudyConfig,
+) -> None:
+    """If study metrics name a target mission, record min range / capture flag."""
+    path = getattr(cfg.metrics, "capture_target_mission", None)
+    if not path:
+        return
+    from uavsim.guidance.waypoints.backend import WaypointsGuidance
+
+    radius = float(getattr(cfg.metrics, "capture_radius_m", 1.0))
+    backend = WaypointsGuidance(method="interp", yaw_mode="from_waypoints", sample_dt_s=0.01)
+    plan = backend.plan({"mission_file": str(path)}, prepared_vehicle_for_capture(cfg))
+    p_t = np.vstack([plan.reference.evaluate(float(ti)).x_ref[0:3] for ti in t])
+    range_m = np.linalg.norm(x[:, 0:3] - p_t, axis=1)
+    i_min = int(np.argmin(range_m))
+    min_range = float(range_m[i_min])
+    metrics["min_range_m"] = min_range
+    metrics["time_of_min_range_s"] = float(t[i_min])
+    metrics["capture_radius_m"] = radius
+    metrics["intercept_success"] = bool(min_range <= radius)
+
+
+def prepared_vehicle_for_capture(cfg: StudyConfig):
+    """Load nominal vehicle for target planning (mass-independent trajectory)."""
+    from uavsim.vehicles.params import default_vehicle, load_vehicle
+
+    try:
+        return load_vehicle(cfg.vehicle)
+    except Exception:
+        return default_vehicle()
+
+
 def _metric_row(metrics: dict[str, Any]) -> dict[str, Any]:
     """Flatten metrics for trial tables (skip nested/large fields)."""
     keys = (
@@ -225,9 +261,14 @@ def _metric_row(metrics: dict[str, Any]) -> dict[str, Any]:
         "control_effort_proxy",
         "peak_thrust_n",
         "peak_torque_nm",
+        "peak_tilt_rad",
         "success",
         "sim_success",
         "sim_message",
+        "min_range_m",
+        "time_of_min_range_s",
+        "capture_radius_m",
+        "intercept_success",
     )
     return {k: metrics[k] for k in keys if k in metrics}
 

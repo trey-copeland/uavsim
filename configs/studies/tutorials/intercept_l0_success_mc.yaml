@@ -1,8 +1,8 @@
-# L0 feasibility: open-loop intercept reference, full-state NDI, quat plant.
-# Capture: min range to scripted target ≤ 1 m (post-sim metrics script / later pipeline).
+# L0 intercept success recipe + 500-trial plant MC (sharded).
+# Capture metric: min range to scripted target ≤ 1 m.
 schema_version: 1
-study_id: intercept_l0_success
-seed: 0
+study_id: intercept_l0_success_mc
+seed: 42
 
 vehicle: configs/vehicles/tutorials/intercept_quadrotor.yaml
 
@@ -38,3 +38,13 @@ metrics:
   position_bound_m: 1.0
   capture_target_mission: configs/missions/tutorials/intercept_l0_target.yaml
   capture_radius_m: 1.0
+
+monte_carlo:
+  enabled: true
+  n_trials: 500
+  backend: local
+  shards: 8
+  redesign_controller: false
+  mass_rel_sigma: 0.10
+  inertia_rel_sigma: 0.10
+  arm_rel_sigma: 0.02

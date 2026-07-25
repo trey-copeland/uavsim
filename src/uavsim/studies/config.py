@@ -122,6 +122,9 @@ class MetricsConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     position_bound_m: float = Field(gt=0, default=0.1)
+    # Optional intercept / pursuit capture metrics vs a scripted target mission
+    capture_target_mission: str | None = None
+    capture_radius_m: float = Field(default=1.0, gt=0)
 
 
 class InitialStateConfig(BaseModel):

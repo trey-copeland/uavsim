@@ -35,3 +35,5 @@ sim:
 
 metrics:
   position_bound_m: 1.0
+  capture_target_mission: configs/missions/tutorials/intercept_l0_target.yaml
+  capture_radius_m: 1.0
