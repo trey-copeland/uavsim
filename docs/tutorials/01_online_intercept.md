@@ -53,9 +53,10 @@ cat $RUN/nominal/metrics.json | head   # or use jq
 | `n_replans` | How many times online guidance rewrote \(x_r\) |
 | `observer_id` | e.g. `mekf` |
 | `soc_final` / `energy_depleted` | Battery bookkeeping (if vehicle has `battery.enabled`) |
-| `success` (tracking) | Peak error vs **reference** + attitude bounds — **often false** under online replan |
+| `success` (tracking) | Peak error vs **commanded** \(x_r\) at each tick + attitude bounds (not capture) |
+| `tracking_vs_commanded_reference` | Should be **true** — RMSE uses the logged piecewise \(x_r\), not the final replan segment alone |
 
-Do **not** treat tracking `success` as intercept success. Online \(x_r\) moves every replan; RMSE can look terrible while min-range is &lt; 1 m.
+Do **not** treat tracking `success` as intercept success. Capture is range-to-target; tracking RMSE diagnoses lag/overshoot on short replan segments (can still fail attitude/pos bounds while `intercept_success` is true).
 
 ---
 
@@ -208,7 +209,7 @@ Checklist for a **new online guidance backend** (same seams as intercept):
 5. Force fixed-step path when `GuidanceLoop` is active (already done for online).  
 6. Unit-test pure helpers without the plant; integration study smoke with short `duration_s`.
 
-Anti-patterns: putting motor counts in the controller; importing guidance from `control`; treating tracking RMSE as capture.
+Anti-patterns: putting motor counts in the controller; importing guidance from `control`; treating tracking RMSE as capture; re-evaluating only the final `adapter.reference` after online replan (clamps — use commanded samples).
 
 ---
 

@@ -153,6 +153,7 @@ For a **true** geometric path, prefer a `SampledReference` dense grid (see `refe
 | Called from closed-loop | **Done** — `sim.closed_loop.GuidanceLoop` + `InProcessControllerAdapter.set_reference` |
 | `intercept_pursue` | **Done** — seed climb mission + scripted target; CV lead-point short-horizon replan after `replan_start_s` |
 | Capture metrics | `metrics.capture_target_mission` + `intercept_success` / `min_range_m` (not tracking RMSE) |
+| Tracking metrics | Per-tick commanded \(x_r\) log (`ClosedLoopResult.x_ref`); do not re-eval final replan segment alone |
 | RNG / MC interaction for replan | **Partial** — replan uses plant state / \(\hat x\); no extra replan RNG |
 
 **Study examples**

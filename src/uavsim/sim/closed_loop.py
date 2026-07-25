@@ -44,6 +44,8 @@ class ClosedLoopResult:
     soc: np.ndarray | None = None
     energy_wh_remaining: np.ndarray | None = None
     replan_log: list[dict[str, Any]] | None = None
+    # Commanded x_r at each control sample (online replan: piecewise, not final segment only)
+    x_ref: np.ndarray | None = None
 
 
 def _attach_battery(result: ClosedLoopResult, plant: SimPlant) -> ClosedLoopResult:
@@ -166,9 +168,13 @@ def _simulate_euler_ivp(
     t_out = np.linspace(t0, tf, n)
     x_out = sol.sol(t_out).T
     u_out = np.zeros((n, CONTROL_DIM))
+    x_ref_out = (
+        np.zeros((n, STATE_DIM)) if isinstance(command_source, InProcessControllerAdapter) else None
+    )
     for i, ti in enumerate(t_out):
         meas = MeasurementBus(t=float(ti), x=x_out[i])
         u_out[i] = plant.apply_command(command_source.command(float(ti), meas))
+        _store_commanded_x_ref(command_source, x_ref_out, i)
 
     finite = np.isfinite(x_out).all() and np.isfinite(u_out).all()
     return ClosedLoopResult(
@@ -180,7 +186,24 @@ def _simulate_euler_ivp(
         attitude="euler",
         x_hat=x_out.copy(),
         observer_id="none",
+        x_ref=x_ref_out,
     )
+
+
+def _store_commanded_x_ref(
+    command_source: CommandSource,
+    x_ref_out: np.ndarray | None,
+    i: int,
+) -> None:
+    """Record the reference sample the controller just used (if available)."""
+    if x_ref_out is None:
+        return
+    if not isinstance(command_source, InProcessControllerAdapter):
+        return
+    sample = command_source.last_sample
+    if sample is None:
+        return
+    x_ref_out[i] = np.asarray(sample.x_ref, dtype=float).reshape(STATE_DIM)
 
 
 def _maybe_replan(
@@ -241,6 +264,9 @@ def _simulate_fixed_step(
     x_out = np.zeros((n, STATE_DIM))
     x_hat_out = np.zeros((n, STATE_DIM))
     u_out = np.zeros((n, CONTROL_DIM))
+    x_ref_out = (
+        np.zeros((n, STATE_DIM)) if isinstance(command_source, InProcessControllerAdapter) else None
+    )
     project = plant.dynamics.project
 
     x = plant.x.copy()
@@ -263,6 +289,7 @@ def _simulate_fixed_step(
         meas_ctrl = MeasurementBus(t=ti, x=observer.x_hat)
         ui = plant.apply_command(command_source.command(ti, meas_ctrl))
         u_out[i] = ui
+        _store_commanded_x_ref(command_source, x_ref_out, i)
 
         def f_at(tt: float, xx: np.ndarray, uu: np.ndarray = ui) -> np.ndarray:
             return plant.derivatives(tt, xx, uu)
@@ -296,6 +323,7 @@ def _simulate_fixed_step(
     # Final control sample
     meas_f = MeasurementBus(t=float(t_out[-1]), x=observer.x_hat)
     u_out[-1] = plant.apply_command(command_source.command(float(t_out[-1]), meas_f))
+    _store_commanded_x_ref(command_source, x_ref_out, n - 1)
 
     finite = np.isfinite(x_out).all() and np.isfinite(u_out).all() and np.isfinite(x_hat_out).all()
     att = plant.dynamics.attitude
@@ -310,4 +338,5 @@ def _simulate_fixed_step(
         x_hat=x_hat_out,
         observer_id=str(oid),
         replan_log=list(guidance_loop.replan_log) if guidance_loop is not None else None,
+        x_ref=x_ref_out,
     )

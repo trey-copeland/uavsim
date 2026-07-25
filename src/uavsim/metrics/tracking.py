@@ -20,17 +20,35 @@ def compute_metrics(
     reference: ReferenceTrajectory,
     *,
     position_bound_m: float = 0.1,
+    x_ref: np.ndarray | None = None,
 ) -> dict[str, Any]:
-    x_ref = np.vstack([reference.evaluate(float(ti)).x_ref for ti in t])
-    e_pos = x[:, 0:3] - x_ref[:, 0:3]
-    e_vel = x[:, 6:9] - x_ref[:, 6:9]
+    """Tracking metrics vs the reference the controller was given.
+
+    Prefer ``x_ref`` when provided: the per-sample commanded state actually used
+    at each control tick. Re-evaluating a single ``ReferenceTrajectory`` object
+    after the run is wrong for online replan (``intercept_pursue``), where
+    ``adapter.reference`` is only the *last* segment and ``evaluate`` clamps
+    out-of-range times to that segment's ``t0`` — producing garbage RMSE.
+    """
+    if x_ref is None:
+        x_ref_arr = np.vstack([reference.evaluate(float(ti)).x_ref for ti in t])
+    else:
+        x_ref_arr = np.asarray(x_ref, dtype=float)
+        if x_ref_arr.shape != np.asarray(x, dtype=float).shape:
+            msg = (
+                f"x_ref shape {x_ref_arr.shape} must match state trajectory shape "
+                f"{np.asarray(x).shape}"
+            )
+            raise ValueError(msg)
+    e_pos = x[:, 0:3] - x_ref_arr[:, 0:3]
+    e_vel = x[:, 6:9] - x_ref_arr[:, 6:9]
 
     # SO(3) attitude error (geodesic angle + rotation-vector components)
     e_att_vec = np.vstack(
-        [rotation_error_vector_from_euler(x[i, 3:6], x_ref[i, 3:6]) for i in range(x.shape[0])]
+        [rotation_error_vector_from_euler(x[i, 3:6], x_ref_arr[i, 3:6]) for i in range(x.shape[0])]
     )
     att_angle = np.array(
-        [geodesic_attitude_error_rad(x[i, 3:6], x_ref[i, 3:6]) for i in range(x.shape[0])]
+        [geodesic_attitude_error_rad(x[i, 3:6], x_ref_arr[i, 3:6]) for i in range(x.shape[0])]
     )
 
     pos_err_norm = np.linalg.norm(e_pos, axis=1)
@@ -89,4 +107,6 @@ def compute_metrics(
         "n_samples": int(t.size),
         "t_final_s": float(t[-1]) if t.size else 0.0,
         "attitude_error_model": "so3_geodesic",
+        # True when RMSE used per-tick commanded x_r (required for online replan)
+        "tracking_vs_commanded_reference": bool(x_ref is not None),
     }

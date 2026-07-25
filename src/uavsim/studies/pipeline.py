@@ -187,6 +187,8 @@ def run_closed_loop_trial(
         sim_result.u,
         adapter.reference,
         position_bound_m=cfg.metrics.position_bound_m,
+        # Per-tick commanded x_r (survives online replan; do not re-eval last segment only)
+        x_ref=sim_result.x_ref,
     )
     metrics["sim_success"] = sim_result.success
     metrics["sim_message"] = sim_result.message
@@ -214,7 +216,20 @@ def run_closed_loop_trial(
     return sim_result, metrics
 
 
-def _write_reference_artifacts(run_dir: Path, prepared: PreparedStudy) -> None:
+def _write_reference_artifacts(
+    run_dir: Path,
+    prepared: PreparedStudy,
+    *,
+    commanded_t: np.ndarray | None = None,
+    commanded_x_ref: np.ndarray | None = None,
+) -> None:
+    """Write reference artifacts for viz / provenance.
+
+    When ``commanded_x_ref`` is provided (closed-loop log of the sample used at
+    each control tick), write that grid so Flight 3D / RMSE overlays match the
+    controller under online replan. Otherwise fall back to the prepared plan
+    reference (correct for fixed open-loop trajectories).
+    """
     reference = prepared.reference
     write_yaml(
         run_dir / "guidance" / "backend.yaml",
@@ -230,7 +245,39 @@ def _write_reference_artifacts(run_dir: Path, prepared: PreparedStudy) -> None:
         run_dir / "guidance" / "feasibility.json",
         prepared.feasibility.to_dict(),
     )
-    if isinstance(reference, SampledReference):
+
+    t_cmd = x_cmd = None
+    if commanded_t is not None and commanded_x_ref is not None:
+        t_cmd = np.asarray(commanded_t, dtype=float).reshape(-1)
+        x_cmd = np.asarray(commanded_x_ref, dtype=float)
+        if t_cmd.size < 2 or x_cmd.shape[0] != t_cmd.size:
+            t_cmd = x_cmd = None
+
+    if t_cmd is not None and x_cmd is not None:
+        write_json(
+            run_dir / "reference" / "sampled.json",
+            {
+                "backend_id": reference.backend_id,
+                "t0": float(t_cmd[0]),
+                "tf": float(t_cmd[-1]),
+                "n_samples": int(t_cmd.size),
+                "dt_s": float(np.mean(np.diff(t_cmd))) if t_cmd.size > 1 else None,
+                "metadata": {
+                    **(reference.metadata or {}),
+                    "commanded_reference_source": "closed_loop_samples",
+                    "note": (
+                        "Piecewise commanded x_r at each sim sample "
+                        "(online replan safe; not the final segment alone)"
+                    ),
+                },
+            },
+        )
+        np.savez_compressed(
+            run_dir / "reference" / "grid.npz",
+            t=t_cmd,
+            x=x_cmd,
+        )
+    elif isinstance(reference, SampledReference):
         write_json(
             run_dir / "reference" / "sampled.json",
             {
@@ -601,7 +648,12 @@ def run_nominal_study(
 
     run_dir = create_run_directory(output_root, cfg.study_id)
     write_yaml(run_dir / "study_config.yaml", cfg.model_dump())
-    _write_reference_artifacts(run_dir, prepared)
+    _write_reference_artifacts(
+        run_dir,
+        prepared,
+        commanded_t=sim_result.t,
+        commanded_x_ref=sim_result.x_ref,
+    )
     write_nominal_timeseries(
         run_dir,
         sim_result.t,
