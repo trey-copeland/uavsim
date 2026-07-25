@@ -25,6 +25,26 @@ class ClosedLoopResult:
     attitude: str = "euler"
     x_hat: np.ndarray | None = None  # (N, 12) estimates when observer active
     observer_id: str = "none"
+    # Optional battery logs (None when vehicle.battery.enabled is false)
+    power_w: np.ndarray | None = None
+    soc: np.ndarray | None = None
+    energy_wh_remaining: np.ndarray | None = None
+
+
+def _attach_battery(result: ClosedLoopResult, plant: SimPlant) -> ClosedLoopResult:
+    """Post-process energy series when vehicle.battery.enabled (non-breaking)."""
+    from uavsim.vehicles.battery import integrate_battery
+
+    vehicle = getattr(plant, "vehicle", None)
+    if vehicle is None:
+        return result
+    series = integrate_battery(result.t, result.u, vehicle)
+    if series is None:
+        return result
+    result.power_w = series.power_w
+    result.soc = series.soc
+    result.energy_wh_remaining = series.energy_wh_remaining
+    return result
 
 
 def simulate_closed_loop(
@@ -46,6 +66,7 @@ def simulate_closed_loop(
     - Quaternion plant and/or non-identity observer: fixed-step RK4 with
       optional measurement noise and Kalman (or other) updates.
     Output ``x`` is always **true** Euler 12-state for metrics.
+    Optional battery logs when ``plant.vehicle.battery.enabled``.
     """
     plant.reset(x0, t0=t0)
     obs = observer if observer is not None else IdentityObserver()
@@ -59,7 +80,7 @@ def simulate_closed_loop(
         or not isinstance(obs, IdentityObserver)
     )
     if use_fixed:
-        return _simulate_fixed_step(
+        result = _simulate_fixed_step(
             plant,
             command_source,
             t0=t0,
@@ -68,16 +89,18 @@ def simulate_closed_loop(
             observer=obs,
             measurement_model=measurement_model,
         )
-    return _simulate_euler_ivp(
-        plant,
-        command_source,
-        t0=t0,
-        tf=tf,
-        x0=x0,
-        max_step=max_step,
-        rtol=rtol,
-        atol=atol,
-    )
+    else:
+        result = _simulate_euler_ivp(
+            plant,
+            command_source,
+            t0=t0,
+            tf=tf,
+            x0=x0,
+            max_step=max_step,
+            rtol=rtol,
+            atol=atol,
+        )
+    return _attach_battery(result, plant)
 
 
 def _simulate_euler_ivp(

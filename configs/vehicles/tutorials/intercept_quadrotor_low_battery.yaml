@@ -1,7 +1,6 @@
-# Intercept-class X-quadrotor (~1.5 kg, high T/W) with pad GE + battery.
-# NED z+ down: pad near ground_z; climb decreases z (higher AGL).
+# Success-class plant with deliberately tiny battery for energy-fail demo.
 schema_version: 1
-vehicle_id: intercept_quadrotor
+vehicle_id: intercept_quadrotor_low_battery
 
 mass_kg: 1.5
 gravity_m_s2: 9.81
@@ -12,7 +11,6 @@ inertia:
   iyy_kg_m2: 0.035
   izz_kg_m2: 0.060
 
-# T/W ≈ 4.5
 limits:
   thrust_min_n: 0.0
   thrust_max_n: 66.2
@@ -33,7 +31,6 @@ aero:
   prop_h_s_per_m: 0.0
   ground_effect: cheeseman
   rotor_radius_m: 0.12
-  # Pad plane; AGL = ground_z - z. Pad z≈3.05 → AGL≈0.05 m (GE on).
   ground_z_ned_m: 3.10
   ge_exp_a: 0.5
   ge_exp_b: 2.0
@@ -41,7 +38,7 @@ aero:
 
 battery:
   enabled: true
-  capacity_wh: 8.0
+  capacity_wh: 0.12
   initial_soc: 1.0
   model: hover_scaled
   hover_power_w: 220.0

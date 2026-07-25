@@ -1,5 +1,5 @@
-/* uavsim intercept L0 demo — vanilla JS + Plotly. Data: ./data/demo.json
- * R2: 3D trajectory + MC confidence bands (2D fill + 3D percentile fan).
+/* uavsim intercept L0 demo — vanilla JS + Plotly.
+ * R3: sticky top transport · 3D|attitude · 2D|range · MC bands · battery.
  */
 (function () {
   "use strict";
@@ -17,7 +17,11 @@
     scene: "#0a0e16",
   };
 
-  const PLOTLY_CFG = { displaylogo: false, responsive: true, modeBarButtonsToRemove: ["lasso2d", "select2d"] };
+  const PLOTLY_CFG = {
+    displaylogo: false,
+    responsive: true,
+    modeBarButtonsToRemove: ["lasso2d", "select2d"],
+  };
 
   /** @type {any} */
   let demo = null;
@@ -34,11 +38,15 @@
   let rafId = null;
   let lastWall = 0;
 
-  /** 3D restyle bookkeeping */
   let traj3dReady = false;
   /** @type {{trail:number, own:number, tgt:number}|null} */
   let traj3dIdx = null;
   let traj3dKey = "";
+
+  let attReady = false;
+  /** @type {{frame:number, motors:number, ax:number, ay:number, az:number}|null} */
+  let attIdx = null;
+  let attKey = "";
 
   const el = {
     app: document.getElementById("app"),
@@ -90,6 +98,30 @@
     return t ? t.length : 0;
   }
 
+  function hasEuler() {
+    const c = activeCase();
+    const e = c && c.timeseries && c.timeseries.euler_deg;
+    return !!(e && e.length);
+  }
+
+  function hasBattery() {
+    const c = activeCase();
+    const ts = c && c.timeseries;
+    if (!ts) return false;
+    return !!(
+      (ts.soc && ts.soc.length) ||
+      (ts.power_w && ts.power_w.length) ||
+      (ts.energy_wh_remaining && ts.energy_wh_remaining.length)
+    );
+  }
+
+  /** SOC as 0–100 percent from fraction or already-percent values. */
+  function socPercent(v) {
+    if (v == null || !Number.isFinite(v)) return null;
+    if (v <= 1.01) return 100 * v;
+    return v;
+  }
+
   function plotLayoutBase(overrides) {
     return Object.assign(
       {
@@ -120,7 +152,111 @@
     );
   }
 
-  /* ── Scene bounds (showcase-style) ─────────────────── */
+  /* ── Attitude helpers (showcase VehicleAttitudeView patterns) ── */
+
+  function deg2rad(d) {
+    return (d * Math.PI) / 180;
+  }
+
+  function matMulVec(R, v) {
+    return [
+      R[0][0] * v[0] + R[0][1] * v[1] + R[0][2] * v[2],
+      R[1][0] * v[0] + R[1][1] * v[1] + R[1][2] * v[2],
+      R[2][0] * v[0] + R[2][1] * v[1] + R[2][2] * v[2],
+    ];
+  }
+
+  /** Body→NED rotation, ZYX (φ, θ, ψ) in radians. */
+  function rotationBodyToNed(phi, theta, psi) {
+    const cph = Math.cos(phi);
+    const sph = Math.sin(phi);
+    const cth = Math.cos(theta);
+    const sth = Math.sin(theta);
+    const cps = Math.cos(psi);
+    const sps = Math.sin(psi);
+    return [
+      [cps * cth, cps * sth * sph - sps * cph, cps * sth * cph + sps * sph],
+      [sps * cth, sps * sth * sph + cps * cph, sps * sth * cph - cps * sph],
+      [-sth, cth * sph, cth * cph],
+    ];
+  }
+
+  function bodyToPlot(R, vb) {
+    const ned = matMulVec(R, vb);
+    return [ned[0], ned[1], -ned[2]];
+  }
+
+  function arrowSeg(R, originBody, dirBody, length) {
+    const o = bodyToPlot(R, originBody);
+    const d = bodyToPlot(R, dirBody);
+    const n = Math.hypot(d[0], d[1], d[2]) || 1;
+    return {
+      x: [o[0], o[0] + (d[0] / n) * length],
+      y: [o[1], o[1] + (d[1] / n) * length],
+      z: [o[2], o[2] + (d[2] / n) * length],
+    };
+  }
+
+  /** X-quad mesh + body axes at origin (wrench optional). */
+  function vehicleGeom(eulerDeg) {
+    const eu = eulerDeg || [0, 0, 0];
+    const phi = deg2rad(+eu[0] || 0);
+    const theta = deg2rad(+eu[1] || 0);
+    const psi = deg2rad(+eu[2] || 0);
+    const R = rotationBodyToNed(phi, theta, psi);
+    const L = 0.38;
+    const motorsB = [
+      [L, L, 0],
+      [-L, L, 0],
+      [-L, -L, 0],
+      [L, -L, 0],
+    ];
+    const segs = [
+      [motorsB[0], motorsB[2]],
+      [motorsB[1], motorsB[3]],
+      [
+        [0.1, 0.1, 0],
+        [-0.1, 0.1, 0],
+      ],
+      [
+        [-0.1, 0.1, 0],
+        [-0.1, -0.1, 0],
+      ],
+      [
+        [-0.1, -0.1, 0],
+        [0.1, -0.1, 0],
+      ],
+      [
+        [0.1, -0.1, 0],
+        [0.1, 0.1, 0],
+      ],
+    ];
+    const fx = [];
+    const fy = [];
+    const fz = [];
+    segs.forEach(function (pair) {
+      const a = bodyToPlot(R, pair[0]);
+      const b = bodyToPlot(R, pair[1]);
+      fx.push(a[0], b[0], null);
+      fy.push(a[1], b[1], null);
+      fz.push(a[2], b[2], null);
+    });
+    const motors = motorsB.map(function (m) {
+      return bodyToPlot(R, m);
+    });
+    const axLen = 0.28;
+    return {
+      frame: { x: fx, y: fy, z: fz },
+      motors: motors,
+      axes: {
+        x: arrowSeg(R, [0, 0, 0], [1, 0, 0], axLen),
+        y: arrowSeg(R, [0, 0, 0], [0, 1, 0], axLen),
+        z: arrowSeg(R, [0, 0, 0], [0, 0, 1], axLen),
+      },
+    };
+  }
+
+  /* ── Scene bounds ──────────────────────────────────── */
 
   function fitSceneBounds(plotArrays) {
     const xs = [];
@@ -236,91 +372,71 @@
     const interceptOk = c && c.metrics && c.metrics.intercept_success;
     const pClass = !hasMc() ? "" : pCap >= 0.5 ? "good" : "bad";
     const failMcNote = caseId === "fail" && hasMc();
+    const batt = hasBattery();
+    const m = (c && c.metrics) || {};
+    const socFinal = m.soc_final != null ? socPercent(m.soc_final) : null;
+    const socMin = m.soc_min != null ? socPercent(m.soc_min) : null;
 
     traj3dReady = false;
     traj3dIdx = null;
     traj3dKey = "";
+    attReady = false;
+    attIdx = null;
+    attKey = "";
+
+    const storyDefault =
+      "Pad climb intercept — ownship takes off from a pad, climbs through ground effect, " +
+      "then tracks an open-loop path toward a scripted target with fixed NDI.";
 
     el.app.innerHTML = `
-      <header class="app-header">
-        <h1>${escapeHtml(title)}</h1>
-        <p class="tagline">${escapeHtml(valueProp)}</p>
-        <div class="meta">
-          generated ${escapeHtml(demo.generated_at || "—")}
-          · uavsim ${escapeHtml(demo.uavsim_version || "—")}
-          ${mc && mc.source_study ? " · MC " + escapeHtml(mc.source_study) : ""}
-        </div>
-        <div class="header-row">
-          <div class="seg" id="case-seg" role="group" aria-label="Nominal case">
-            <button type="button" data-case="success" class="${caseId === "success" ? "active" : ""}">Success</button>
-            <button type="button" data-case="fail" class="${caseId === "fail" ? "active" : ""}" ${hasFail() ? "" : "disabled"}>Fail</button>
+      <div class="sticky-chrome">
+        <header class="app-header">
+          <h1>${escapeHtml(title)}</h1>
+          <p class="tagline">${escapeHtml(valueProp)}</p>
+          <div class="meta">
+            generated ${escapeHtml(demo.generated_at || "—")}
+            · uavsim ${escapeHtml(demo.uavsim_version || "—")}
+            ${mc && mc.source_study ? " · MC " + escapeHtml(mc.source_study) : ""}
           </div>
-          <span class="badge ${interceptOk ? "ok" : "miss"}" id="capture-badge">${interceptOk ? "Capture" : "Miss"}</span>
-          <div class="kpi-row" id="kpi-row">
-            <div class="kpi ${pClass}">
-              <span class="kpi-label">P(capture)</span>
-              <span class="kpi-value">${hasMc() ? fmtPct(pCap) : "no MC"}</span>
+          <div class="header-row">
+            <div class="seg" id="case-seg" role="group" aria-label="Nominal case">
+              <button type="button" data-case="success" class="${caseId === "success" ? "active" : ""}">Success</button>
+              <button type="button" data-case="fail" class="${caseId === "fail" ? "active" : ""}" ${hasFail() ? "" : "disabled"}>Fail</button>
             </div>
-            <div class="kpi">
-              <span class="kpi-label">n trials</span>
-              <span class="kpi-value">${hasMc() ? String(nTrials) : "—"}</span>
-            </div>
-            <div class="kpi">
-              <span class="kpi-label">r capture</span>
-              <span class="kpi-value">${fmt(rCap, 2)} m</span>
-            </div>
-          </div>
-          <button type="button" class="about-toggle" id="about-btn">About</button>
-        </div>
-        <div class="about-panel ${aboutOpen ? "" : "hidden"}" id="about-panel">
-          ${(ui.about_paragraphs || []).map((p) => `<p>${escapeHtml(p)}</p>`).join("")}
-        </div>
-      </header>
-
-      <div class="story-strip">
-        <strong>L0 intercept</strong> — open-loop ownship path + scripted target + fixed NDI.
-        Capture when
-        <span class="capture-eq">min ‖p<sub>own</sub> − p<sub>tgt</sub>‖ ≤ ${fmt(rCap, 2)} m</span>.
-        Plant MC on the success recipe; Fail is a miss nominal for geometry contrast.
-        ${
-          failMcNote
-            ? '<span class="fail-mc-note"> MC / bands: success plant study</span>'
-            : ""
-        }
-      </div>
-
-      <main>
-        <div class="primary-row">
-          <section class="card">
-            <h2>
-              Trajectory 3D
-              <span class="card-tools">
-                <label class="tool-label" id="bands-label" title="${hasBands() ? "Show MC percentile bands on 2D + 3D" : "Bands not in data pack"}">
-                  <input type="checkbox" id="bands-toggle" ${showBands && hasBands() ? "checked" : ""} ${hasBands() ? "" : "disabled"} />
-                  MC bands
-                </label>
-              </span>
-            </h2>
-            <div class="plot-host tall" id="traj3d-plot"></div>
-          </section>
-          <section class="card">
-            <h2>Range vs time</h2>
-            <div class="plot-host tall" id="range-plot"></div>
-          </section>
-        </div>
-
-        <section class="card traj2d-card">
-          <h2>
-            Trajectory 2D
-            <span class="card-tools">
-              <div class="seg" id="proj-seg" role="group" aria-label="Projection">
-                <button type="button" data-proj="NE" class="${projection === "NE" ? "active" : ""}">N–E</button>
-                <button type="button" data-proj="NU" class="${projection === "NU" ? "active" : ""}">N–Up</button>
+            <span class="badge ${interceptOk ? "ok" : "miss"}" id="capture-badge">${interceptOk ? "Capture" : "Miss"}</span>
+            <div class="kpi-row" id="kpi-row">
+              <div class="kpi ${pClass}">
+                <span class="kpi-label">P(capture)</span>
+                <span class="kpi-value">${hasMc() ? fmtPct(pCap) : "no MC"}</span>
               </div>
-            </span>
-          </h2>
-          <div class="plot-host mid" id="traj-plot"></div>
-        </section>
+              <div class="kpi">
+                <span class="kpi-label">n trials</span>
+                <span class="kpi-value">${hasMc() ? String(nTrials) : "—"}</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-label">r capture</span>
+                <span class="kpi-value">${fmt(rCap, 2)} m</span>
+              </div>
+              ${
+                socFinal != null
+                  ? `<div class="kpi">
+                <span class="kpi-label">SOC final</span>
+                <span class="kpi-value">${fmt(socFinal, 1)}%</span>
+              </div>`
+                  : socMin != null
+                    ? `<div class="kpi">
+                <span class="kpi-label">SOC min</span>
+                <span class="kpi-value">${fmt(socMin, 1)}%</span>
+              </div>`
+                    : ""
+              }
+            </div>
+            <button type="button" class="about-toggle" id="about-btn">About</button>
+          </div>
+          <div class="about-panel ${aboutOpen ? "" : "hidden"}" id="about-panel">
+            ${(ui.about_paragraphs || []).map((p) => `<p>${escapeHtml(p)}</p>`).join("")}
+          </div>
+        </header>
 
         <div class="transport" id="transport">
           <button type="button" class="btn primary" id="play-btn">${playing ? "Pause" : "Play"}</button>
@@ -335,7 +451,80 @@
             <button type="button" data-speed="1" class="${speed === 1 ? "active" : ""}">1×</button>
             <button type="button" data-speed="2" class="${speed === 2 ? "active" : ""}">2×</button>
           </div>
+          <label class="tool-label transport-bands" id="bands-label" title="${hasBands() ? "Show MC percentile bands on 2D + 3D" : "Bands not in data pack"}">
+            <input type="checkbox" id="bands-toggle" ${showBands && hasBands() ? "checked" : ""} ${hasBands() ? "" : "disabled"} />
+            MC bands
+          </label>
+          <div class="soc-strip ${batt ? "" : "hidden"}" id="soc-strip" title="State of charge @ scrub">
+            <span class="soc-label">SOC</span>
+            <div class="soc-bar-track"><div class="soc-bar-fill" id="soc-bar-fill" style="width:0%"></div></div>
+            <span class="soc-pct" id="soc-pct">—</span>
+          </div>
         </div>
+      </div>
+
+      <div class="story-strip">
+        <strong>Pad climb intercept</strong> — ${escapeHtml(
+          ui.mission_notes === "pad_climb_ground_effect"
+            ? "ownship takes off from a pad, climbs through ground effect, then tracks an open-loop path toward a scripted target with fixed NDI."
+            : storyDefault.replace(/^Pad climb intercept — /, "")
+        )}
+        Capture when
+        <span class="capture-eq">min ‖p<sub>own</sub> − p<sub>tgt</sub>‖ ≤ ${fmt(rCap, 2)} m</span>.
+        Plant MC on the success recipe; battery SOC/power when logged.
+        ${
+          failMcNote
+            ? '<span class="fail-mc-note"> MC / bands: success plant study</span>'
+            : ""
+        }
+      </div>
+
+      <main>
+        <div class="primary-row">
+          <section class="card">
+            <h2>Trajectory 3D</h2>
+            <div class="plot-host tall" id="traj3d-plot"></div>
+          </section>
+          <section class="card">
+            <h2>Attitude @ origin</h2>
+            <div class="plot-host tall" id="attitude-plot"></div>
+            <p class="muted-note ${hasEuler() ? "hidden" : ""}" id="att-empty">
+              Attitude not in pack (missing <code>euler_deg</code>). Rebuild exporter from state <code>x[:,3:6]</code>.
+            </p>
+          </section>
+        </div>
+
+        <div class="secondary-row">
+          <section class="card">
+            <h2>
+              Trajectory 2D
+              <span class="card-tools">
+                <div class="seg" id="proj-seg" role="group" aria-label="Projection">
+                  <button type="button" data-proj="NE" class="${projection === "NE" ? "active" : ""}">N–E</button>
+                  <button type="button" data-proj="NU" class="${projection === "NU" ? "active" : ""}">N–Up</button>
+                </div>
+              </span>
+            </h2>
+            <div class="plot-host mid" id="traj-plot"></div>
+          </section>
+          <section class="card">
+            <h2>Range vs time</h2>
+            <div class="plot-host mid" id="range-plot"></div>
+          </section>
+        </div>
+
+        <section class="card battery-row ${batt ? "" : "hidden"}" id="battery-panel">
+          <h2>Battery</h2>
+          <div class="battery-grid">
+            <div class="soc-gauge-wrap">
+              <div class="soc-gauge-label">SOC @ t</div>
+              <div class="soc-gauge-value" id="soc-gauge-value">—</div>
+              <div class="soc-bar-track large"><div class="soc-bar-fill" id="soc-gauge-fill" style="width:0%"></div></div>
+            </div>
+            <div class="plot-host mid" id="power-plot"></div>
+            <div class="plot-host mid" id="energy-plot"></div>
+          </div>
+        </section>
 
         <section class="card mc-panel ${hasMc() ? "" : "hidden"}" id="mc-panel">
           <h2>Monte Carlo — min range</h2>
@@ -377,6 +566,15 @@
   }
 
   /* ── Controls ──────────────────────────────────────── */
+
+  function applyFrameViews() {
+    updateReadouts();
+    drawTraj3d(false);
+    drawAttitude(false);
+    drawTraj2d();
+    drawRange();
+    drawBattery();
+  }
 
   function wireControls() {
     const caseSeg = document.getElementById("case-seg");
@@ -445,10 +643,7 @@
       scrub.addEventListener("input", () => {
         frameIndex = parseInt(scrub.value, 10) || 0;
         if (playing) stopPlay();
-        updateReadouts();
-        drawTraj3d(false);
-        drawTraj2d();
-        drawRange();
+        applyFrameViews();
       });
     }
 
@@ -475,10 +670,7 @@
       else frameIndex = Math.min(n - 1, frameIndex + step);
       stopPlay();
       syncScrub();
-      updateReadouts();
-      drawTraj3d(false);
-      drawTraj2d();
-      drawRange();
+      applyFrameViews();
     } else if (ev.key === " " || ev.code === "Space") {
       ev.preventDefault();
       if (playing) stopPlay();
@@ -496,6 +688,26 @@
     if (playBtn) playBtn.textContent = playing ? "Pause" : "Play";
   }
 
+  function updateSocUi(pct) {
+    const fill = document.getElementById("soc-bar-fill");
+    const pctEl = document.getElementById("soc-pct");
+    const gFill = document.getElementById("soc-gauge-fill");
+    const gVal = document.getElementById("soc-gauge-value");
+    const w = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+    const color =
+      pct == null ? COLORS.muted : pct > 50 ? COLORS.good : pct > 20 ? COLORS.warn : COLORS.bad;
+    if (fill) {
+      fill.style.width = w + "%";
+      fill.style.background = color;
+    }
+    if (pctEl) pctEl.textContent = pct == null ? "—" : fmt(pct, 1) + "%";
+    if (gFill) {
+      gFill.style.width = w + "%";
+      gFill.style.background = color;
+    }
+    if (gVal) gVal.textContent = pct == null ? "—" : fmt(pct, 1) + "%";
+  }
+
   function updateReadouts() {
     const c = activeCase();
     const ts = c && c.timeseries;
@@ -509,6 +721,11 @@
       <div><span>range = </span><strong>${fmt(r, 3)} m</strong></div>
       <div><span>frame </span><strong>${i + 1}/${ts.t.length}</strong></div>
     `;
+    if (ts.soc && ts.soc.length) {
+      updateSocUi(socPercent(ts.soc[i]));
+    } else {
+      updateSocUi(null);
+    }
   }
 
   function jumpToCpa() {
@@ -538,10 +755,7 @@
     frameIndex = i;
     stopPlay();
     syncScrub();
-    updateReadouts();
-    drawTraj3d(false);
-    drawTraj2d();
-    drawRange();
+    applyFrameViews();
   }
 
   /* ── Playback ──────────────────────────────────────── */
@@ -582,11 +796,8 @@
     const tNow = t[frameIndex] + dtWall * speed;
     if (tNow >= t[t.length - 1]) {
       frameIndex = t.length - 1;
-      updateReadouts();
       syncScrub();
-      drawTraj3d(false);
-      drawTraj2d();
-      drawRange();
+      applyFrameViews();
       stopPlay();
       return;
     }
@@ -597,11 +808,8 @@
     }
     if (i !== frameIndex) {
       frameIndex = i;
-      updateReadouts();
       syncScrub();
-      drawTraj3d(false);
-      drawTraj2d();
-      drawRange();
+      applyFrameViews();
     }
     rafId = requestAnimationFrame(tick);
   }
@@ -903,6 +1111,174 @@
     });
   }
 
+  /* ── Attitude ──────────────────────────────────────── */
+
+  function applyAttitudeFrame(host, ts, i) {
+    if (!attReady || !attIdx || !host || !ts || !ts.euler_deg) return;
+    const ii = Math.max(0, Math.min(i, ts.euler_deg.length - 1));
+    const g = vehicleGeom(ts.euler_deg[ii]);
+    const m = g.motors;
+    Plotly.restyle(
+      host,
+      {
+        x: [
+          g.frame.x,
+          m.map(function (p) {
+            return p[0];
+          }),
+          g.axes.x.x,
+          g.axes.y.x,
+          g.axes.z.x,
+        ],
+        y: [
+          g.frame.y,
+          m.map(function (p) {
+            return p[1];
+          }),
+          g.axes.x.y,
+          g.axes.y.y,
+          g.axes.z.y,
+        ],
+        z: [
+          g.frame.z,
+          m.map(function (p) {
+            return p[2];
+          }),
+          g.axes.x.z,
+          g.axes.y.z,
+          g.axes.z.z,
+        ],
+      },
+      [attIdx.frame, attIdx.motors, attIdx.ax, attIdx.ay, attIdx.az]
+    );
+  }
+
+  function drawAttitude(forceFull) {
+    const host = document.getElementById("attitude-plot");
+    const c = activeCase();
+    if (!host || !c || !c.timeseries || typeof Plotly === "undefined") return;
+    const ts = c.timeseries;
+    if (!ts.euler_deg || !ts.euler_deg.length) {
+      host.innerHTML = "";
+      attReady = false;
+      return;
+    }
+    const i = Math.min(frameIndex, ts.euler_deg.length - 1);
+    const key = caseId;
+
+    if (!forceFull && attReady && attKey === key) {
+      applyAttitudeFrame(host, ts, i);
+      return;
+    }
+
+    attReady = false;
+    attKey = key;
+    const g0 = vehicleGeom(ts.euler_deg[0]);
+    const span = 1.05;
+    const bounds = { x: [-span, span], y: [-span, span], z: [-span, span] };
+
+    function ax(title) {
+      return {
+        title: title,
+        range: [-span, span],
+        autorange: false,
+        gridcolor: "#243044",
+        zerolinecolor: "#3a4a60",
+        showbackground: true,
+        backgroundcolor: "rgba(10,14,22,0.95)",
+        showspikes: false,
+      };
+    }
+
+    function line3(seg, color, width, name, showleg) {
+      return {
+        type: "scatter3d",
+        mode: "lines",
+        x: seg.x,
+        y: seg.y,
+        z: seg.z,
+        line: { color: color, width: width },
+        name: name,
+        showlegend: !!showleg,
+        hoverinfo: "name",
+      };
+    }
+
+    const m0 = g0.motors;
+    const traces = [
+      cornerTrace(bounds),
+      {
+        type: "scatter3d",
+        mode: "lines",
+        x: g0.frame.x,
+        y: g0.frame.y,
+        z: g0.frame.z,
+        line: { color: "#8ab4e8", width: 8 },
+        name: "airframe",
+        hoverinfo: "skip",
+      },
+      {
+        type: "scatter3d",
+        mode: "markers",
+        x: m0.map(function (p) {
+          return p[0];
+        }),
+        y: m0.map(function (p) {
+          return p[1];
+        }),
+        z: m0.map(function (p) {
+          return p[2];
+        }),
+        marker: {
+          size: 8,
+          color: ["#5b9fd4", "#e6b450", "#5b9fd4", "#e6b450"],
+          symbol: "circle",
+          line: { width: 1, color: "#0a0e16" },
+        },
+        name: "motors",
+        hoverinfo: "skip",
+      },
+      line3(g0.axes.x, "#f07178", 6, "body +x", true),
+      line3(g0.axes.y, "#3ecf8e", 6, "body +y", true),
+      line3(g0.axes.z, "#5b9fd4", 6, "body +z", true),
+    ];
+
+    attIdx = { frame: 1, motors: 2, ax: 3, ay: 4, az: 5 };
+
+    const layout = {
+      paper_bgcolor: COLORS.scene,
+      plot_bgcolor: COLORS.scene,
+      font: { color: COLORS.text, size: 11 },
+      margin: { l: 0, r: 0, t: 8, b: 0 },
+      uirevision: "att-" + caseId,
+      scene: {
+        xaxis: ax("N"),
+        yaxis: ax("E"),
+        zaxis: ax("up"),
+        aspectmode: "cube",
+        bgcolor: COLORS.scene,
+        camera: {
+          eye: { x: 1.55, y: 1.55, z: 1.15 },
+          center: { x: 0, y: 0, z: 0 },
+          up: { x: 0, y: 0, z: 1 },
+        },
+      },
+      showlegend: true,
+      legend: {
+        orientation: "h",
+        y: 1.08,
+        x: 0,
+        font: { size: 10, color: COLORS.muted },
+        bgcolor: "rgba(0,0,0,0)",
+      },
+    };
+
+    Plotly.react(host, traces, layout, PLOTLY_CFG).then(function () {
+      attReady = true;
+      applyAttitudeFrame(host, ts, i);
+    });
+  }
+
   /* ── 2D trajectory ─────────────────────────────────── */
 
   function drawTraj2d() {
@@ -1046,8 +1422,8 @@
       {
         x: [tPlay, tPlay],
         y: [
-          Math.min(0, Math.min(...ts.range_m)),
-          Math.max(rCap * 1.2, Math.max(...ts.range_m)),
+          Math.min(0, Math.min.apply(null, ts.range_m)),
+          Math.max(rCap * 1.2, Math.max.apply(null, ts.range_m)),
         ],
         mode: "lines",
         name: "playhead",
@@ -1083,6 +1459,92 @@
     });
 
     Plotly.react(host, traces, layout, PLOTLY_CFG);
+  }
+
+  /* ── Battery ───────────────────────────────────────── */
+
+  function seriesPlayheadTraces(t, y, tPlay, color, name) {
+    const yMin = Math.min.apply(null, y);
+    const yMax = Math.max.apply(null, y);
+    const pad = 0.05 * Math.max(1e-6, yMax - yMin);
+    return [
+      {
+        x: t,
+        y: y,
+        mode: "lines",
+        name: name,
+        line: { color: color, width: 2 },
+      },
+      {
+        x: [tPlay, tPlay],
+        y: [yMin - pad, yMax + pad],
+        mode: "lines",
+        name: "playhead",
+        line: { color: COLORS.warn, width: 1.5 },
+        showlegend: false,
+      },
+    ];
+  }
+
+  function drawBattery() {
+    if (!hasBattery()) return;
+    const c = activeCase();
+    const ts = c.timeseries;
+    const i = Math.min(frameIndex, ts.t.length - 1);
+    const tPlay = ts.t[i];
+
+    const powerHost = document.getElementById("power-plot");
+    const energyHost = document.getElementById("energy-plot");
+
+    if (powerHost && ts.power_w && ts.power_w.length && typeof Plotly !== "undefined") {
+      const traces = seriesPlayheadTraces(ts.t, ts.power_w, tPlay, COLORS.accent, "power");
+      Plotly.react(
+        powerHost,
+        traces,
+        plotLayoutBase({
+          title: { text: "Power (W)", font: { size: 12, color: COLORS.muted } },
+          xaxis: { title: "t (s)", gridcolor: COLORS.grid, color: COLORS.muted },
+          yaxis: { title: "W", gridcolor: COLORS.grid, color: COLORS.muted },
+          margin: { l: 48, r: 10, t: 32, b: 40 },
+          showlegend: false,
+          uirevision: "power-" + caseId,
+        }),
+        PLOTLY_CFG
+      );
+    } else if (powerHost) {
+      powerHost.innerHTML = '<p class="muted-note" style="padding:1rem">power_w not in pack</p>';
+    }
+
+    if (
+      energyHost &&
+      ts.energy_wh_remaining &&
+      ts.energy_wh_remaining.length &&
+      typeof Plotly !== "undefined"
+    ) {
+      const traces = seriesPlayheadTraces(
+        ts.t,
+        ts.energy_wh_remaining,
+        tPlay,
+        COLORS.good,
+        "energy"
+      );
+      Plotly.react(
+        energyHost,
+        traces,
+        plotLayoutBase({
+          title: { text: "Energy remaining (Wh)", font: { size: 12, color: COLORS.muted } },
+          xaxis: { title: "t (s)", gridcolor: COLORS.grid, color: COLORS.muted },
+          yaxis: { title: "Wh", gridcolor: COLORS.grid, color: COLORS.muted },
+          margin: { l: 48, r: 10, t: 32, b: 40 },
+          showlegend: false,
+          uirevision: "energy-" + caseId,
+        }),
+        PLOTLY_CFG
+      );
+    } else if (energyHost) {
+      energyHost.innerHTML =
+        '<p class="muted-note" style="padding:1rem">energy_wh_remaining not in pack</p>';
+    }
   }
 
   function drawHist() {
@@ -1192,17 +1654,14 @@
             ? `<li><span>peak tilt mean</span><strong>${fmt((tilt.mean * 180) / Math.PI, 1)}°</strong></li>`
             : ""
         }
-        ${
-          nBand != null
-            ? `<li><span>band paths used</span><strong>${nBand}</strong></li>`
-            : ""
-        }
+        ${nBand != null ? `<li><span>band paths used</span><strong>${nBand}</strong></li>` : ""}
       `;
     }
 
     const how = document.getElementById("how-to");
     const bullets =
       (demo.ui && demo.ui.how_to_read) || [
+        "Pad takeoff → climb through ground effect → open-loop intercept path.",
         "Plant parameter scatter only — controller gains are fixed.",
         "Capture = min range ≤ capture radius (not tracking success).",
         "MC is on the success recipe; Fail toggle is geometry contrast only.",
@@ -1215,8 +1674,10 @@
 
   function drawAll() {
     drawTraj3d(true);
+    drawAttitude(true);
     drawTraj2d();
     drawRange();
+    drawBattery();
     drawHist();
   }
 
@@ -1250,7 +1711,7 @@
   }
 
   async function boot() {
-    let url = "./data/demo.json";
+    const url = "./data/demo.json";
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);

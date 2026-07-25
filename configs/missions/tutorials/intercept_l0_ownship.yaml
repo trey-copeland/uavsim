@@ -1,14 +1,17 @@
-# L0 open-loop ownship: hard intercept (shorter transit) then ride-along.
-# Target: p=[20, -15+5*t, 3], v=[0,5,0]  (intercept_l0_target.yaml)
-# CPA t=3.0 → target at [20, 0, 3]; ownship transit ~2 s over ~20 m → high accel.
+# Pad takeoff (GE) → climb → intercept CPA → ride-along.
+# NED z+ down. Pad z≈3.05 (AGL≈0.05 m vs ground_z=3.10); cruise z=1.0 (AGL≈2.1 m).
+# Target: intercept_l0_target.yaml at z=1.0, v=[0,5,0].
+# CPA t=5.0 → target at [20, 10, 1.0].
 schema_version: 1
 name: intercept_l0_ownship
 frame: NED
 description: >
-  Aggressive L0 intercept reference for high-T/W NDI plant.
+  Climb-from-pad intercept: ground effect on takeoff, then hard lateral transit.
 waypoints:
-  - {label: start, time: 0.0, x: 0.0, y: 0.0, z: 3.0, yaw: 0.0}
-  - {label: settle, time: 1.0, x: 0.0, y: 0.0, z: 3.0, yaw: 0.0}
-  - {label: cpa, time: 3.0, x: 20.0, y: 0.0, z: 3.0, yaw: 1.5708}
-  - {label: ride_mid, time: 5.5, x: 20.0, y: 12.5, z: 3.0, yaw: 1.5708}
-  - {label: end, time: 8.0, x: 20.0, y: 25.0, z: 3.0, yaw: 1.5708}
+  - {label: pad, time: 0.0, x: 0.0, y: 0.0, z: 3.05, yaw: 0.0}
+  - {label: lift, time: 1.0, x: 0.0, y: 0.0, z: 2.5, yaw: 0.0}
+  - {label: cruise_alt, time: 2.5, x: 0.0, y: 0.0, z: 1.0, yaw: 0.5}
+  # Hard lateral transit (~20 m in 1.5 s) — needs high T/W; starve plant for fail
+  - {label: cpa, time: 4.0, x: 20.0, y: 5.0, z: 1.0, yaw: 1.5708}
+  - {label: ride_mid, time: 7.0, x: 20.0, y: 20.0, z: 1.0, yaw: 1.5708}
+  - {label: end, time: 10.0, x: 20.0, y: 35.0, z: 1.0, yaw: 1.5708}

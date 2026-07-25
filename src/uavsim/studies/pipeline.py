@@ -153,6 +153,10 @@ def run_closed_loop_trial(
     metrics["observer_id"] = sim_result.observer_id
     metrics["sim_attitude"] = sim_result.attitude
     _maybe_add_capture_metrics(metrics, sim_result.t, sim_result.x, cfg)
+    from uavsim.vehicles.battery import battery_metrics, integrate_battery
+
+    bat_series = integrate_battery(sim_result.t, sim_result.u, plant_vehicle)
+    metrics.update(battery_metrics(bat_series))
     if sim_result.x_hat is not None and sim_result.x is not None:
         from uavsim.dynamics.attitude_error import geodesic_attitude_error_rad
 
@@ -269,6 +273,12 @@ def _metric_row(metrics: dict[str, Any]) -> dict[str, Any]:
         "time_of_min_range_s",
         "capture_radius_m",
         "intercept_success",
+        "soc_final",
+        "soc_min",
+        "energy_used_wh",
+        "energy_depleted",
+        "peak_power_w",
+        "battery_enabled",
     )
     return {k: metrics[k] for k in keys if k in metrics}
 
@@ -552,6 +562,9 @@ def run_nominal_study(
         sim_result.x,
         sim_result.u,
         x_hat=sim_result.x_hat,
+        power_w=sim_result.power_w,
+        soc=sim_result.soc,
+        energy_wh_remaining=sim_result.energy_wh_remaining,
     )
     write_json(run_dir / "nominal" / "metrics.json", metrics)
     ctrl_summary: dict[str, Any] = {

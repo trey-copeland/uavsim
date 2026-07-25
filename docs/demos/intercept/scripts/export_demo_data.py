@@ -164,6 +164,10 @@ def load_case_pack(
         "sim_success": metrics.get("sim_success"),
         "t_final_s": float(t_full[-1]) if t_full.size else None,
     }
+    # Battery metrics when pipeline logged them
+    for bk in ("soc_final", "soc_min", "peak_power_w", "battery_enabled", "energy_wh_final"):
+        if bk in metrics and metrics[bk] is not None:
+            case_metrics[bk] = metrics[bk]
 
     timeseries: dict[str, Any] = {
         "t": t.tolist(),
@@ -175,6 +179,19 @@ def load_case_pack(
         "euler_deg": np.rad2deg(x[:, 3:6]).tolist() if x.shape[1] >= 6 else None,
         "vel_ned": x[:, 6:9].tolist() if x.shape[1] >= 9 else None,
     }
+    # Battery / energy series (same downsample index as position)
+    for key in ("soc", "power_w", "energy_wh_remaining"):
+        if key in data.files:
+            arr = np.asarray(data[key], dtype=float)
+            if arr.shape[0] == t_full.size:
+                timeseries[key] = arr[idx].tolist()
+            elif arr.size == t_full.size:
+                timeseries[key] = arr.reshape(-1)[idx].tolist()
+    # Optional wrench for attitude rotor viz
+    if "u" in data.files:
+        u_full = np.asarray(data["u"], dtype=float)
+        if u_full.ndim == 2 and u_full.shape[0] == t_full.size:
+            timeseries["u"] = u_full[idx].tolist()
     # Drop null optional arrays for smaller JSON
     timeseries = {k: v for k, v in timeseries.items() if v is not None}
 
@@ -628,7 +645,12 @@ def build_demo(
     if fail is not None:
         cases["fail"] = fail
 
+    has_batt = any(
+        k in (success.get("timeseries") or {}) for k in ("soc", "power_w", "energy_wh_remaining")
+    )
+
     how_to = [
+        "Pad takeoff → climb through ground effect → open-loop intercept path.",
         "Plant parameter scatter only — controller gains are fixed.",
         "Capture = min range ≤ capture radius (not tracking RMSE / success flag).",
         "MC summary attaches to the success recipe; Fail toggle shows a miss nominal only.",
@@ -638,6 +660,34 @@ def build_demo(
             "Trajectory bands = ownship spatial p5/p50/p95 from plant re-sim "
             f"(n={bands.get('n_paths_used')}); axis-wise, not sensor noise."
         )
+    if has_batt:
+        how_to.append(
+            "Battery SOC / power / energy series are scrub-synced when logged by the study."
+        )
+
+    about = [
+        (
+            "Pad climb intercept: ownship takes off from a pad, climbs through ground effect "
+            "(GE), then tracks an open-loop reference toward a scripted target with fixed NDI "
+            "(redesign_controller=false under plant MC). L0 is not closed-loop replan."
+        ),
+        (
+            f"Capture criterion: min_t ‖p_own − p_tgt‖ ≤ r_capture "
+            f"(default r_capture = {r_cap:g} m). KPI P(capture) uses "
+            "intercept_success, not tracking success (attitude error bounds often fail)."
+        ),
+        (
+            "Monte Carlo perturbs plant parameters only (mass, I, arm length, …). "
+            "Gains stay fixed so the histogram reflects plant robustness, "
+            "not retuned control. Trajectory confidence bands are offline re-sim "
+            "percentiles of ownship position under that plant scatter."
+        ),
+    ]
+    if has_batt:
+        about.append(
+            "Battery model enabled on this pack: SOC, electrical power, and energy remaining "
+            "are downsampled with the nominal timeseries for the scrubbed energy story."
+        )
 
     return {
         "schema_version": 1,
@@ -646,29 +696,14 @@ def build_demo(
         "uavsim_version": uavsim_version,
         "ui": {
             "value_prop": (
-                "Open-loop ownship intercept path, scripted target, fixed NDI gains; "
-                "plant mass / inertia / arm scatter for Monte Carlo."
+                "Pad climb (ground effect) → open-loop intercept path; scripted target; "
+                "fixed NDI; plant mass / inertia / arm Monte Carlo"
+                + ("; battery SOC/power when logged." if has_batt else ".")
             ),
-            "about_paragraphs": [
-                (
-                    "L0 intercept: the ownship flies a preplanned path (waypoints / open-loop "
-                    "reference) while a scripted target mission defines the intercept geometry. "
-                    "The controller is cascade NDI with redesign_controller=false under plant MC."
-                ),
-                (
-                    f"Capture criterion: min_t ‖p_own − p_tgt‖ ≤ r_capture "
-                    f"(default r_capture = {r_cap:g} m). KPI P(capture) uses "
-                    "intercept_success, not tracking success (attitude error bounds often fail)."
-                ),
-                (
-                    "Monte Carlo perturbs plant parameters only (mass, I, arm length, …). "
-                    "Gains stay fixed so the histogram reflects plant robustness, "
-                    "not retuned control. Trajectory confidence bands are offline re-sim "
-                    "percentiles of ownship position under that plant scatter."
-                ),
-            ],
+            "about_paragraphs": about,
             "capture_radius_m": r_cap,
             "default_case": "success",
+            "mission_notes": "pad_climb_ground_effect",
             "how_to_read": how_to,
         },
         "cases": cases,

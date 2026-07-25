@@ -1,5 +1,4 @@
-# Same mass/geometry as intercept_quadrotor but starved thrust/torque —
-# intentional L0 failure vehicle for "cannot close intercept" demo.
+# Same mass/GE/battery schema as intercept_quadrotor but starved thrust/torque.
 schema_version: 1
 vehicle_id: intercept_quadrotor_underpowered
 
@@ -12,11 +11,10 @@ inertia:
   iyy_kg_m2: 0.035
   izz_kg_m2: 0.060
 
-# T/W ≈ 1.15 — hover-capable, not enough lateral accel for hard intercept
 limits:
   thrust_min_n: 0.0
-  thrust_max_n: 16.9
-  torque_max_nm: 0.6
+  thrust_max_n: 15.5
+  torque_max_nm: 0.45
 
 propulsion:
   layout: x
@@ -27,13 +25,22 @@ propulsion:
   omega_max_rad_s: 900.0
 
 aero:
-  drag_lin_ns_m: 0.0
+  drag_lin_ns_m: 0.02
   drag_quad_ns2_m2: 0.0
-  rate_damp_nm_s: 0.0
+  rate_damp_nm_s: 0.001
   prop_h_s_per_m: 0.0
-  ground_effect: none
+  ground_effect: cheeseman
   rotor_radius_m: 0.12
-  ground_z_ned_m: 0.0
+  ground_z_ned_m: 3.10
   ge_exp_a: 0.5
   ge_exp_b: 2.0
   ge_kappa_max: 3.0
+
+battery:
+  enabled: true
+  capacity_wh: 8.0
+  initial_soc: 1.0
+  model: hover_scaled
+  hover_power_w: 220.0
+  thrust_power_exp: 1.5
+  idle_power_w: 8.0

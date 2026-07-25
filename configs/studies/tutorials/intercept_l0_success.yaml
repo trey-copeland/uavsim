@@ -1,5 +1,4 @@
-# L0 feasibility: open-loop intercept reference, full-state NDI, quat plant.
-# Capture: min range to scripted target ≤ 1 m (post-sim metrics script / later pipeline).
+# L0: pad climb (GE) + intercept, full-state NDI, battery on, quat plant.
 schema_version: 1
 study_id: intercept_l0_success
 seed: 0
@@ -38,3 +37,9 @@ metrics:
   position_bound_m: 1.0
   capture_target_mission: configs/missions/tutorials/intercept_l0_target.yaml
   capture_radius_m: 1.0
+
+initial_state:
+  position_ned_m: [0.0, 0.0, 3.05]
+  euler_rad: [0.0, 0.0, 0.0]
+  velocity_ned_m_s: [0.0, 0.0, 0.0]
+  omega_body_rad_s: [0.0, 0.0, 0.0]

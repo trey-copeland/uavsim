@@ -2,103 +2,153 @@
 
 | Field | Value |
 |-------|--------|
-| **Status** | Design R2 (3D + MC bands required) |
-| **Audience** | Hiring GNC reviewers + peers; teaching intercept + plant-MC robustness |
+| **Status** | Design **R3** (top transport · attitude pane · battery · pad/GE story) |
+| **Audience** | Hiring GNC reviewers + peers; teaching intercept + plant-MC robustness + energy |
 | **Location** | `docs/demos/intercept/` (independent of portfolio showcase) |
 | **Hosting** | Static GitHub Pages; no build step preferred |
 | **Stack** | HTML + vanilla JS (or React-via-CDN like showcase) + Plotly CDN |
-| **Story** | L0 open-loop ownship path, scripted target, NDI; capture if `min_range ≤ 1 m`; plant MC on success recipe |
+| **Story** | Pad takeoff + climb (ground effect), open-loop ownship path, scripted target, NDI; capture if `min_range ≤ 1 m`; plant MC on success recipe; battery SOC/power when enabled |
 
-This is a **thin single-mission dashboard**, not a matrix gallery. Reuse **visual language and interaction patterns** from [`docs/showcase/`](../../showcase/) (dark research chrome, scrubber, Flight 3D scene, MC histograms). Do **not** rebuild the controller × sensor portfolio.
+This is a **thin single-mission dashboard**, not a matrix gallery. Reuse **visual language and interaction patterns** from [`docs/showcase/`](../../showcase/) (dark research chrome, **sticky transport near header**, Flight **trajectory + attitude** dual-pane, MC histograms). Do **not** rebuild the controller × sensor portfolio.
 
 Related product intent: [`plan/ONLINE_INTERCEPT_AND_BATTERY.md`](../../../plan/ONLINE_INTERCEPT_AND_BATTERY.md) §5, §7; heritage of scrub/MC/3D in [`docs/showcase/UI_SPEC.md`](../../showcase/UI_SPEC.md).
 
-**R2 product correction:** 3D flight-path visualization and MC trajectory confidence bands are **required acceptance**, not stretch / nullable. Shipping `mc.bands: null` or a 2D-only primary view is **not** UX-satisfied for this iteration.
+**R2 product correction (retained):** 3D flight-path visualization and MC trajectory confidence bands are **required acceptance**. Shipping `mc.bands: null` or a 2D-only primary view is **not** UX-satisfied.
+
+**R3 product correction:** Layout and energy/attitude presentation are **hard requirements** (not polish):
+
+1. **Play/scrub transport at the TOP** (sticky under/with header — portfolio showcase pattern), **not** buried under geometry plots.
+2. **Attitude plot** (vehicle at origin / dual-pane Flight style) occupies the slot **to the right of primary 3D geometry** (where range-vs-time sat in R2).
+3. **Range-vs-time** moves **down**, **side-by-side with top-down (N–E) trajectory**.
+4. **MC confidence bands** remain **required and visible by default** on **2D and 3D** when `mc.bands` present.
+5. **Battery level indicator** (SOC gauge/bar scrub-synced) + **energy/power time series** when pack includes battery fields.
+6. Story copy: mission is **pad climb + ground effect** (takeoff from pad / GE), not abstract free-flight only.
 
 ---
 
 ## 1. Goals
 
-1. Communicate the **intercept story** in one screenful of hierarchy: geometry (3D + 2D) → capture KPI → MC confidence.
-2. Let a reviewer **play/scrub** a nominal success (and fail, if present) chase with ownship + target in **3D plot frame (N/E/up)** and supporting series/projections.
+1. Communicate the **intercept story** in one screenful of hierarchy: **transport first** → geometry (3D + **attitude**) → map + range → battery → capture KPI → MC confidence.
+2. Let a reviewer **play/scrub** a nominal success (and fail, if present) chase with ownship + target in **3D plot frame (N/E/up)**, **vehicle attitude at origin**, and supporting map/series — controls always reachable at top.
 3. Surface **P(capture)** and **min-range distribution** from plant mass / I / arm scatter without burying the reader in a full metrics dump.
-4. Show **toggleable MC confidence bands** on trajectories — **required on 2D N–E at minimum**; 3D shows nominal + envelope (percentile polylines and/or translucent tube-like fan).
-5. Ship as a **self-contained static SPA** under `docs/demos/intercept/` with a data pack that **includes** precomputed `mc.bands` (re-sim trials offline if needed).
+4. Show **toggleable MC confidence bands** on trajectories — **required on 2D N–E**; **required on 3D** (percentile polylines and/or translucent fan); default **ON** when data present.
+5. Show **battery SOC + power/energy** when timeseries include `soc` / `power_w` / `energy_wh_remaining`.
+6. Ship as a **self-contained static SPA** under `docs/demos/intercept/` with a data pack that **includes** precomputed `mc.bands` (and battery series when the study enables battery).
 
 ### Non-goals (summary)
 
-See §7. Notably: no live sim, no multi-mission matrix, no full per-trial 3D cloud of all 500 paths, dual-pane attitude/wrench mesh optional, battery UI optional later.
+See §7. Notably: no live sim, no multi-mission matrix, no full per-trial 3D cloud of all 500 paths, no wrench HUD required (attitude mesh yes; full rotor-thrust wrench optional). No in-browser re-sim.
 
 ---
 
 ## 2. Page structure / information hierarchy
 
-Single page, top → bottom (sticky header + one scrollable body; optional light section anchors — **no multi-tab matrix**).
+Single page, top → bottom. **Header + transport sticky** so play/scrub remains available while scrolling plots (showcase sticky-header pattern).
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│ HEADER (sticky)                                             │
-│  title · one-line value prop · About (expand) · meta        │
-│  [ Success | Fail ] case toggle   KPI chips: P(cap) · n · r │
+│ HEADER (sticky top)                                         │
+│  title · value prop · About · meta                          │
+│  [ Success | Fail ]   KPI chips: P(cap) · n · r             │
 ├─────────────────────────────────────────────────────────────┤
-│ STORY STRIP (1–2 sentences + capture criterion)             │
+│ TRANSPORT (sticky under header — R3 HARD)                   │
+│  Play · scrub · t / range readouts · speed · CPA · bands    │
+│  [optional compact SOC bar in transport row]                │
+├─────────────────────────────────────────────────────────────┤
+│ STORY STRIP                                                 │
+│  Pad takeoff + climb (ground effect) · L0 open-loop path ·  │
+│  scripted target · fixed NDI · capture criterion            │
 ├──────────────────────────────┬──────────────────────────────┤
-│ PRIMARY A: Trajectory 3D     │ PRIMARY B: companion pane    │
-│  N / E / up (Plotly scene)   │  Prefer: range(t)  OR        │
-│  ownship + target paths      │  2D N–E with bands + circle  │
-│  scrub markers + trail       │  (if range moved elsewhere)  │
-│  MC envelope (toggle)        │                              │
-│  optional capture sphere     │                              │
+│ PRIMARY A: Trajectory 3D     │ PRIMARY B: Attitude (R3)     │
+│  N / E / up (Plotly scene)   │  Vehicle at origin           │
+│  ownship + target paths      │  X-quad mesh + body axes     │
+│  scrub markers + trail       │  euler from pack / x[3:6]    │
+│  MC envelope (toggle)        │  scrub-synced (Flight style) │
+│  optional capture sphere     │  (wrench optional)           │
+├──────────────────────────────┼──────────────────────────────┤
+│ SECONDARY A: Top-down 2D     │ SECONDARY B: Range vs time   │
+│  N–E map                     │  range_m(t) + capture line   │
+│  paths + capture circle      │  scrub playhead              │
+│  MC band fill (required)     │                              │
 ├──────────────────────────────┴──────────────────────────────┤
-│ SECONDARY ROW (if range not in primary B)                   │
-│  2D N–E map with MC bands + capture circle  ·  range(t)     │
-│  (layout may combine: 3D | range on top; 2D bands full-width)│
-│  play / scrub bar (full width under primary geometry)       │
+│ BATTERY ROW (when data present — R3 HARD)                   │
+│  SOC gauge/bar (scrub-synced)  ·  power_w(t) / energy_wh(t) │
 ├─────────────────────────────────────────────────────────────┤
 │ MC PANEL                                                    │
-│  min_range histogram · optional peak_tilt / RMSE sparklines │
+│  min_range histogram · optional peak_tilt stats             │
 │  short “how to read” blurb                                  │
 ├─────────────────────────────────────────────────────────────┤
 │ FOOTER · Simulation only · link to repo / study YAMLs       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Preferred layout (R2)
+### Preferred layout (R3) — normative
 
-**Default recommendation** (desktop wide):
+| Slot | Content | R2 was… |
+|------|---------|---------|
+| **Sticky header** | Title, KPIs, case toggle, About | same |
+| **Sticky transport** | Play / scrub / speed / CPA / bands / time+range (+ optional SOC strip) | under geometry ❌ |
+| **Left primary** | **3D trajectory** (N, E, up) + MC envelope | same |
+| **Right primary** | **Attitude** at origin (Flight dual-pane style) | range(t) |
+| **Left secondary** | **2D N–E** + capture circle + **MC bands** | full-width 2D |
+| **Right secondary** | **`range_m(t)`** + capture line + playhead | right primary |
+| **Battery row** | SOC indicator + power/energy series | optional later ❌ → **required when pack has series** |
+| **MC panel** | histogram + how-to-read | same |
 
-| Slot | Content |
-|------|---------|
-| **Left primary** | **3D trajectory** (N, E, up) — ownship + target nominals, scrub markers, optional MC fan |
-| **Right primary** | **`range_m(t)`** with capture line + playhead |
-| **Secondary full width** | **2D N–E** with **MC bands** (required when data present), capture circle, scrub markers |
-| **Under geometry** | Shared **play / scrub** transport |
+**Not acceptable (R3):**
 
-**Acceptable alternate:** left **3D**, right **2D N–E with bands**; range(t) as a third row full-width card. Keep total density readable — do not force three equal tall plots if the viewport collapses.
-
-**Not acceptable:** 2D-only primary with 3D omitted; bands permanently absent from the shipped pack.
+- Transport only under plots (must also be at top; dual placement of transport is OK only if **top sticky** is the primary).
+- Range-vs-time still in the right primary slot instead of attitude.
+- Attitude omitted when `euler_deg` or state `x` attitude is available in pack.
+- MC bands permanently off / missing on 2D when `mc.bands` present.
+- Empty battery chrome when series exist; **or** fake empty battery charts when series absent (omit block if no data).
+- Story copy that ignores pad takeoff / ground effect for the current mission framing.
 
 ### 2.1 Header
 
 | Element | Behavior |
 |---------|----------|
 | **Title** | e.g. `uavsim · intercept L0 (NDI + plant MC)` — mono weight like showcase |
-| **Value prop** | One muted line: open-loop intercept path, scripted target, fixed NDI, plant scatter |
-| **About** | Collapsed: capture radius, success vs fail recipe, MC perturbations (mass/I/arm), redesign_controller false; note that trajectory bands come from re-sim / percentile paths |
+| **Value prop** | One muted line: pad climb + intercept path, scripted target, fixed NDI, plant scatter (+ battery if enabled) |
+| **About** | Collapsed: capture radius; pad takeoff / GE; success vs fail recipe; MC perturbations (mass/I/arm); redesign_controller false; trajectory bands from re-sim percentiles; battery model note if present |
 | **Case toggle** | Segmented control: **Success** \| **Fail** (disable or hide Fail if data missing) |
-| **KPI chips** | Always visible (from MC summary when available; else nominal-only badges) |
+| **KPI chips** | Always visible (from MC summary when available; else nominal-only badges). Optional chip: **SOC final** or **SOC min** when battery metrics exist |
 
 ### 2.2 Story strip
 
-Short static copy (from `meta.json` / `demo.json` `ui` block):
+Short static copy (from `meta.json` / `demo.json` `ui` block). **R3 must mention pad / GE:**
 
-- L0 = open-loop ownship reference + scripted target (not closed-loop replan hero yet, if still L0).
+- Ownship **takes off from a pad**, climbs through **ground effect**, then pursues a **scripted target** on an **open-loop** reference (L0 — not closed-loop replan hero yet if still L0).
 - Capture: \(\min_t \|p_{\mathrm{own}}-p_{\mathrm{tgt}}\| \le r_{\mathrm{capture}}\) (default **1 m**).
 - MC: plant parameters only; gains fixed; bands = spatial envelope of ownship under plant scatter.
+- Battery (if enabled): SOC/power logged; demo shows scrub-synced energy story.
 
-### 2.3 Primary visual A: trajectory 3D (required)
+Exporter / `ui` strings should be updated so About + value_prop match (not only hard-coded HTML).
 
-**Plot frame: North–East–Up** (Plotly `scatter3d`), matching showcase Flight path conventions ([`docs/showcase/UI_SPEC.md`](../../showcase/UI_SPEC.md) §4.2 trajectory pane — **path only**, not full attitude/wrench dual-pane).
+### 2.3 Transport bar (play + scrub) — **TOP, sticky (R3 hard)**
+
+Place **immediately under the header** (same sticky stack as showcase `sticky-header` / Flight toolbar feel). Do **not** leave transport only below secondary plots.
+
+| Control | Behavior |
+|---------|----------|
+| **Play / Pause** | Toggle; advances frame index at ~real-time or fixed FPS (e.g. 30 fps mapped to `t`) |
+| **Scrubber** | Range input 0…N−1; drag updates **all** markers (3D + 2D + attitude + range cursor + battery gauge) |
+| **← / →** | Step ±1 frame; Shift = ±10 (ignore when focus is text inputs) |
+| **Time readouts** | `t = … s` and `range = … m` tabular nums |
+| **Speed** | Optional 0.5× / 1× / 2×; default 1× |
+| **MC bands toggle** | Global for 2D + 3D envelopes; default **on** when data present |
+| **Jump to CPA** | Optional; index nearest `time_of_min_range_s` |
+| **SOC strip** | Optional compact bar in transport showing `soc[i]` when battery present |
+
+On case toggle: reset to t=0; pause; rebind all plots to active `CasePack`.
+
+**Frame sync rule:** one `frameIndex` drives every view. Prefer Plotly `restyle` for marker/trail/attitude updates on scrub; full `newPlot` only on case change, projection change, or band toggle.
+
+**CSS:** `position: sticky; top: 0` (or under fixed header height); `z-index` above plots; dark translucent background + border like showcase `.sticky-header` (`backdrop-filter` optional).
+
+### 2.4 Primary visual A: trajectory 3D (required)
+
+**Plot frame: North–East–Up** (Plotly `scatter3d`), matching showcase Flight **path** pane ([`docs/showcase/UI_SPEC.md`](../../showcase/UI_SPEC.md) §4.2).
 
 | Layer | Style | Notes |
 |-------|--------|------|
@@ -107,16 +157,30 @@ Short static copy (from `meta.json` / `demo.json` `ui` block):
 | Ownship trail to \(t_i\) | brighter / thicker | scrub-dependent |
 | Vehicle marker at \(t_i\) | accent | |
 | Target marker at \(t_i\) | warn | |
-| MC envelope (toggle) | translucent percentile polylines (p5/p50/p95) and/or soft mesh-like fan | ownship only; see §4.4 |
-| Capture sphere (optional) | faint dashed / translucent sphere radius `capture_radius_m` centered at target at CPA (or ownship at CPA) | **nice-to-have**; 2D circle remains required |
+| **MC envelope (toggle)** | translucent percentile polylines (p5/p50/p95) and/or soft fan | ownship only; **required visible when bands on** |
+| Capture sphere (optional) | faint dashed / translucent sphere radius `capture_radius_m` at CPA | nice-to-have |
 
-**Camera / scene:** fixed bounds from nominal paths (+ band extents if larger); dark scene bg; aspectmode manual; preserve camera on scrub via `uirevision` + restyle of markers/trail (showcase pattern). User may orbit/zoom via Plotly; scrub must not reset camera.
+**Camera / scene:** fixed bounds from nominal paths (+ band extents if larger); dark scene bg; aspectmode manual; preserve camera on scrub via `uirevision` + restyle of markers/trail. User may orbit/zoom; scrub must not reset camera.
 
-**Attitude mesh dual-pane** (X-quad, rotor thrust): **optional nice-to-have**, not R2 acceptance.
+### 2.5 Primary visual B: attitude at origin (**R3 hard**)
 
-### 2.4 Primary visual B / secondary: 2D trajectory + bands (required)
+Right of 3D — **Flight dual-pane attitude** pattern from [`docs/showcase/app.js`](../../showcase/app.js) (`VehicleAttitudeView` / `vehicleGeom`, ~lines 429–530, 857–1040):
 
-**Default 2D: North–East top-down** (Plotly 2D).
+| Concern | Guidance |
+|---------|----------|
+| **Frame** | Vehicle fixed at **origin**; plot axes N / E / up (body rotated into plot frame) |
+| **Mesh** | X-quad airframe segments + motor hubs |
+| **Body axes** | RGB (or accent triad) body +x/+y/+z |
+| **Attitude source** | Prefer `timeseries.euler_deg[i]` (φθψ deg); else derive from state if exporter stores `x` columns 3:6 rad |
+| **Wrench / rotor thrust** | **Optional** for R3 (showcase draws `u` mix); attitude mesh + axes alone **satisfies** if `u` not in pack |
+| **FOV** | Fixed cube ~±1 m visual span; `uirevision` stable; **restyle** on scrub |
+| **Sync** | Same `frameIndex` as 3D / 2D / range / battery |
+
+If euler missing entirely: show honest empty card (“attitude not in pack”) — **exporter should include `euler_deg`** for success/fail nominals (already partially supported in `export_demo_data.py`).
+
+### 2.6 Secondary row: 2D N–E + range(t) (**R3 hard**)
+
+**Left — Trajectory 2D (North–East top-down):**
 
 | Layer | Style | Notes |
 |-------|--------|------|
@@ -124,57 +188,42 @@ Short static copy (from `meta.json` / `demo.json` `ui` block):
 | Ownship path | solid accent | full history |
 | Ownship trail to \(t_i\) | brighter / thicker | scrub-dependent |
 | Vehicle / target markers | at \(t_i\) | |
-| **Capture circle** | dashed good/muted | radius = `capture_radius_m`; center at target at CPA (or documented CPA pose) — **required on 2D** |
-| **MC bands** | translucent fill between p5–p95 paired paths in N–E | ownship only; **required** when `mc.bands` present (default **ON**) |
+| **Capture circle** | dashed good/muted | radius = `capture_radius_m` — **required** |
+| **MC bands** | translucent fill between p5–p95 in N–E | ownship only; **required** when `mc.bands` present (default **ON**) |
 
-**Optional projection chip:** N–E \| N–Up on the 2D card (bands on N–Up use N/U percentile pairs). Bands **must** work on N–E at minimum.
+**Optional projection chip:** N–E \| N–Up on the 2D card (bands on N–Up use N/U pairs). Bands **must** work on N–E at minimum.
 
-### 2.5 Time series (companion)
+**Right — Range vs time:**
 
-Must:
-
-- **`range_m(t)`** ownship–target Euclidean range; horizontal line at `capture_radius_m`.
+- **`range_m(t)`** with horizontal line at `capture_radius_m`.
 - Scrub playhead vertical line.
+- Nice-to-have: tilt strip (not required).
 
-Nice-to-have:
+### 2.7 Battery (**R3 hard when data present**)
 
-- Peak-relevant: `tilt_rad` or `tilt_deg(t)` for “beyond linear” story.
-- Tracking error if reference present.
+When **any** of `timeseries.soc`, `timeseries.power_w`, `timeseries.energy_wh_remaining` exist on the active case:
 
-### 2.6 Transport bar (play + scrub)
+| Widget | Behavior |
+|--------|----------|
+| **SOC gauge / bar** | Shows `soc[frameIndex]` (0–1 or 0–100% — label units from data; assume fraction if ≤1.01). Scrub/play updates live. Color: good when high, warn mid, bad near empty (cosmetic thresholds OK). |
+| **Power series** | `power_w(t)` vs time + playhead when present |
+| **Energy series** | `energy_wh_remaining(t)` vs time + playhead when present |
+| **Layout** | One card row: gauge left (~¼), shared or dual time series right; stack on narrow viewports |
 
-Full width under the primary geometry row (mirror showcase scrub patterns; **add play** which showcase lacks).
+When **no** battery series: **omit** the entire battery section (no empty chart, no fake zeros).
 
-| Control | Behavior |
-|---------|----------|
-| **Play / Pause** | Toggle; advances frame index at ~real-time or fixed FPS (e.g. 30 fps mapped to `t`) |
-| **Scrubber** | Range input 0…N−1; drag updates **all** markers (3D + 2D + range cursor) |
-| **← / →** | Step ±1 frame; Shift = ±10 (ignore when focus is text inputs) |
-| **Time readouts** | `t = … s` and `range = … m` tabular nums |
-| **Speed** | Optional 0.5× / 1× / 2×; default 1× |
-| **MC bands toggle** | Global for 2D + 3D envelopes; default **on** when data present |
-| **Jump to CPA** | Optional; index nearest `time_of_min_range_s` |
+Exporter: pass through from nominal `timeseries.npz` / pipeline (`soc`, `power_w`, `energy_wh_remaining` written by `run_dir` / studies pipeline when battery enabled). Downsample with the same index as other series.
 
-On case toggle: reset to t=0; pause; rebind 3D + 2D + range to active `CasePack`.
-
-**Frame sync rule:** one `frameIndex` drives every view. Prefer Plotly `restyle` for marker/trail updates on scrub; full `newPlot` only on case change, projection change, or band toggle.
-
-### 2.7 Monte Carlo panel
+### 2.8 Monte Carlo panel
 
 | Widget | Content |
 |--------|---------|
 | **KPI restatement** | P(capture), n trials, capture radius (same as header chips) |
 | **Histogram** | `min_range_m` over trials; vertical line at `capture_radius_m`; optional color split success/fail bins |
-| **Secondary stats** | Compact: mean/p50/p95 `min_range_m`; optional mean `peak_tilt_rad` (deg); optional tracking RMSE if columns present |
-| **How to read** | 3–4 bullets: plant scatter only; fixed NDI; capture definition; bands = ownship spatial percentiles across re-sim trials |
+| **Secondary stats** | Compact: mean/p50/p95 `min_range_m`; optional mean `peak_tilt_rad` (deg); optional SOC stats if MC columns present |
+| **How to read** | 3–4 bullets: plant scatter only; fixed NDI; capture definition; bands = ownship spatial percentiles; pad/GE mission context |
 
-Optional collapsed “trial table” (first N rows) — not required.
-
-### 2.8 Battery (placeholder — later)
-
-If SOC/power series absent: **omit** the block entirely (no empty chart).
-
-If present later: small SOC gauge + power/SOC vs t scrub-synced under time series. Spec note only; **not acceptance for R2**.
+Optional collapsed “trial table” — not required.
 
 ---
 
@@ -184,20 +233,25 @@ If present later: small SOC gauge + power/SOC vs t scrub-synced under time serie
 |---|------|----------|-----------------|
 | 1 | KPI: **P(capture)**, **n trials**, capture radius | Yes | `mc.summary` / derived from trials |
 | 2 | Success vs fail **nominal case toggle** | Yes if both packs present | `cases.success`, `cases.fail` |
-| 3 | Trajectory **3D** (N/E/up) ownship + target + scrub | **Yes (R2)** | nominal `*_plot` timeseries |
-| 4 | Trajectory **2D** N–E with **capture circle** | Yes | nominal timeseries |
-| 5 | **MC confidence bands** on **2D N–E** (toggleable) | **Yes (R2)** — pack **must** include bands for success MC | `mc.bands` non-null |
-| 6 | MC envelope on **3D** (toggleable; may share toggle) | **Yes (R2)** — at least percentile polylines or projected envelope | same `mc.bands` |
-| 7 | **min_range histogram** | Yes if MC present | `trials[].min_range_m` |
-| 8 | **Scrub + play** synced across 3D / 2D / range | Yes | `timeseries.t` |
-| 9 | Battery / energy | Optional later | SOC series |
+| 3 | Trajectory **3D** (N/E/up) ownship + target + scrub | Yes | nominal `*_plot` timeseries |
+| 4 | **Attitude at origin** (right primary) | **Yes (R3)** when euler available | `euler_deg` or equivalent |
+| 5 | Trajectory **2D** N–E with **capture circle** | Yes | nominal timeseries |
+| 6 | **`range_m(t)`** secondary right (with 2D) | Yes | `timeseries.range_m` |
+| 7 | **MC confidence bands** on **2D N–E** (toggleable, default ON) | Yes — pack **must** include bands for success MC | `mc.bands` non-null |
+| 8 | MC envelope on **3D** (toggleable; shared toggle) | Yes | same `mc.bands` |
+| 9 | **Transport sticky at top** (play + scrub) | **Yes (R3)** | `timeseries.t` |
+| 10 | **min_range histogram** | Yes if MC present | `trials[].min_range_m` |
+| 11 | **Battery SOC + power/energy** | **Yes (R3)** when series in pack | `soc`, `power_w`, `energy_wh_remaining` |
+| 12 | Story mentions **pad climb / GE** | **Yes (R3)** | `ui` copy / story strip |
 
 Empty states:
 
-- No MC → show nominal 3D + 2D + range; KPI chips show “MC not in pack”; hide histogram + band toggle. (**Shipped product pack for R2 is expected to include MC + bands.**)
-- Bands missing in a broken pack → disable toggle with honest tooltip; treat as **implementation defect** for the success-MC demo pack, not an acceptable permanent state.
-- No fail case → Success only (no broken segmented control).
-- Load error → single card with path to rebuild instructions.
+- No MC → show nominal geometry + attitude + range; KPI chips show “MC not in pack”; hide histogram + band toggle. (**Shipped product pack is expected to include MC + bands.**)
+- Bands missing in a broken pack → disable toggle with honest tooltip; treat as **implementation defect** for the success-MC demo pack.
+- No euler → attitude empty card; exporter should fix pack.
+- No battery series → omit battery row.
+- No fail case → Success only.
+- Load error → single card with rebuild instructions.
 
 ---
 
@@ -206,17 +260,9 @@ Empty states:
 Prefer a **single demo pack** built offline into `docs/demos/intercept/data/` so Pages never reads `runs/`. Source of truth for generation remains study run dirs, e.g.:
 
 ```text
-runs/intercept_l0_success_*/nominal/{timeseries.*, metrics.json}
-runs/intercept_l0_success_*/monte_carlo/{trials.csv, summary.json}
-runs/intercept_l0_fail_*/nominal/{timeseries.*, metrics.json}
-```
-
-Plus, for bands (if not already stored under MC):
-
-```text
-# Offline re-sim outputs (generator-owned paths — example)
-runs/intercept_l0_success_*/monte_carlo/trial_paths/   # optional
-# or ephemeral arrays only inside export_demo_data.py
+runs/intercept_*_success_*/nominal/{timeseries.*, metrics.json}
+runs/intercept_*_success_*/monte_carlo/{trials.csv, summary.json}
+runs/intercept_*_fail_*/nominal/{timeseries.*, metrics.json}
 ```
 
 ### 4.1 Files served to the browser
@@ -224,12 +270,12 @@ runs/intercept_l0_success_*/monte_carlo/trial_paths/   # optional
 | Path | Role |
 |------|------|
 | `data/demo.json` | **Primary** pack: meta, cases, MC summary, trials, **required `mc.bands`** for success MC demo |
-| `data/meta.json` | Optional thin pointer (version, generated_at) if split from demo |
-| `data/trials.csv` | Optional raw MC table (if not inlined) |
+| `data/meta.json` | Optional thin pointer |
+| `data/trials.csv` | Optional raw MC table |
 
-**Recommendation:** one `demo.json` ≤ ~2–5 MB with downsampled timeseries, compact trials (500 rows OK), histogram pre-bin optional, and **bands as quantile polylines** (not full trial clouds). Full 500×T×3 path dumps are too large — **never** ship raw multi-trial path clouds in the SPA pack.
+**Recommendation:** one `demo.json` ≤ ~2–5 MB with downsampled timeseries (incl. battery + euler), compact trials, **bands as quantile polylines**. Never ship raw multi-trial path clouds.
 
-### 4.2 Top-level `demo.json` schema (v1 / R2)
+### 4.2 Top-level `demo.json` schema
 
 ```json
 {
@@ -238,17 +284,18 @@ runs/intercept_l0_success_*/monte_carlo/trial_paths/   # optional
   "generated_at": "ISO-8601",
   "uavsim_version": "0.1.0",
   "ui": {
-    "value_prop": "…",
-    "about_paragraphs": ["…"],
+    "value_prop": "Pad climb (ground effect) → open-loop intercept path; scripted target; fixed NDI; plant MC.",
+    "about_paragraphs": ["…pad takeoff…", "…capture…", "…MC bands…", "…battery if enabled…"],
     "capture_radius_m": 1.0,
-    "default_case": "success"
+    "default_case": "success",
+    "mission_notes": "pad_climb_ground_effect"
   },
   "cases": {
     "success": { "…CasePack…" },
     "fail": { "…CasePack…" }
   },
   "mc": {
-    "source_study": "intercept_l0_success_mc_…",
+    "source_study": "…",
     "n_trials": 500,
     "summary": { },
     "trials": [ ],
@@ -257,7 +304,7 @@ runs/intercept_l0_success_*/monte_carlo/trial_paths/   # optional
 }
 ```
 
-`cases.fail` may be `null` or omitted. MC attaches to the **success** recipe by product plan; KPI still shown when viewing fail nominal (caption: “MC on success plant scatter”). **Bands always describe success-recipe plant MC**, even when Fail nominal geometry is displayed (toggle still applies to success envelope; optional caption “bands: success MC”).
+`cases.fail` may be `null` or omitted. MC + **bands** attach to the **success** recipe; when Fail nominal is shown, caption: “MC / bands: success plant study”.
 
 ### 4.3 `CasePack` (nominal)
 
@@ -272,17 +319,23 @@ runs/intercept_l0_success_*/monte_carlo/trial_paths/   # optional
 | `metrics.intercept_success` | bool | |
 | `metrics.capture_radius_m` | number | |
 | `metrics.peak_tilt_rad` | number \| optional | |
-| `metrics.rmse_position_m` | number \| optional | |
+| `metrics.soc_final` / `soc_min` / `peak_power_w` | optional | when battery enabled |
 | `timeseries.t` | number[] | seconds, downsampled (~200–400 pts OK) |
 | `timeseries.pos_ned` | number[][] | ownship \(N,E,D\) — optional if `pos_plot` present |
-| `timeseries.pos_plot` | number[][] | **required plot frame: N, E, up** (match showcase) |
-| `timeseries.target_ned` / `target_plot` | number[][] | scripted target, same length as `t` (resampled) |
+| `timeseries.pos_plot` | number[][] | **required plot frame: N, E, up** |
+| `timeseries.target_ned` / `target_plot` | number[][] | scripted target, same length as `t` |
 | `timeseries.range_m` | number[] | \(\|p_{\mathrm{own}}-p_{\mathrm{tgt}}\|\) |
-| `timeseries.euler_deg` | number[][] \| optional | φθψ for optional attitude niceties |
-| `timeseries.vel_ned` | optional | velocity cue in 3D if desired |
+| `timeseries.euler_deg` | number[][] | **φθψ deg — required for attitude pane (R3)** when available from `x` |
+| `timeseries.vel_ned` | optional | |
 | `timeseries.ref_plot` | optional | open-loop reference path |
+| `timeseries.soc` | number[] \| optional | state of charge (fraction or % — document); **R3 battery** |
+| `timeseries.power_w` | number[] \| optional | electrical / propulsive power |
+| `timeseries.energy_wh_remaining` | number[] \| optional | residual energy |
+| `timeseries.u` | number[][] \| optional | wrench for optional rotor thrust viz |
 
 Convention: **prefer `*_plot` arrays as North, East, Up** so UI never guesses D vs U.
+
+**Attitude derivation:** if only full state is available offline, exporter uses `x[:, 3:6]` rad → `euler_deg` (already in `export_demo_data.py`). UI prefers ready-made `euler_deg`.
 
 ### 4.4 Monte Carlo block
 
@@ -299,7 +352,7 @@ Convention: **prefer `*_plot` arrays as North, East, Up** so UI never guesses D 
 | `capture_radius_m` | should be constant |
 | `intercept_success` | bool → **P(capture)** |
 | `peak_tilt_rad` | secondary stat |
-| `rmse_position_m`, `rmse_attitude_rad`, … | optional secondary |
+| `soc_final`, `soc_min`, `peak_power_w` | optional energy MC columns |
 | `success`, `sim_success` | sim health vs capture; **do not conflate** with `intercept_success` |
 
 **P(capture)** definition for KPI:
@@ -307,17 +360,6 @@ Convention: **prefer `*_plot` arrays as North, East, Up** so UI never guesses D 
 \[
 P(\mathrm{capture}) = \frac{\#\{\texttt{intercept\_success}=\mathrm{true}\}}{n_{\mathrm{trials}}}
 \]
-
-Use `intercept_success`, **not** generic tracking `success`, unless the study aliases them (document if aliased).
-
-**`monte_carlo/summary.json`** (`summarize_trials`, schema_version 2):
-
-| Field | Use |
-|-------|-----|
-| `n_trials` | KPI |
-| `n_success` | tracking success count — **label carefully**; may ≠ capture count |
-| `metrics` / `metrics_all_trials` | optional RMSE aggregates |
-| (demo may add) `n_intercept_success`, `p_capture` | **preferred explicit fields** written by demo exporter |
 
 Demo exporter **should compute and store**:
 
@@ -332,16 +374,9 @@ Demo exporter **should compute and store**:
 }
 ```
 
-so the UI does not re-implement percentile logic if only summary is present.
+#### Confidence bands (`mc.bands`) — **required for success-MC pack**
 
-#### Confidence bands (`mc.bands`) — **required for R2 success-MC pack**
-
-Standard MC exports only write **scalar** trial rows. That is **insufficient** for R2. The demo exporter **must** produce spatial percentiles by one of:
-
-1. **Offline re-simulation** of each (or a subsample of) MC trial using plant params from `trials.csv` + the same success-recipe mission/controller as the study, recording ownship position vs time; or  
-2. Loading pre-stored per-trial paths if the MC pipeline later writes them.
-
-Then downsample onto a common time grid and compute percentiles **per axis, per sample time**.
+Standard MC exports only write **scalar** trial rows. The demo exporter **must** produce spatial percentiles by offline re-sim (or stored paths), then axis-wise percentiles on a common grid.
 
 **Required schema:**
 
@@ -363,43 +398,31 @@ Then downsample onto a common time grid and compute percentiles **per axis, per 
 
 | Field | Requirement |
 |-------|-------------|
-| `frame` | `"plot"` → arrays are N, E, **up** (not down) |
-| `percentiles` | Include **5 and 95** (or document p10/p90 if substituted; UI labels must match). **50** (median) recommended |
-| `t` | Common time grid (s); length \(T\) same as each percentile array. May match nominal downsample or a coarser MC grid |
-| `ownship.N/E/U.p5|p50|p95` | Length-\(T\) arrays; **required** p5 + p95 for N and E at minimum; U required for 3D envelope |
+| `frame` | `"plot"` → arrays are N, E, **up** |
+| `percentiles` | Include **5 and 95**; **50** recommended |
+| `t` | Common time grid (s); length \(T\) |
+| `ownship.N/E/U.p5|p50|p95` | Length-\(T\); p5+p95 for N,E min; U for 3D |
 | `n_paths_used` | Provenance |
-| `method` | e.g. `axiswise_percentile` (independent percentiles per N/E/U) — document that this is **not** a joint ellipsoidal tube |
-
-**Optional extensions** (not required):
-
-```json
-"ownship_joint": {
-  "comment": "optional future: PCA tubes or convex slices",
-  "p5_path_plot": [[N,E,U], …],
-  "p95_path_plot": [[N,E,U], …]
-}
-```
+| `method` | e.g. `axiswise_percentile` — not a joint ellipsoidal tube |
 
 **UI rendering:**
 
 | View | How to draw |
 |------|-------------|
-| **2D N–E** | Filled band: polygon along (E_p5, N_p5) then reverse (E_p95, N_p95); optional thin p50 line. Prefer **paired percentile paths**, not convex hull of all trials |
+| **2D N–E** | Filled band: polygon along (E_p5, N_p5) then reverse (E_p95, N_p95); optional thin p50 line |
 | **2D N–Up** | Same with N/U |
-| **3D** | Draw p5, p50, p95 as three `scatter3d` polylines (N,E,U) with decreasing opacity; **or** a light “fan” of a few percentile levels. Full mesh tube is optional. Same global toggle as 2D |
+| **3D** | p5, p50, p95 as `scatter3d` polylines (N,E,U) with decreasing opacity; same global toggle |
 
-**Subsampling for generation:** If re-sim of 500 trials is expensive, generator may use ≥100 stratified or random successful trials **or** all trials — document `n_paths_used`. Prefer all trials when feasible for honest bands.
+**R3 visibility gate:** With bands present and toggle default ON, a reviewer must **see** the 2D fill and 3D percentile curves without hunting for a buried control. Toggle lives in **top transport**.
 
-**Alignment:** Band `t` need not equal nominal `timeseries.t` exactly; UI interpolates or nearest-neighbor when drawing static bands (bands are full-horizon envelopes, not scrub-dependent geometry). Scrub still only moves nominal markers.
-
-**R2 gate:** Product pack for the success MC demo **must not** ship `"bands": null`. Fail-only or MC-less packs may omit bands; the **primary hiring demo** must include them.
+**Alignment:** Band `t` need not equal nominal `timeseries.t`; bands are full-horizon envelopes (not scrub-dependent geometry). Scrub only moves nominal markers / attitude / series cursors.
 
 ### 4.5 Provenance fields
 
 Optional footer / About:
 
-- `source_run`, `git_commit`, `seed`, `n_trials`, `perturbation` blurb from study YAML snapshot.
-- Band generation: `n_paths_used`, `method`, optional CLI flags.
+- `source_run`, `git_commit`, `seed`, `n_trials`, pad/GE mission id, battery config blurb.
+- Band generation: `n_paths_used`, `method`, CLI flags.
 
 ---
 
@@ -408,14 +431,14 @@ Optional footer / About:
 | Action | Result |
 |--------|--------|
 | **Load** | Fetch `data/demo.json`; default case = `ui.default_case` or `success` |
-| **Case toggle Success/Fail** | Swap nominal timeseries + metrics badges; keep MC panel + bands (success study); reset playhead to 0; pause; rebuild 3D/2D paths |
-| **Play** | `requestAnimationFrame` or `setInterval`; map wall time × speed → nearest index in `t`; loop **off** by default (stop at end) |
+| **Case toggle Success/Fail** | Swap nominal timeseries + metrics; keep MC panel + bands (success study); reset playhead; pause; rebuild all plots |
+| **Play** | Advance index; **stop at end** by default (loop off) |
 | **Pause** | freeze index |
-| **Scrub** | set index; update 3D markers/trail, 2D markers/trail, range cursor |
+| **Scrub** | set index; update 3D trail/markers, attitude mesh, 2D markers/trail, range cursor, battery gauge + series playheads |
 | **Keyboard ←/→** | step frames when not typing |
 | **MC bands toggle** | show/hide band traces on **2D and 3D** (default **on** if data present) |
-| **Orbit 3D** | Plotly camera free; scrub does not reset eye |
-| **Jump to CPA** (optional) | index nearest `time_of_min_range_s` |
+| **Orbit 3D / attitude** | Plotly camera free; scrub does not reset eye |
+| **Jump to CPA** | index nearest `time_of_min_range_s` |
 
 ### State (minimal)
 
@@ -425,8 +448,7 @@ frameIndex: number
 playing: boolean
 speed: number
 showBands: boolean   // default true when mc.bands present
-// projection optional if 2D N–Up retained
-projection: 'NE' | 'NU'
+projection: 'NE' | 'NU'   // optional 2D
 ```
 
 No URL routing required for v1; optional `?case=fail` nice-to-have.
@@ -451,17 +473,17 @@ Match showcase research aesthetic ([`docs/showcase/styles.css`](../../showcase/s
 
 | Pattern | Guidance |
 |---------|----------|
-| **Typography** | System UI; titles `ui-monospace`; tabular nums for KPIs/time |
+| **Typography** | System UI; titles `ui-monospace`; tabular nums for KPIs/time/SOC |
 | **Cards** | Panel background, 1px border, 8–12px radius |
-| **Segmented controls** | Same as showcase mission-seg (active = accent wash) |
-| **KPI chips** | Pill or compact stat blocks; good color for high P(capture); bad if low (threshold cosmetic only, e.g. &lt; 0.5) |
-| **Plotly 2D** | `paper_bgcolor` / `plot_bgcolor` dark (`#0c1018` / `#111315`); grid `#2a2f36`; `displaylogo: false`; modeBar hover |
-| **Plotly 3D** | Scene like showcase Flight: dark bg `#0a0e16`, axis grid muted; height ~400–480px desktop |
-| **Bands** | Low-saturation fill (e.g. accent @ 15–25% opacity); never obscure nominal ownship/target |
-| **Capture** | good/green dashed circle on 2D; optional sphere on 3D; fail nominal path still accent but metrics badge **Miss** in `--bad` |
-| **Density** | Prefer one focused page; wide desktop first; stack cards on narrow viewports |
+| **Sticky chrome** | Header + transport: dark translucent bg, bottom border, z-index ≥ 40 |
+| **Segmented controls** | Showcase mission-seg pattern |
+| **KPI chips** | Pill/stat blocks; good for high P(capture) |
+| **Plotly 2D/3D** | Dark paper/plot; scene bg `#0a0e16`; `displaylogo: false` |
+| **Bands** | Accent @ 15–25% opacity; never obscure nominal paths |
+| **SOC gauge** | Horizontal bar or radial; high contrast fill; % label |
+| **Density** | Wide desktop first; **primary-row** and **secondary-row** each two columns; stack ≤960px |
 
-Copy tone: engineering, not marketing (“plant scatter, fixed NDI gains” not “hero filter win”).
+Copy tone: engineering, not marketing (“pad climb, ground-effect κ, plant scatter, fixed NDI” not “hero win”).
 
 ---
 
@@ -469,36 +491,37 @@ Copy tone: engineering, not marketing (“plant scatter, fixed NDI gains” not 
 
 - Portfolio **controller × sensor matrix**, envelope τ-sweep, compare tab, stack diagram
 - Live / WASM simulation or parameter knobs that re-run dynamics in-browser
-- Full **3D cloud of all MC trial paths** (use percentile envelope only)
-- Showcase-parity **attitude + wrench dual-pane** (optional stretch only)
+- Full **3D cloud of all MC trial paths**
+- **Required** full wrench HUD (rotor thrust arrows) — optional if `u` present
 - Closed-loop **online replan** intercept UX (future L1+ story)
-- Battery/SOC UI (placeholder only until energy model ships in pack)
 - Auth, multi-user, mobile-first layout
 - MATLAB or runtime dependency on heritage tree
-- Requiring users to open raw `runs/` paths on Pages
-- Build step / bundler **required** (optional later; CDN first)
+- Requiring users to open raw `runs/` on Pages
+- Build step / bundler **required** (CDN first)
 - HIL, multi-vehicle, sensor-noise MC story
 
 ---
 
-## 8. Acceptance criteria — “UX satisfied”
+## 8. Acceptance criteria — “UX satisfied” (R3)
 
 Mark **UX satisfied** when a reviewer can open the static page (local or Pages) and:
 
 1. **See KPIs immediately:** P(capture) and n trials (or explicit “no MC”) without opening a second tab.
-2. **Toggle Success/Fail** (if fail pack present) and see ownship + target paths and range(t) update in all geometry panes.
-3. **Play and scrub** nominal time; vehicle/target markers and range cursor stay synced **across 3D, 2D, and range**.
-4. **Read capture criterion** (1 m default) on the page and on the range plot as a reference line; **see capture circle on 2D**.
+2. **Toggle Success/Fail** (if fail pack present) and see ownship + target paths, attitude, range(t), and battery (if present) update.
+3. **Play and scrub from the TOP transport** (sticky); vehicle/target markers, attitude, range cursor, and battery gauge stay synced across panes. Transport is **not** only under the plots.
+4. **Read capture criterion** on the page and on the range plot; **see capture circle on 2D**.
 5. **Inspect min_range histogram** with capture-radius marker when MC data present.
 6. **View 3D flight path** (N/E/up) for the active nominal with ownship + target; orbit works; scrub updates markers without destroying the scene.
-7. **Toggle MC bands** default ON when present: **2D N–E** shows 5–95% (or labeled p10–p90) ownship envelope; **3D** shows nominal + percentile envelope; plot remains legible (nominal bold, target distinct).
-8. **Shipped success-MC pack includes non-null `mc.bands`** with documented schema (§4.4). Shipping `bands: null` fails acceptance for the primary demo.
-9. **Empty/missing data** does not blank the page: controls hide or show honest empty copy (broken packs only).
-10. **Visual parity:** dark theme tokens aligned with showcase; no light “default Plotly” flash as the final look.
-11. **Independence:** all assets under `docs/demos/intercept/`; no hard dependency on `docs/showcase/data/showcase.json`.
-12. **Static:** works with `python -m http.server` or GH Pages (relative `fetch` paths).
-
-Battery UI, full attitude/wrench mesh, and trial-parameter scatter plots are **not** required for this bar.
+7. **View attitude at origin** in the **right primary** slot (showcase Flight-style mesh/axes), scrub-synced from `euler_deg` (or documented equivalent).
+8. **See range(t) side-by-side with 2D N–E** on the **secondary** row (range not in the primary-right slot).
+9. **Toggle MC bands** default ON when present: **2D N–E** shows 5–95% envelope; **3D** shows percentile curves; both clearly visible; toggle in top transport.
+10. **Shipped success-MC pack includes non-null `mc.bands`** with documented schema (§4.4).
+11. **Battery (when pack includes series):** SOC indicator tracks scrub; power and/or energy_wh series show playhead; no empty battery chrome when data absent.
+12. **Story copy** states **pad takeoff / climb** and **ground effect** (story strip and/or `ui` About).
+13. **Empty/missing data** does not blank the page: controls hide or show honest empty copy.
+14. **Visual parity:** dark theme tokens aligned with showcase; sticky chrome readable over plots.
+15. **Independence:** all assets under `docs/demos/intercept/`; no hard dependency on `docs/showcase/data/showcase.json`.
+16. **Static:** works with `python -m http.server` or GH Pages (relative `fetch` paths).
 
 ---
 
@@ -506,21 +529,25 @@ Battery UI, full attitude/wrench mesh, and trial-parameter scatter plots are **n
 
 ```text
 docs/demos/intercept/
-  index.html          # shell + CDN: Plotly
-  app.js              # state, 3D + 2D + transport
-  styles.css          # clone/adapt showcase tokens
-  UX_SPEC.md          # this file
+  index.html
+  app.js                 # state; sticky transport; 3D + attitude + 2D|range + battery
+  styles.css             # sticky header+transport; primary/secondary rows
+  UX_SPEC.md             # this file
   IMPLEMENT_CHECKLIST.md
-  UX_REVIEW_R2_BRIEF.md
+  UX_REVIEW_R3_BRIEF.md  # implementer brief (R3)
   scripts/
-    export_demo_data.py   # cases + MC + band generation
+    export_demo_data.py  # cases + MC bands + euler + battery fields
   data/
-    demo.json             # built offline — bands required
+    demo.json
 ```
 
-**Generator:** CLI/script loads success/fail run dirs + MC trials → writes `demo.json` (downsample, compute `p_capture`, **re-sim or load paths → `mc.bands`**).
+**Generator:** pass through battery arrays when present; always emit `euler_deg` from `x` when possible; keep `mc.bands` generation; refresh `ui` copy for pad/GE.
 
-**Pages:** site path e.g. `…/demos/intercept/` linked from README when live.
+**Reference implementations (read, do not import runtime from showcase):**
+
+- Sticky header: `docs/showcase/styles.css` `.sticky-header`
+- Attitude: `docs/showcase/app.js` `rotationBodyToNed`, `vehicleGeom`, `VehicleAttitudeView`
+- Path 3D + restyle scrub: intercept `drawTraj3d` / showcase `Flight3DView`
 
 ---
 
@@ -528,15 +555,15 @@ docs/demos/intercept/
 
 | Topic | Default if undecided |
 |-------|----------------------|
-| React CDN vs vanilla | Keep **vanilla** (current SPA); extract Flight-like 3D helpers as plain JS |
-| Layout | **3D + range** top; **2D N–E with bands** secondary full width |
+| React CDN vs vanilla | Keep **vanilla** |
+| Layout | **R3 normative:** top sticky transport; **3D \| attitude**; **2D N–E \| range**; battery; MC |
 | Band percentiles | **5–95** with median p50 |
-| Band generation | **Re-sim plant params from trials.csv**; subsample ≥100 if cost-bound |
-| Trial cloud | **No** raw multi-path dump in pack |
+| Attitude wrench | **Mesh + body axes required**; rotor thrust if `u` present |
+| SOC units | If values ∈ [0, 1.01] treat as fraction → display % |
+| Battery absent | **Omit** section |
 | Fail MC | **No**; MC + bands on success only |
 | Loop playback | **Off** by default |
 | Capture sphere on 3D | Optional |
-| Attitude dual-pane | Optional stretch |
 
 ---
 
@@ -545,4 +572,5 @@ docs/demos/intercept/
 | Date | Note |
 |------|------|
 | 2026-07-25 | Initial UX spec for L0 intercept MC static dashboard |
-| 2026-07-25 | **R2:** 3D trajectory + MC bands required acceptance; bands data generation / schema mandated; 2D-only + `bands: null` no longer satisfied |
+| 2026-07-25 | **R2:** 3D trajectory + MC bands required acceptance; bands data generation / schema mandated |
+| 2026-07-25 | **R3:** Top sticky transport; attitude right of 3D; range beside 2D N–E; battery SOC/power required when data present; pad climb + GE story; bands visibility retained |

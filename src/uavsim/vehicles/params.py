@@ -82,6 +82,25 @@ class AeroParams(BaseModel):
     ge_kappa_max: float = Field(default=3.0, gt=1.0)
 
 
+class BatteryParams(BaseModel):
+    """
+    Optional energy bookkeeping (SIL proxy, not electrochemical cell physics).
+
+    Default ``enabled=False`` so existing vehicles/studies are unchanged.
+    Power map (hover_scaled): ``P = idle + P_hover * (F / (m g))^k``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    capacity_wh: float = Field(default=20.0, gt=0)
+    initial_soc: float = Field(default=1.0, ge=0.0, le=1.0)
+    model: Literal["hover_scaled"] = "hover_scaled"
+    hover_power_w: float = Field(default=80.0, gt=0)
+    thrust_power_exp: float = Field(default=1.5, gt=0)
+    idle_power_w: float = Field(default=5.0, ge=0)
+
+
 class VehicleParams(BaseModel):
     """Physical params + limits. Does not own equations of motion."""
 
@@ -96,6 +115,7 @@ class VehicleParams(BaseModel):
     limits: ActuatorLimits
     propulsion: PropulsionParams = Field(default_factory=PropulsionParams)
     aero: AeroParams = Field(default_factory=AeroParams)
+    battery: BatteryParams = Field(default_factory=BatteryParams)
 
     @property
     def m(self) -> float:
@@ -144,4 +164,5 @@ def default_vehicle() -> VehicleParams:
         ),
         propulsion=PropulsionParams(),
         aero=AeroParams(),
+        battery=BatteryParams(),
     )
