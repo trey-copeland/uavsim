@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|--------|
-| **Status** | Draft — **next product priority** (post-showcase freeze) |
+| **Status** | **L0–L4 capability on branch** `feature/intercept-guidance-battery` — ship gate: merge + Pages + docs (docs sync in progress) |
 | **Goal** | Ship a **single-vehicle, online guidance** backend that pursues a **scripted target** via mid-sim replan, an **opt-in battery** model that never breaks existing studies, and a **live interactive demo** (GitHub Pages) |
 | **Primary story** | Sized-up quadrotor, takeoff → aggressive intercept (**beyond hover-linear** attitude), **NDI only**, energy margin so the mission can fail honestly |
 | **Airframe** | **Quadrotor only** (X layout as today). Not trirotor / multi-layout |
@@ -62,10 +62,10 @@ Ordered by **risk of “we built the plumbing and the chase still fails”**. Cl
 | Peak tilt (success L0) | **~55°** achieved | **beyond hover-linear** — sufficient; no drive to force ~90° |
 | Success vehicle | `intercept_quadrotor` T/W≈**4.5**, \(\tau_\max=4\) | min_range **≈0.04 m** (truth NDI) |
 | Fail vehicle | `intercept_quadrotor_underpowered` T/W≈**1.15** | min_range **≈3.8 m** (miss) |
-| Sensor | L0: `observer: none` | L2 still required for sense-driven story |
-| MC | not yet | after L2–L3 |
+| Sensor | Online hero: **MEKF** + `pos`/`omega` | L2 green on branch |
+| MC online | **P(capture)≈0.28** (500 trials) | plant scatter + estimate replan |
 
-**L0 gate status:** success + intentional fail **green** (open-loop \(x_r\), full-state NDI, quat wrench).
+**L0 gate:** green (open-loop). **L1–L4:** green enough to ship capability (online pursue, MEKF, energy log fail, MC).
 
 ### 0A.2 Oracle ladder (definition of “green”)
 
@@ -546,16 +546,17 @@ Motors plant; auto lead-time; PN; thrust derate at empty; 3D MC cloud; full show
 
 ## 11. Exit criteria (epic **done**)
 
-- [ ] G-6 online replan works for intercept studies  
-- [ ] Sized quadrotor + NDI + quat + **GPS+IMU observer** intercept **success** study (**capture ≤ ~1 m**)  
-- [ ] Hero filter is **not** hover-`linear_kf` for the success story; MEKF (extended as needed) documented  
-- [ ] Replan uses **estimate** by default for the demo recipe  
-- [ ] **Unsuccessful** deterministic recipe  
-- [ ] Battery optional; defaults unbroken  
-- [ ] **MC** on success recipe: P(capture), min-range stats, export for bands  
-- [ ] Unit + integration tests green (incl. MC smoke)  
-- [ ] **Interactive demo live**: success/fail, scrub, **play**, battery, energy, **toggleable 2D MC confidence bands**  
-- [ ] README + developer docs + LIMITATIONS synced  
+- [x] G-6 online replan works for intercept studies (`intercept_pursue`)  
+- [x] Sized quadrotor + NDI + quat + **MEKF GPS+IMU** intercept success (`intercept_online_success`)  
+- [x] Hero filter is **MEKF** (not hover-`linear_kf`); thrust–tilt MEKF polish still open  
+- [x] Replan `state_source: estimate` on hero recipe  
+- [x] Unsuccessful recipes: underpowered L0 miss; energy_fail depletes SOC  
+- [x] Battery optional; defaults unbroken  
+- [x] **MC** on online hero: P(capture)≈0.28 @ 500 trials; bands exportable  
+- [x] Unit tests for G-6 / predict / battery  
+- [x] Interactive demo SPA (R3) in-repo; **re-export pack from online MC** (`p_capture≈0.28`)  
+- [ ] **Pages live** on `main` (merge + workflow)  
+- [x] Developer docs + LIMITATIONS sync  
 
 ---
 

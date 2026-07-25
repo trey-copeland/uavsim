@@ -1,6 +1,6 @@
-# Intercept L0 demo (static SPA)
+# Intercept demo (static SPA)
 
-Thin single-mission dashboard for the **pad climb + ground-effect** L0 open-loop intercept, attitude, battery, and plant Monte Carlo story.
+Dashboard for the **pad climb + ground-effect** intercept story: online `intercept_pursue` (G-6) + NDI + MEKF GPS/IMU + battery + plant Monte Carlo (pack rebuilt from online MC runs).
 
 - **Spec:** [`UX_SPEC.md`](UX_SPEC.md) (**R3**)
 - **Checklist:** [`IMPLEMENT_CHECKLIST.md`](IMPLEMENT_CHECKLIST.md)
@@ -39,7 +39,7 @@ python -m http.server 8765
 # open http://127.0.0.1:8765/docs/demos/intercept/
 ```
 
-Optional query: `?case=fail` selects the miss nominal when present.
+Optional query: `?case=fail` selects the **energy-fail** nominal (SOC depleted) when present.
 
 ## What you should see (R3)
 

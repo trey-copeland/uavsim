@@ -23,7 +23,7 @@ Guidance **produces** a `ReferenceTrajectory`. The sim loop and controllers only
 from uavsim.guidance import register_guidance, create_guidance, list_guidance_backends
 ```
 
-Core registrations: `hold`, `waypoints` (import side effects in `guidance/__init__.py`).
+Core registrations: `hold`, `waypoints`, **`intercept_pursue`** (import side effects in `guidance/__init__.py`).
 
 ---
 
@@ -143,15 +143,35 @@ Import the module from `guidance/__init__.py` so registration runs.
 
 For a **true** geometric path, prefer a `SampledReference` dense grid (see `reference/types.py`) rather than abusing hold.
 
-### Online / replan (nav growth)
+### Online / replan (G-6) — **shipped**
 
-`GuidanceBackend.update(...)` is reserved for mid-sim replan.
+`GuidanceBackend.update(...)` is called from **fixed-step** closed-loop when a `GuidanceLoop` is attached (study `guidance.type: intercept_pursue`).
 
 | Piece | Status |
 |-------|--------|
-| Protocol method | **Exists** |
-| Called from `ClosedLoopSim` | **TODO** — sim does not invoke `update` today |
-| RNG / MC interaction for replan | **TODO** (SPEC open) |
+| Protocol method | **Done** |
+| Called from closed-loop | **Done** — `sim.closed_loop.GuidanceLoop` + `InProcessControllerAdapter.set_reference` |
+| `intercept_pursue` | **Done** — seed climb mission + scripted target; CV lead-point short-horizon replan after `replan_start_s` |
+| Capture metrics | `metrics.capture_target_mission` + `intercept_success` / `min_range_m` (not tracking RMSE) |
+| RNG / MC interaction for replan | **Partial** — replan uses plant state / \(\hat x\); no extra replan RNG |
+
+**Study examples**
+
+```yaml
+guidance:
+  type: intercept_pursue
+  seed_mission_file: configs/missions/tutorials/intercept_seed_climb.yaml
+  target_mission_file: configs/missions/tutorials/intercept_l0_target.yaml
+  replan_period_s: 0.2
+  replan_start_s: 2.5      # stay on seed through pad/GE climb
+  lead_time_s: 1.2
+  capture_radius_m: 1.0
+  horizon_s: 3.0
+  duration_s: 10.0
+  state_source: estimate   # truth | estimate
+```
+
+Demos: `configs/studies/tutorials/intercept_online_*.yaml` · live pack: `docs/demos/intercept/`.
 
 ---
 
@@ -159,10 +179,10 @@ For a **true** geometric path, prefer a `SampledReference` dense grid (see `refe
 
 | Gap | Status |
 |-----|--------|
-| Pipeline uses **hard-coded** hold/waypoints switch instead of registry + open config | **TODO** — blocks third backends without editing pipeline |
+| Pipeline uses **hard-coded** hold/waypoints/**intercept** switch instead of pure registry | **Partial** — third backends still edit pipeline |
 | Non-waypoint family (helix, corridor, landing profile) | **TODO** / Phase 6 |
-| In-loop `update` / replan | **TODO** |
-| Mixed multi-segment missions (takeoff → transit → hover) | **TODO** |
+| In-loop `update` / replan | **Done** (G-6 + intercept_pursue) |
+| Mixed multi-segment missions (takeoff → transit → hover) | **Partial** — seed + online intercept is a teaching pattern |
 | External trajectory ingest | **TODO** |
 | Polyglot min-snap QP swap | **Open** (interface boundary exists; solver is NumPy KKT) |
 
