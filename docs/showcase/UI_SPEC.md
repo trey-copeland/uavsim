@@ -32,7 +32,7 @@ Out of scope: live simulation control, multi-user auth, mobile-first layout.
 | Element | Behavior |
 |---------|----------|
 | **Sticky header** | Title, value prop, **About this study** expand, **Mission** segmented control, version/date |
-| **Walkthrough strip** | 4 steps → navigates primary tabs: Overview → Flight → Estimation → Envelope |
+| **Walkthrough strip** | 4 steps → navigates primary tabs: Overview → Flight → Estimation → Envelope (System not forced into strip for Phase 1) |
 | **Tab list** | Story-first order (below); `role=tablist` / `tab` / `tabpanel` |
 | **Footer** | “Simulation only”; link to GitHub |
 
@@ -42,13 +42,16 @@ Out of scope: live simulation control, multi-user auth, mobile-first layout.
 |------:|--------|--------|------|
 | 1 | `overview` | Overview | Decision matrix + suggested first look |
 | 2 | `flight` | Flight 3D | Dual-pane scrubber |
-| 3 | `estimation` | Estimation | LQR vs PID bars + scenario table |
-| 4 | `envelope` | Envelope | τ-sweep multi-scheme curves + tables |
-| 5 | `monte_carlo` | Monte Carlo | MC for active mission |
-| 6 | `compare` | Compare | Pairwise metrics / path overlay |
-| 7 | `metrics` | Run metrics | Single-run detail (power / linked from Flight) |
+| 3 | `stack` | System | Closed-loop stack diagram + provenance for active run |
+| 4 | `estimation` | Estimation | LQR vs PID bars + scenario table |
+| 5 | `envelope` | Envelope | τ-sweep multi-scheme curves + tables |
+| 6 | `monte_carlo` | Monte Carlo | MC for active mission |
+| 7 | `compare` | Compare | Pairwise metrics / path overlay |
+| 8 | `metrics` | Run metrics | Single-run detail (power / linked from Flight) |
 
-Walkthrough labels (strip only): **Matrix · Flight · Laws · Envelope** (Estimation is titled “Laws” in the strip).
+Walkthrough labels (strip only): **Matrix · Flight · Laws · Envelope** (Estimation is titled “Laws” in the strip). System is available in the tab list but not a walkthrough step in Phase 1.
+
+Stack schema source of truth: [STACK_SPEC.md](STACK_SPEC.md).
 
 ### 2.3 Mission model
 
@@ -107,7 +110,25 @@ Fallback constants live in `app.js` if JSON fields are missing.
 
 **Data fields:** `timeseries.t`, `pos_plot`, `ref_plot`, `euler_deg`, `vel_ned`, `omega`, `u`, `limits`.
 
-### 4.3 Estimation (“Laws” in walkthrough)
+### 4.3 System (stack provenance)
+
+**Must have**
+
+- Bound to **active run** (same mission-filtered run picker as Flight / Metrics).
+- Horizontal wrapping **block diagram** from `run.stack.nodes` + `run.stack.edges` (HTML/CSS only; no diagram library).
+- Click node → detail panel for `run.stack.details[node.id]` (title, summary, structured fields).
+- Matrices (`gains.K`) as HTML tables; Q/R diagonals and PID gains as vectors / labeled lists.
+- Identity footer from `run.stack.details.identity` (`study_id`, `seed`, `git_commit`, … when present).
+- Empty state if `run.stack` missing: tell user to rebuild gallery (`uv run uavsim gallery --base-case`).
+
+**Must not**
+
+- Require live simulation or a server.
+- Force System into the 4-step walkthrough strip (optional later).
+
+Full field contract: [STACK_SPEC.md](STACK_SPEC.md).
+
+### 4.4 Estimation (“Laws” in walkthrough)
 
 **Must have**
 
@@ -115,7 +136,7 @@ Fallback constants live in `app.js` if JSON fields are missing.
 - **Scenario table** congruent with envelope tables: sticky header, sort, bound filter, search, pass/fail pills, row click → Flight.
 - Short “How to read this” list (naive vs KF, LQR vs PID, GPS-denied, naming, envelope pointer).
 
-### 4.4 Envelope
+### 4.5 Envelope
 
 **Must have**
 
@@ -129,18 +150,18 @@ Fallback constants live in `app.js` if JSON fields are missing.
 
 **Data:** `envelope.points[]`, `envelope.schemes[]`, `envelope.boundary`.
 
-### 4.5 Monte Carlo
+### 4.6 Monte Carlo
 
 - Prefer `missions[i].mc_run_id` for active mission.
 - Existing MC visualizations (summary + trials payload).
 
-### 4.6 Compare
+### 4.7 Compare
 
 - Default pair from mission `compare_ids` (baseline: naive vs LQG).
 - Caption: same-sensor naive vs KF/LQG, not vague “filter win.”
 - Metrics B−A; optional 3D path overlay when both have timeseries.
 
-### 4.7 Run metrics
+### 4.8 Run metrics
 
 - Secondary: full metric dump for selected run.
 - Entry from Flight toolbar; de-emphasized in tab order.
@@ -194,6 +215,23 @@ Fallback constants live in `app.js` if JSON fields are missing.
 ### 5.4 `runs[]` (gallery entry)
 
 Must include: `id`, `label`, `role`, `mission_id`, `metrics`, optional `timeseries`, optional `mc`.
+
+Optional **`stack`** (closed-loop provenance; schema_version 1) — see [STACK_SPEC.md](STACK_SPEC.md):
+
+| Key | Type | Notes |
+|-----|------|--------|
+| `schema_version` | int | `1` |
+| `topology` | string | e.g. `closed_loop_sil` |
+| `nodes[]` | array | `{ id, kind, title, summary, badges? }` |
+| `edges[]` | array | `[from, to]` pairs |
+| `details` | object | Per-node payloads + `identity` |
+
+| `details` key | Role |
+|---------------|------|
+| `mission`, `guidance`, `sensors`, `observer`, `controller`, `actuators`, `plant`, `metrics` | Block fields (gains, plant_mode, channels, …) |
+| `identity` | `study_id`, `gallery_id`, `seed`, `git_commit`, `config_hash`, `uavsim_version`, `vehicle_id`, `source_run` |
+
+If the builder cannot assemble provenance, gallery may set `stack: null` / omit the field; SPA shows rebuild guidance.
 
 ### 5.5 `estimation_matrix.scenarios[]`
 
@@ -262,4 +300,4 @@ When changing UX behavior or the JSON contract:
 2. Update `docs/showcase/README.md` only for rebuild recipes / study tables if those change.
 3. Prefer driving copy via `ui.*` in `gallery.py` so rebuilds stay consistent with the SPA fallbacks in `app.js`.
 
-**Last as-built review:** 2026-07-24 — dual mission, full matrix envelope, guided walkthrough, About paragraphs, Estimation data table.
+**Last as-built review:** 2026-07-24 — dual mission, full matrix envelope, guided walkthrough, About paragraphs, Estimation data table, System tab (`runs[].stack` / STACK_SPEC).

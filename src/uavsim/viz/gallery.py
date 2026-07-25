@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
@@ -13,6 +14,9 @@ import numpy as np
 from uavsim import __version__
 from uavsim.viz.compare import compute_metric_deltas
 from uavsim.viz.loaders import load_run, ned_to_plot
+from uavsim.viz.stack import build_stack_from_run_dir
+
+logger = logging.getLogger(__name__)
 
 GALLERY_SCHEMA = 1
 
@@ -523,6 +527,13 @@ def run_to_gallery_entry(
             "n_trials": len(art.trials),
             "n_trials_in_payload": len(trials),
         }
+
+    try:
+        entry["stack"] = build_stack_from_run_dir(run_dir, gallery_id=gid)
+    except Exception as exc:  # noqa: BLE001 — never break gallery generation
+        logger.debug("stack provenance failed for %s: %s", run_dir, exc)
+        entry["stack"] = None
+
     return entry
 
 

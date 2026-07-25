@@ -1724,6 +1724,471 @@
     );
   }
 
+  /** Canonical left→right teaching order for closed-loop stack nodes. */
+  const STACK_NODE_ORDER = [
+    "mission",
+    "guidance",
+    "sensors",
+    "observer",
+    "controller",
+    "actuators",
+    "plant",
+    "metrics",
+  ];
+
+  function isNumericLike(v) {
+    return typeof v === "number" && Number.isFinite(v);
+  }
+
+  /** True for list-of-lists matrices (e.g. gains.K). */
+  function isMatrix2d(v) {
+    if (!Array.isArray(v) || !v.length) return false;
+    if (!Array.isArray(v[0])) return false;
+    return v.every(function (row) {
+      return Array.isArray(row) && row.every(function (c) {
+        return isNumericLike(c) || c == null;
+      });
+    });
+  }
+
+  /** True for flat numeric vectors (Q_diag, R_diag, u_hover). */
+  function isNumericVector(v) {
+    if (!Array.isArray(v) || !v.length) return false;
+    if (Array.isArray(v[0])) return false;
+    return v.every(function (c) {
+      return isNumericLike(c) || c == null || typeof c === "boolean";
+    });
+  }
+
+  function MatrixTable({ matrix, caption }) {
+    if (!isMatrix2d(matrix)) return null;
+    return e(
+      "div",
+      { className: "stack-matrix-wrap" },
+      caption ? e("div", { className: "stack-matrix-caption" }, caption) : null,
+      e(
+        "table",
+        { className: "stack-matrix", "aria-label": caption || "matrix" },
+        e(
+          "tbody",
+          null,
+          matrix.map(function (row, i) {
+            return e(
+              "tr",
+              { key: i },
+              row.map(function (cell, j) {
+                return e(
+                  "td",
+                  { key: j },
+                  cell == null ? "—" : fmt(cell, Math.abs(cell) >= 10 ? 3 : 4)
+                );
+              })
+            );
+          })
+        )
+      )
+    );
+  }
+
+  function VectorList({ values, label }) {
+    if (!isNumericVector(values)) return null;
+    return e(
+      "div",
+      { className: "stack-vector" },
+      label ? e("span", { className: "stack-vector-label" }, label) : null,
+      e(
+        "code",
+        { className: "stack-vector-vals" },
+        "[",
+        values
+          .map(function (v) {
+            return v == null ? "—" : fmt(v, Math.abs(+v) >= 10 ? 3 : 4);
+          })
+          .join(", "),
+        "]"
+      )
+    );
+  }
+
+  function stackFmtScalar(v) {
+    if (v === true || v === false) return String(v);
+    if (v == null) return "—";
+    if (typeof v === "number") return fmt(v, Math.abs(v) >= 100 ? 2 : 4);
+    return String(v);
+  }
+
+  /**
+   * Render a stack detail field value (scalars, vectors, matrices, nested objects).
+   * Special-cases gains.K / Q_diag / R_diag and common PID gain keys.
+   */
+  function StackFieldValue({ fieldKey, value, depth }) {
+    const d = depth || 0;
+    if (value == null) return e("span", { className: "stack-muted" }, "—");
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      return e("span", { className: "stack-scalar" }, stackFmtScalar(value));
+    }
+    if (isMatrix2d(value)) {
+      return e(MatrixTable, {
+        matrix: value,
+        caption: fieldKey === "K" || fieldKey === "gains" ? "K" : fieldKey || "matrix",
+      });
+    }
+    if (isNumericVector(value)) {
+      return e(VectorList, { values: value, label: fieldKey || null });
+    }
+    if (Array.isArray(value)) {
+      // List of primitives or small objects (channels, waypoints_preview, badges)
+      if (
+        !value.length ||
+        value.every(function (x) {
+          return x == null || typeof x === "string" || typeof x === "number" || typeof x === "boolean";
+        })
+      ) {
+        return e(
+          "span",
+          { className: "stack-list-inline" },
+          value.length
+            ? value
+                .map(function (x) {
+                  return stackFmtScalar(x);
+                })
+                .join(", ")
+            : "—"
+        );
+      }
+      return e(
+        "ul",
+        { className: "stack-list" },
+        value.map(function (item, i) {
+          return e(
+            "li",
+            { key: i },
+            typeof item === "object" && item
+              ? e(StackObjectFields, { obj: item, depth: d + 1 })
+              : stackFmtScalar(item)
+          );
+        })
+      );
+    }
+    if (typeof value === "object") {
+      // gains: prefer structured LQR / PID layout
+      if (fieldKey === "gains") {
+        return e(StackGainsBlock, { gains: value });
+      }
+      return e(StackObjectFields, { obj: value, depth: d + 1 });
+    }
+    return e("span", null, String(value));
+  }
+
+  function StackGainsBlock({ gains }) {
+    if (!gains || typeof gains !== "object") return e("span", { className: "stack-muted" }, "—");
+    const children = [];
+    if (isMatrix2d(gains.K)) {
+      children.push(e(MatrixTable, { key: "K", matrix: gains.K, caption: "K (LQR gain)" }));
+    }
+    if (isNumericVector(gains.Q_diag)) {
+      children.push(e(VectorList, { key: "Q", values: gains.Q_diag, label: "Q_diag" }));
+    }
+    if (isNumericVector(gains.R_diag)) {
+      children.push(e(VectorList, { key: "R", values: gains.R_diag, label: "R_diag" }));
+    }
+    // PID-style: kp_pos, kd_pos, kp_att, kd_rate, …
+    const pidKeys = Object.keys(gains).filter(function (k) {
+      return k !== "K" && k !== "Q_diag" && k !== "R_diag";
+    });
+    if (pidKeys.length) {
+      children.push(
+        e(
+          "dl",
+          { key: "pid", className: "stack-kv" },
+          pidKeys.map(function (k) {
+            return e(
+              React.Fragment,
+              { key: k },
+              e("dt", null, k),
+              e("dd", null, e(StackFieldValue, { fieldKey: k, value: gains[k], depth: 1 }))
+            );
+          })
+        )
+      );
+    }
+    if (!children.length) {
+      return e(StackObjectFields, { obj: gains, depth: 1 });
+    }
+    return e("div", { className: "stack-gains" }, children);
+  }
+
+  function StackObjectFields({ obj, depth }) {
+    if (!obj || typeof obj !== "object") return null;
+    const keys = Object.keys(obj);
+    if (!keys.length) return e("span", { className: "stack-muted" }, "(empty)");
+    const d = depth || 0;
+    return e(
+      "dl",
+      { className: "stack-kv" + (d > 0 ? " stack-kv-nested" : "") },
+      keys.map(function (k) {
+        return e(
+          React.Fragment,
+          { key: k },
+          e("dt", null, k),
+          e("dd", null, e(StackFieldValue, { fieldKey: k, value: obj[k], depth: d + 1 }))
+        );
+      })
+    );
+  }
+
+  function stackNodesOrdered(nodes) {
+    const list = nodes || [];
+    const byId = {};
+    list.forEach(function (n) {
+      if (n && n.id) byId[n.id] = n;
+    });
+    const out = [];
+    STACK_NODE_ORDER.forEach(function (id) {
+      if (byId[id]) {
+        out.push(byId[id]);
+        delete byId[id];
+      }
+    });
+    // Any extra nodes (future kinds) follow in original order
+    list.forEach(function (n) {
+      if (n && n.id && byId[n.id]) out.push(n);
+    });
+    return out;
+  }
+
+  function StackDiagram({ nodes, edges, selectedId, onSelect }) {
+    const ordered = stackNodesOrdered(nodes);
+    const edgePairs = (edges || []).map(function (pair) {
+      if (Array.isArray(pair) && pair.length >= 2) return pair[0] + " → " + pair[1];
+      return null;
+    }).filter(Boolean);
+
+    return e(
+      "div",
+      { className: "stack-diagram-wrap" },
+      e(
+        "div",
+        {
+          className: "stack-diagram",
+          role: "listbox",
+          "aria-label": "Closed-loop stack blocks",
+        },
+        ordered.map(function (node, i) {
+          const active = selectedId === node.id;
+          return e(
+            React.Fragment,
+            { key: node.id },
+            i > 0
+              ? e("span", { className: "stack-arrow", "aria-hidden": "true" }, "→")
+              : null,
+            e(
+              "button",
+              {
+                type: "button",
+                role: "option",
+                className: "stack-block kind-" + (node.kind || node.id) + (active ? " active" : ""),
+                "aria-selected": active ? "true" : "false",
+                onClick: function () {
+                  onSelect(node.id);
+                },
+              },
+              e("span", { className: "stack-block-kind" }, node.kind || node.id),
+              e("span", { className: "stack-block-title" }, node.title || node.id),
+              node.summary
+                ? e("span", { className: "stack-block-summary" }, node.summary)
+                : null,
+              node.badges && node.badges.length
+                ? e(
+                    "span",
+                    { className: "badge-row stack-block-badges" },
+                    node.badges.map(function (b) {
+                      return e("span", { key: b, className: "badge" }, b);
+                    })
+                  )
+                : null
+            )
+          );
+        })
+      ),
+      edgePairs.length
+        ? e(
+            "p",
+            { className: "stack-edges-caption" },
+            "Edges: ",
+            edgePairs.join(" · ")
+          )
+        : null
+    );
+  }
+
+  function StackIdentityFooter({ identity }) {
+    if (!identity || typeof identity !== "object") return null;
+    const keys = [
+      "study_id",
+      "gallery_id",
+      "seed",
+      "git_commit",
+      "config_hash",
+      "uavsim_version",
+      "vehicle_id",
+      "source_run",
+    ];
+    const rows = keys
+      .filter(function (k) {
+        return identity[k] != null && identity[k] !== "";
+      })
+      .map(function (k) {
+        return e(
+          "span",
+          { key: k, className: "stack-id-item" },
+          e("span", { className: "stack-id-key" }, k),
+          e("code", null, String(identity[k]))
+        );
+      });
+    // Any extra identity fields
+    Object.keys(identity).forEach(function (k) {
+      if (keys.indexOf(k) >= 0) return;
+      if (identity[k] == null || identity[k] === "") return;
+      rows.push(
+        e(
+          "span",
+          { key: k, className: "stack-id-item" },
+          e("span", { className: "stack-id-key" }, k),
+          e("code", null, String(identity[k]))
+        )
+      );
+    });
+    if (!rows.length) return null;
+    return e(
+      "footer",
+      { className: "stack-identity" },
+      e("div", { className: "stack-identity-label" }, "Identity"),
+      e("div", { className: "stack-identity-row" }, rows)
+    );
+  }
+
+  function StackDetailPanel({ node, detail }) {
+    if (!node) {
+      return e(
+        "div",
+        { className: "stack-detail stack-detail-empty" },
+        e("p", { className: "stack-muted" }, "Select a block to inspect provenance fields.")
+      );
+    }
+    return e(
+      "div",
+      { className: "stack-detail" },
+      e(
+        "header",
+        { className: "stack-detail-head" },
+        e("h3", null, node.title || node.id),
+        e("span", { className: "stack-detail-kind" }, node.kind || node.id)
+      ),
+      node.summary ? e("p", { className: "stack-detail-summary" }, node.summary) : null,
+      detail && typeof detail === "object" && Object.keys(detail).length
+        ? e(StackObjectFields, { obj: detail, depth: 0 })
+        : e(
+            "p",
+            { className: "stack-muted" },
+            "No structured fields for this block in the gallery payload."
+          )
+    );
+  }
+
+  /**
+   * Closed-loop stack provenance for the active run (`run.stack`).
+   * Spec: docs/showcase/STACK_SPEC.md
+   */
+  function StackTab({ run }) {
+    const stack = run && run.stack;
+    const nodes = (stack && stack.nodes) || [];
+    const [selectedId, setSelectedId] = useState(null);
+
+    // Reset selection when run or stack changes
+    useEffect(
+      function () {
+        if (!stack || !nodes.length) {
+          setSelectedId(null);
+          return;
+        }
+        setSelectedId(function (prev) {
+          if (prev && nodes.some(function (n) { return n.id === prev; })) return prev;
+          return nodes[0].id;
+        });
+      },
+      [run && run.id, stack]
+    );
+
+    if (!stack) {
+      return e(
+        "div",
+        { className: "card stack-empty" },
+        e("h2", { style: { marginTop: 0 } }, "System stack"),
+        e(
+          "p",
+          null,
+          "This run has no ",
+          e("code", null, "stack"),
+          " provenance yet. Rebuild the gallery for stack provenance."
+        ),
+        e(
+          "p",
+          { className: "stack-muted" },
+          e("code", null, "uv run uavsim gallery --base-case")
+        ),
+        e(
+          "p",
+          { className: "stack-muted", style: { fontSize: "0.82rem" } },
+          "Contract: ",
+          e("code", null, "docs/showcase/STACK_SPEC.md")
+        )
+      );
+    }
+
+    const ordered = stackNodesOrdered(nodes);
+    const selectedNode =
+      ordered.find(function (n) {
+        return n.id === selectedId;
+      }) ||
+      ordered[0] ||
+      null;
+    const details = stack.details || {};
+    const detail =
+      selectedNode && details[selectedNode.id] != null ? details[selectedNode.id] : null;
+
+    return e(
+      "div",
+      { className: "stack-tab" },
+      e(
+        "div",
+        { className: "card" },
+        e("h2", { style: { marginTop: 0 } }, "Closed-loop stack — ", run.label),
+        e(
+          "p",
+          { className: "matrix-lead", style: { marginBottom: "0.85rem" } },
+          "How this run was generated: mission → guidance → estimate → control → plant. ",
+          "Click a block for config, gains, and plant mode. ",
+          stack.topology
+            ? e("span", { className: "stack-muted" }, "Topology: ", stack.topology, ".")
+            : null
+        ),
+        e(StackDiagram, {
+          nodes: nodes,
+          edges: stack.edges,
+          selectedId: selectedNode ? selectedNode.id : null,
+          onSelect: setSelectedId,
+        })
+      ),
+      e(
+        "div",
+        { className: "card stack-detail-card" },
+        e(StackDetailPanel, { node: selectedNode, detail: detail })
+      ),
+      e(StackIdentityFooter, { identity: details.identity })
+    );
+  }
+
   function McTab({ run }) {
     const mc = run.mc;
     if (!mc || !mc.trials || !mc.trials.length) {
@@ -3582,6 +4047,7 @@
     const tabs = [
       ["overview", "Overview"],
       ["flight", "Flight 3D"],
+      ["stack", "System"],
       ["estimation", "Estimation"],
       ["envelope", "Envelope"],
       ["monte_carlo", "Monte Carlo"],
@@ -3657,6 +4123,35 @@
           )
         ),
         e(FlightTab, { run: run })
+      );
+    else if (tab === "stack")
+      body = e(
+        "div",
+        null,
+        e(
+          "div",
+          { className: "row tab-toolbar" },
+          e(ActiveMissionChip, { doc: doc, missionId: missionId }),
+          e(
+            "label",
+            { className: "run-pick" },
+            e("span", null, "Run"),
+            e(
+              "select",
+              {
+                value: run.id,
+                onChange: function (ev) {
+                  setRunId(ev.target.value);
+                },
+                "aria-label": "Select run for system stack",
+              },
+              runOptions.map(function (r) {
+                return e("option", { key: r.id, value: r.id }, r.label);
+              })
+            )
+          )
+        ),
+        e(StackTab, { run: run })
       );
     else if (tab === "metrics")
       body = e(

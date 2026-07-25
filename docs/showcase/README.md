@@ -4,9 +4,12 @@ Single-page React app for the portfolio base case: a **guided technical report**
 
 **UI product spec (as-built):** [UI_SPEC.md](UI_SPEC.md) — IA, screens, data contract, copy slots, sync policy. Keep it updated when the SPA or `showcase.json` shape changes.
 
+**Closed-loop stack provenance:** [STACK_SPEC.md](STACK_SPEC.md) — `runs[].stack` schema + **System** tab contract.
+
 **Walkthrough (header strip):** Matrix → Flight → Laws (LQR vs PID) → Envelope.  
 **Mission** is a segmented control in the sticky header (rebinds all tabs).  
-**Suggested first look** opens Flight on the envelope-edge mission.
+**Suggested first look** opens Flight on the envelope-edge mission.  
+**System** tab (after Flight) shows the active run’s block diagram and config/gains when gallery includes `stack`.
 
 ## Base-case studies
 
@@ -99,8 +102,9 @@ If the live site looks stale after a green **Pages showcase** run:
 ## Tabs
 
 - **Overview** — controller × sensor RMSE grid + MC card  
-- **Estimation** — grouped RMSE bars (LQR/LQG vs PID) + scenario table  
 - **Flight 3D** — rotate/zoom path, scrub time, velocity vector, strip charts  
+- **System** — closed-loop stack diagram + per-block provenance (`run.stack`; rebuild gallery if missing)  
+- **Estimation** — grouped RMSE bars (LQR/LQG vs PID) + scenario table  
 - **Metrics / Monte Carlo / Envelope** — as before  
 - **Compare** — pick any two runs (A/B) for metric deltas + path overlay  
 
