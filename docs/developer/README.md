@@ -27,7 +27,7 @@ Guides for **using** and **extending** `uavsim` without reading the whole tree.
 ```text
 Study YAML
   ├─ vehicle        → VehicleParams (configs/vehicles/)
-  ├─ controller     → Controller protocol (lqr_hover | pid_cascade | …)
+  ├─ controller     → Controller protocol (lqr_hover | pid_cascade | ndi_cascade | …)
   ├─ guidance       → GuidanceBackend.plan → ReferenceTrajectory
   └─ sim            → plant (wrench|motors × euler|quat) → optional observer → control → metrics
 ```
