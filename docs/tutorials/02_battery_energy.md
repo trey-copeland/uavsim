@@ -7,7 +7,7 @@ title: Battery and energy feasibility
 
 **Goal:** Enable the **battery** block on a vehicle, run a short mission, read SOC / energy metrics, and understand what the model **does not** claim.
 
-**Prerequisites:** same as [T-GUIDE-ONLINE](01_online_intercept.md).  
+**Prerequisites:** same as [T-GUIDE-ONLINE](01_online_intercept.md). Vehicle clone pattern: [T-VEH-YAML](04_vehicle_yaml.md).  
 **Contracts:** [vehicles.md](../developer/vehicles.md) · [LIMITATIONS.md](../LIMITATIONS.md)
 
 ---

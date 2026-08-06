@@ -4,15 +4,35 @@ Story-driven guides for **using and extending** `uavsim`. Contract details stay 
 
 | ID | Guide | Status |
 |----|--------|--------|
-| **T-GUIDE-ONLINE** | [Online intercept (G-6)](01_online_intercept.md) | Ready on this branch |
-| **T-ENERGY** | [Battery / energy feasibility](02_battery_energy.md) | Ready on this branch |
-| **T0** | First run (install → simulate → report) | Deferred — separate tutorial-track branch |
-| **D-INTERCEPT** | [Interactive demo SPA](../demos/intercept/) | Ready in-repo; Pages after merge to `main` |
+| **T0** | [First run — install → simulate → report](00_first_run.md) | Ready |
+| **T-GUIDE-ONLINE** | [Online intercept (G-6)](01_online_intercept.md) | Ready |
+| **T-ENERGY** | [Battery / energy feasibility](02_battery_energy.md) | Ready |
+| **T-GUIDE-PLUGIN** | [Extend guidance (registry / plan / replan)](03_guidance_extension.md) | Ready |
+| **T-VEH-YAML** | [Point a study at a new vehicle YAML](04_vehicle_yaml.md) | Ready |
+| **D-INTERCEPT** | [Interactive demo SPA](../demos/intercept/) | Ready |
 
-**Live demo (after merge):** [trey-copeland.github.io/uavsim/intercept/](https://trey-copeland.github.io/uavsim/intercept/)
+### Live demos
 
-**Plans:** [ONLINE_INTERCEPT_AND_BATTERY.md](../../plan/ONLINE_INTERCEPT_AND_BATTERY.md) · [TUTORIALS.md](../../plan/TUTORIALS.md)
+| Surface | URL |
+|---------|-----|
+| Portfolio showcase | [trey-copeland.github.io/uavsim](https://trey-copeland.github.io/uavsim/) |
+| Intercept dashboard | […/uavsim/intercept/](https://trey-copeland.github.io/uavsim/intercept/) |
 
-### What is T0?
+Local static servers (**from repo root**):
 
-**T0** is a five-minute on-ramp for brand-new users: install, run one stock study (e.g. hover), open a report. It is **not** intercept-specific. We intentionally leave it for a dedicated **tutorial-track** branch so this intercept effort can wrap without diluting the G-6 / energy story.
+```bash
+python3 -m http.server 8766 --directory docs/showcase
+python3 -m http.server 8765 --directory docs/demos/intercept
+```
+
+### Suggested path
+
+1. **T0** — green install and one LQR hover study  
+2. **Showcase** — controller × sensor matrix in the browser  
+3. **T-VEH-YAML** — clone a vehicle YAML and re-point a study  
+4. **T-GUIDE-ONLINE** + **live intercept** — online replan and capture metrics  
+5. **T-ENERGY** — opt-in battery and energy-fail recipe  
+6. **T-GUIDE-PLUGIN** — how guidance backends register and replan  
+7. [Developer hub](../developer/README.md) — vehicles, control, guidance, estimation  
+
+**Plans:** [TUTORIALS.md](../../plan/TUTORIALS.md) · [ONLINE_INTERCEPT_AND_BATTERY.md](../../plan/ONLINE_INTERCEPT_AND_BATTERY.md)

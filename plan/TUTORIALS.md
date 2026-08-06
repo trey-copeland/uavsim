@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|--------|
-| **Status** | **T-GUIDE-ONLINE + T-ENERGY shipped** on intercept branch; T0 + full track polish deferred to a separate tutorials branch |
+| **Status** | **Markdown catalog complete on `feature/tutorials`** — T0 · T-GUIDE-ONLINE · T-ENERGY · T-GUIDE-PLUGIN · T-VEH-YAML; D-INTERCEPT already on main |
 | **Goal** | Ship **runnable configs**, **developer Markdown where useful**, and **interactive hosted demos** (GitHub Pages) that teach how to use and extend `uavsim` |
 | **Priority product** | Online intercept + battery + live demo — [`ONLINE_INTERCEPT_AND_BATTERY.md`](ONLINE_INTERCEPT_AND_BATTERY.md) |
 | **Airframe for hero demo** | **Sized-up X-quadrotor** (not trirotor) |
@@ -20,7 +20,7 @@ Portfolio **showcase** stays tabled as a broad matrix. This track owns **targete
 | **Done** | Code shipped **and** demo **live on GitHub** **and** README / related docs **synced** |
 | **Hero vehicle** | Quadrotor (sized up for power). **Not** trirotor / new layout epic |
 | **Hero control** | NDI only; attitude beyond hover-linear (no forced ~90°) |
-| **Git branch** | Do **not** develop on `main` — e.g. `feature/intercept-guidance-battery` |
+| **Git branch** | Product epic shipped via `feature/intercept-guidance-battery` → main; tutorial catalog polish on `feature/tutorials` |
 | **Actuation teaching default** | Body wrench as today; “beyond wrench” deferred to **future plans**, not this track’s hero |
 | **Format** | **Not Markdown-only.** Markdown = how-to / extension notes. **Primary “wow” = interactive Pages demo** (scrub + **play**, 3D path, attitude, battery, energy series) |
 | **UI reuse** | Extract showcase Flight-like pieces into **reusable components**; add play + battery/energy for intercept demo |
@@ -57,12 +57,12 @@ Layer A is **required** for the intercept epic done criteria. Layer B supports �
 
 | ID | Surface | Depends on | Status intent |
 |----|---------|------------|----------------|
-| **D-INTERCEPT** | Live interactive intercept demo | ONLINE_INTERCEPT_AND_BATTERY Phases B–E | **Hero — must ship** |
+| **D-INTERCEPT** | Live interactive intercept demo | ONLINE_INTERCEPT_AND_BATTERY Phases B–E | **Done** — `docs/demos/intercept/` · Pages `/intercept/` |
 | **T-GUIDE-ONLINE** | Markdown: online guidance / G-6 / config | Same product | **Done** — `docs/tutorials/01_online_intercept.md` |
 | **T-ENERGY** | Markdown: battery opt-in / proxies | Battery phase | **Done** — `docs/tutorials/02_battery_energy.md` |
-| **T0** | First run CLI (Markdown) | Nothing | **Deferred** — separate tutorial-track branch |
-| **T-VEH-YAML** | Optional short: “point a study at a new quad YAML” | Nothing | Optional contrast; **not** a layout plugin story — may fold into intercept vehicle section of T-GUIDE-ONLINE |
-| **T-GUIDE-PLUGIN** | How intercept (or a stub) registers as guidance | G-5 preferred | Extension appendix |
+| **T0** | First run CLI (Markdown) | Nothing | **Done** — `docs/tutorials/00_first_run.md` |
+| **T-VEH-YAML** | Point a study at a new quad YAML | Nothing | **Done** — `docs/tutorials/04_vehicle_yaml.md` (X-quad clone only; not multi-layout) |
+| **T-GUIDE-PLUGIN** | How intercept registers / plan+update / pipeline | G-5 preferred | **Done** — `docs/tutorials/03_guidance_extension.md` (honest: pipeline still manual switch) |
 | ~~T-EXT-AIR trirotor~~ | Multi-layout extension map | — | **Out of this track** (revisit only under a future airframe plan) |
 
 Deprioritized as primary content (already portfolio-covered): estimation matrix, envelope sweeps, full law×sensor showcase.
@@ -106,11 +106,12 @@ Document in `docs/demos/…/README.md` or tutorials index.
 
 ```text
 docs/tutorials/
-  README.md              # index: live demos + guides; ready/blocked badges
-  00_first_run.md        # T0
-  01_online_intercept.md # T-GUIDE-ONLINE (links live demo)
-  02_battery_energy.md   # T-ENERGY
-  03_guidance_extension.md  # plugin/registry lessons from intercept
+  README.md                 # index: live demos + guides + suggested path
+  00_first_run.md           # T0
+  01_online_intercept.md    # T-GUIDE-ONLINE (links live demo)
+  02_battery_energy.md      # T-ENERGY
+  03_guidance_extension.md  # T-GUIDE-PLUGIN
+  04_vehicle_yaml.md        # T-VEH-YAML
 ```
 
 ```text
@@ -130,7 +131,7 @@ docs/demos/intercept/                          # interactive app + data
 
 That question was: *should “change mass in YAML” be its own mini-tutorial, or only part of a multi-layout guide?*
 
-**Resolution:** No multi-layout guide. At most a **short section** inside intercept docs: “demo vehicle is a sized-up quadrotor YAML (`intercept_quadrotor.yaml`) — clone this pattern for your mass/limits.” Dedicated T-VEH-YAML page is **optional**, not a done-gate.
+**Resolution:** No multi-layout guide. Shipped dedicated **T-VEH-YAML** (`04_vehicle_yaml.md`) as a short X-quad clone recipe (plus intercept fleet patterns); still **not** an airframe-plugin tutorial.
 
 ### 5.3 “Monte Carlo in the tutorial?”
 
@@ -176,11 +177,11 @@ Extract UI components; play; battery/energy; export pipeline; deploy Pages.
 
 ### Phase 3 — Markdown sync
 
-T-GUIDE-ONLINE, T-ENERGY, T0; README demo link; developer guide cross-links.
+T-GUIDE-ONLINE, T-ENERGY, T0, T-GUIDE-PLUGIN, T-VEH-YAML; README demo link; developer guide cross-links. **Done** on `feature/tutorials` (pending merge).
 
 ### Phase 4 — Exit gate
 
-All exit criteria in both plans checked; status → **Done**.
+All exit criteria in both plans checked; status → **Done** after merge + Pages smoke.
 
 ---
 
@@ -203,21 +204,23 @@ ONLINE_INTERCEPT_AND_BATTERY          TUTORIALS / DEMOS
 
 ## 9. Exit criteria (track v1)
 
-- [x] Intercept product MVP on branch (see product plan §11; Pages pending merge)  
-- [x] Interactive demo SPA in-repo (live after merge)  
+- [x] Intercept product MVP (merged to main; see product plan §11)  
+- [x] Interactive demo SPA in-repo + Pages path `/intercept/`  
 - [x] Local re-run recipes (tutorials + demo README)  
 - [x] **T-GUIDE-ONLINE** + **T-ENERGY** Markdown guides  
-- [x] Developer docs / LIMITATIONS synced  
-- [ ] T0 first-run tutorial (deferred to tutorials branch)  
-- [ ] Pages live + smoke tests polish  
+- [x] Developer docs / LIMITATIONS synced (product epic)  
+- [x] **T0** first-run (`docs/tutorials/00_first_run.md`)  
+- [x] **T-GUIDE-PLUGIN** (`docs/tutorials/03_guidance_extension.md`)  
+- [x] **T-VEH-YAML** (`docs/tutorials/04_vehicle_yaml.md`)  
+- [ ] Merge `feature/tutorials` + README/index cross-links green on main  
 
 ### Not required / deferred
 
-- T0 first-run (separate branch)  
 - Trirotor tutorial  
 - Jupyter  
 - Full showcase refactor  
-- 3D MC trial cloud
+- 3D MC trial cloud  
+- Pure registry-driven pipeline (G-5) — still manual `_build_guidance` switch; documented in T-GUIDE-PLUGIN
 
 ---
 

@@ -1,5 +1,7 @@
 # Tutorial / intercept study recipes
 
+Human guides: [`docs/tutorials/`](../../../docs/tutorials/README.md) (T0 · ONLINE · ENERGY · PLUGIN · VEH-YAML).
+
 ## Intercept study ladder
 
 | Study | Guidance | Observer | Intent |

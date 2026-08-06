@@ -74,6 +74,8 @@ guidance:
 uv run uavsim simulate configs/studies/my_hover.yaml
 ```
 
+Step-by-step tutorial: [T-VEH-YAML](../tutorials/04_vehicle_yaml.md). Intercept-class templates live under `configs/vehicles/tutorials/`.
+
 ### Load in Python
 
 ```python
