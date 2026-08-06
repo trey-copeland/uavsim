@@ -9,7 +9,7 @@ title: Online intercept guidance (G-6)
 
 **Prerequisites:** `uv sync --extra dev` from the repo root; Python 3.11+.
 
-**Related:** [guidance.md](../developer/guidance.md) · [demo SPA](../demos/intercept/) · study ladder in [`configs/studies/tutorials/README.md`](../../configs/studies/tutorials/README.md)
+**Related:** [guidance.md](../developer/guidance.md) · [T-GUIDE-PLUGIN](03_guidance_extension.md) · [T-VEH-YAML](04_vehicle_yaml.md) · [demo SPA](../demos/intercept/) · study ladder in [`configs/studies/tutorials/README.md`](../../configs/studies/tutorials/README.md)
 
 ---
 

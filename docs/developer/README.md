@@ -18,7 +18,7 @@ Guides for **using** and **extending** `uavsim` without reading the whole tree.
 |-----|------|
 | [`docs/LIMITATIONS.md`](../LIMITATIONS.md) | **Scope & known limitations** (interview / portfolio honesty) |
 | [`docs/demos/intercept/`](../demos/intercept/) | Intercept SPA (online pursue + MC + battery); Pages `/intercept/` |
-| [`docs/tutorials/`](../tutorials/) | **T-GUIDE-ONLINE**, **T-ENERGY** (how to run / extend intercept + battery) |
+| [`docs/tutorials/`](../tutorials/) | **T0** · **ONLINE** · **ENERGY** · **PLUGIN** · **VEH-YAML** (use + extend) |
 | [`SPEC.md`](../../SPEC.md) | Requirements and MoSCoW |
 | [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) | Package map, import rules, data flow |
 | [`docs/viz.md`](../viz.md) | Reports and figures |

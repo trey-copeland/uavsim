@@ -123,7 +123,7 @@ uv run uavsim --help
 | [Extensibility backlog](docs/developer/EXTENSIBILITY_TODO.md) | What works today vs TODO |
 | [Visualization](docs/viz.md) | Report figure pack (§11A) |
 | [Showcase / Pages](docs/showcase/README.md) | React demo hosting + study matrix |
-| [Tutorials](docs/tutorials/README.md) | First run · online intercept · battery |
+| [Tutorials](docs/tutorials/README.md) | First run · vehicle YAML · intercept · battery · guidance extension |
 | [Intercept demo](docs/demos/intercept/README.md) | SPA + export pack for `/intercept/` |
 | [Containers](docs/containers.md) | Docker + sharded MC |
 

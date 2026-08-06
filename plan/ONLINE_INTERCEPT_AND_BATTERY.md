@@ -2,14 +2,14 @@
 
 | Field | Value |
 |-------|--------|
-| **Status** | **L0–L4 capability on branch** `feature/intercept-guidance-battery` — ship gate: merge + Pages + docs (docs sync in progress) |
+| **Status** | **Shipped on main** (merged PR #1) — L0–L4 capability, demo SPA + export, LIMITATIONS; teaching guides on `feature/tutorials` (T0 · ONLINE · ENERGY · PLUGIN · VEH-YAML) |
 | **Goal** | Ship a **single-vehicle, online guidance** backend that pursues a **scripted target** via mid-sim replan, an **opt-in battery** model that never breaks existing studies, and a **live interactive demo** (GitHub Pages) |
 | **Primary story** | Sized-up quadrotor, takeoff → aggressive intercept (**beyond hover-linear** attitude), **NDI only**, energy margin so the mission can fail honestly |
 | **Airframe** | **Quadrotor only** (X layout as today). Not trirotor / multi-layout |
 | **Audience** | Research users learning guidance extension; GNC peers evaluating online reference generation + energy |
 | **Related backlog** | G-4/G-5 (registry-driven pipeline), **G-6** (`update` in closed loop), G-7 (non-waypoint family), battery gap |
 | **Companion** | Hosting / teaching packaging: [`TUTORIALS.md`](TUTORIALS.md) |
-| **Git** | Work on a **feature branch** (e.g. `feature/intercept-guidance-battery`) — **not** `main` |
+| **Git** | Product epic merged via `feature/intercept-guidance-battery`; follow-on tutorials on `feature/tutorials` |
 
 This document is the **implementation plan and product contract** for the intercept + energy + demo epic.
 
@@ -555,8 +555,9 @@ Motors plant; auto lead-time; PN; thrust derate at empty; 3D MC cloud; full show
 - [x] **MC** on online hero: P(capture)≈0.28 @ 500 trials; bands exportable  
 - [x] Unit tests for G-6 / predict / battery  
 - [x] Interactive demo SPA (R3) in-repo; **re-export pack from online MC** (`p_capture≈0.28`)  
-- [ ] **Pages live** on `main` (merge + workflow)  
+- [x] **Merged to main** + Pages workflow publishes `/` + `/intercept/`  
 - [x] Developer docs + LIMITATIONS sync  
+- [x] Tutorial track (companion): T0, T-GUIDE-ONLINE, T-ENERGY, T-GUIDE-PLUGIN, T-VEH-YAML — see [`TUTORIALS.md`](TUTORIALS.md) 
 
 ---
 

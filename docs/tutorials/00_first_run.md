@@ -161,8 +161,10 @@ Live (after deploy): [trey-copeland.github.io/uavsim](https://trey-copeland.gith
 
 | If you want… | Open |
 |--------------|------|
+| Clone / retune a vehicle YAML | [04_vehicle_yaml.md](04_vehicle_yaml.md) |
 | Online intercept + capture metrics | [01_online_intercept.md](01_online_intercept.md) |
 | Battery SOC / energy-fail story | [02_battery_energy.md](02_battery_energy.md) |
+| Add a guidance backend / G-6 | [03_guidance_extension.md](03_guidance_extension.md) |
 | Live intercept dashboard | [docs/demos/intercept](../demos/intercept/) · [Pages `/intercept/`](https://trey-copeland.github.io/uavsim/intercept/) |
 | Extend vehicles / control / estimation | [docs/developer/README.md](../developer/README.md) |
 | Honest limits of the SIL | [LIMITATIONS.md](../LIMITATIONS.md) |

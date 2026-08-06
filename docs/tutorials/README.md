@@ -7,7 +7,8 @@ Story-driven guides for **using and extending** `uavsim`. Contract details stay 
 | **T0** | [First run — install → simulate → report](00_first_run.md) | Ready |
 | **T-GUIDE-ONLINE** | [Online intercept (G-6)](01_online_intercept.md) | Ready |
 | **T-ENERGY** | [Battery / energy feasibility](02_battery_energy.md) | Ready |
-| **T-GUIDE-PLUGIN** | Guidance extension / registry (from intercept) | Planned — this branch |
+| **T-GUIDE-PLUGIN** | [Extend guidance (registry / plan / replan)](03_guidance_extension.md) | Ready |
+| **T-VEH-YAML** | [Point a study at a new vehicle YAML](04_vehicle_yaml.md) | Ready |
 | **D-INTERCEPT** | [Interactive demo SPA](../demos/intercept/) | Ready |
 
 ### Live demos
@@ -17,7 +18,7 @@ Story-driven guides for **using and extending** `uavsim`. Contract details stay 
 | Portfolio showcase | [trey-copeland.github.io/uavsim](https://trey-copeland.github.io/uavsim/) |
 | Intercept dashboard | […/uavsim/intercept/](https://trey-copeland.github.io/uavsim/intercept/) |
 
-Local static servers (from **repo root**):
+Local static servers (**from repo root**):
 
 ```bash
 python3 -m http.server 8766 --directory docs/showcase
@@ -27,9 +28,11 @@ python3 -m http.server 8765 --directory docs/demos/intercept
 ### Suggested path
 
 1. **T0** — green install and one LQR hover study  
-2. **Showcase** — browse the controller × sensor matrix in the browser  
-3. **T-GUIDE-ONLINE** + **live intercept** — online replan and capture metrics  
-4. **T-ENERGY** — opt-in battery and energy-fail recipe  
-5. Developer guides — vehicles, control, guidance, estimation  
+2. **Showcase** — controller × sensor matrix in the browser  
+3. **T-VEH-YAML** — clone a vehicle YAML and re-point a study  
+4. **T-GUIDE-ONLINE** + **live intercept** — online replan and capture metrics  
+5. **T-ENERGY** — opt-in battery and energy-fail recipe  
+6. **T-GUIDE-PLUGIN** — how guidance backends register and replan  
+7. [Developer hub](../developer/README.md) — vehicles, control, guidance, estimation  
 
 **Plans:** [TUTORIALS.md](../../plan/TUTORIALS.md) · [ONLINE_INTERCEPT_AND_BATTERY.md](../../plan/ONLINE_INTERCEPT_AND_BATTERY.md)

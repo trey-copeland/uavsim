@@ -172,7 +172,8 @@ guidance:
   state_source: estimate   # truth | estimate
 ```
 
-Demos: `configs/studies/tutorials/intercept_online_*.yaml` · live pack: `docs/demos/intercept/`.
+Demos: `configs/studies/tutorials/intercept_online_*.yaml` · live pack: `docs/demos/intercept/`.  
+Tutorials: [T-GUIDE-ONLINE](../tutorials/01_online_intercept.md) · [T-GUIDE-PLUGIN](../tutorials/03_guidance_extension.md) (registry + plan/update walkthrough).
 
 ---
 
