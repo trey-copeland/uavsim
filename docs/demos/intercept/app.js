@@ -34,6 +34,20 @@
   /** @type {'NE'|'NU'} */
   let projection = "NE";
   let aboutOpen = false;
+  /** Expanded sticky details (tagline, KPIs, demos). Compact bar + transport always show. */
+  let chromeOpen = true;
+  try {
+    const stored = localStorage.getItem("uavsim.chromeOpen");
+    if (stored === "0") chromeOpen = false;
+    else if (stored === "1") chromeOpen = true;
+    else if (typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches) {
+      chromeOpen = false;
+    }
+  } catch (_) {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches) {
+      chromeOpen = false;
+    }
+  }
   /** @type {number|null} */
   let rafId = null;
   let lastWall = 0;
@@ -325,57 +339,72 @@
       "then tracks an open-loop path toward a scripted target with fixed NDI.";
 
     el.app.innerHTML = `
-      <div class="sticky-chrome">
+      <div class="sticky-chrome ${chromeOpen ? "" : "is-collapsed"}">
         <header class="app-header">
-          <h1>${escapeHtml(title)}</h1>
-          <p class="tagline">${escapeHtml(valueProp)}</p>
-          <nav class="site-demos" aria-label="uavsim demos">
-            <span class="site-demos-label">Demos</span>
-            <a class="site-demo-link" href="../">Portfolio showcase</a>
-            <a class="site-demo-link is-current" href="./" aria-current="page">Intercept dashboard</a>
-          </nav>
-          <div class="meta">
-            generated ${escapeHtml(demo.generated_at || "—")}
-            · uavsim ${escapeHtml(demo.uavsim_version || "—")}
-            ${mc && mc.source_study ? " · MC " + escapeHtml(mc.source_study) : ""}
-          </div>
-          <div class="header-row">
-            <div class="seg" id="case-seg" role="group" aria-label="Nominal case">
-              <button type="button" data-case="success" class="${caseId === "success" ? "active" : ""}">Success</button>
-              <button type="button" data-case="fail" class="${caseId === "fail" ? "active" : ""}" ${hasFail() ? "" : "disabled"}>Fail</button>
+          <div class="chrome-bar">
+            <div class="chrome-bar-main">
+              <h1 class="chrome-title">${escapeHtml(title)}</h1>
+              <span class="badge ${interceptOk ? "ok" : "miss"} chrome-badge" id="capture-badge">${interceptOk ? "Capture" : "Miss"}</span>
             </div>
-            <span class="badge ${interceptOk ? "ok" : "miss"}" id="capture-badge">${interceptOk ? "Capture" : "Miss"}</span>
-            <div class="kpi-row" id="kpi-row">
-              <div class="kpi ${pClass}">
-                <span class="kpi-label">P(capture)</span>
-                <span class="kpi-value">${hasMc() ? fmtPct(pCap) : "no MC"}</span>
+            <div class="chrome-bar-actions">
+              <div class="seg chrome-case-seg" id="case-seg" role="group" aria-label="Nominal case">
+                <button type="button" data-case="success" class="${caseId === "success" ? "active" : ""}">OK</button>
+                <button type="button" data-case="fail" class="${caseId === "fail" ? "active" : ""}" ${hasFail() ? "" : "disabled"}>Fail</button>
               </div>
-              <div class="kpi">
-                <span class="kpi-label">n trials</span>
-                <span class="kpi-value">${hasMc() ? String(nTrials) : "—"}</span>
-              </div>
-              <div class="kpi">
-                <span class="kpi-label">r capture</span>
-                <span class="kpi-value">${fmt(rCap, 2)} m</span>
-              </div>
-              ${
-                socFinal != null
-                  ? `<div class="kpi">
-                <span class="kpi-label">SOC final</span>
-                <span class="kpi-value">${fmt(socFinal, 1)}%</span>
-              </div>`
-                  : socMin != null
+              <button type="button" class="chrome-toggle" id="chrome-toggle"
+                aria-expanded="${chromeOpen ? "true" : "false"}"
+                aria-controls="chrome-details"
+                title="${chromeOpen ? "Hide header details" : "Show header details"}">
+                <span class="chrome-toggle-label">${chromeOpen ? "Less" : "More"}</span>
+                <span class="chrome-chevron" aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
+          <div class="chrome-details" id="chrome-details" ${chromeOpen ? "" : "hidden"}>
+            <p class="tagline">${escapeHtml(valueProp)}</p>
+            <nav class="site-demos" aria-label="uavsim demos">
+              <span class="site-demos-label">Demos</span>
+              <a class="site-demo-link" href="../">Portfolio showcase</a>
+              <a class="site-demo-link is-current" href="./" aria-current="page">Intercept dashboard</a>
+            </nav>
+            <div class="meta">
+              generated ${escapeHtml(demo.generated_at || "—")}
+              · uavsim ${escapeHtml(demo.uavsim_version || "—")}
+              ${mc && mc.source_study ? " · MC " + escapeHtml(mc.source_study) : ""}
+            </div>
+            <div class="header-row">
+              <div class="kpi-row" id="kpi-row">
+                <div class="kpi ${pClass}">
+                  <span class="kpi-label">P(capture)</span>
+                  <span class="kpi-value">${hasMc() ? fmtPct(pCap) : "no MC"}</span>
+                </div>
+                <div class="kpi">
+                  <span class="kpi-label">n trials</span>
+                  <span class="kpi-value">${hasMc() ? String(nTrials) : "—"}</span>
+                </div>
+                <div class="kpi">
+                  <span class="kpi-label">r capture</span>
+                  <span class="kpi-value">${fmt(rCap, 2)} m</span>
+                </div>
+                ${
+                  socFinal != null
                     ? `<div class="kpi">
-                <span class="kpi-label">SOC min</span>
-                <span class="kpi-value">${fmt(socMin, 1)}%</span>
-              </div>`
-                    : ""
-              }
+                  <span class="kpi-label">SOC final</span>
+                  <span class="kpi-value">${fmt(socFinal, 1)}%</span>
+                </div>`
+                    : socMin != null
+                      ? `<div class="kpi">
+                  <span class="kpi-label">SOC min</span>
+                  <span class="kpi-value">${fmt(socMin, 1)}%</span>
+                </div>`
+                      : ""
+                }
+              </div>
+              <button type="button" class="about-toggle" id="about-btn">About</button>
             </div>
-            <button type="button" class="about-toggle" id="about-btn">About</button>
-          </div>
-          <div class="about-panel ${aboutOpen ? "" : "hidden"}" id="about-panel">
-            ${(ui.about_paragraphs || []).map((p) => `<p>${escapeHtml(p)}</p>`).join("")}
+            <div class="about-panel ${aboutOpen ? "" : "hidden"}" id="about-panel">
+              ${(ui.about_paragraphs || []).map((p) => `<p>${escapeHtml(p)}</p>`).join("")}
+            </div>
           </div>
         </header>
 
@@ -548,6 +577,29 @@
         aboutOpen = !aboutOpen;
         const panel = document.getElementById("about-panel");
         if (panel) panel.classList.toggle("hidden", !aboutOpen);
+      });
+    }
+
+    const chromeBtn = document.getElementById("chrome-toggle");
+    if (chromeBtn) {
+      chromeBtn.addEventListener("click", () => {
+        chromeOpen = !chromeOpen;
+        try {
+          localStorage.setItem("uavsim.chromeOpen", chromeOpen ? "1" : "0");
+        } catch (_) {
+          /* ignore */
+        }
+        const root = document.querySelector(".sticky-chrome");
+        const details = document.getElementById("chrome-details");
+        if (root) root.classList.toggle("is-collapsed", !chromeOpen);
+        if (details) {
+          if (chromeOpen) details.removeAttribute("hidden");
+          else details.setAttribute("hidden", "");
+        }
+        chromeBtn.setAttribute("aria-expanded", chromeOpen ? "true" : "false");
+        chromeBtn.title = chromeOpen ? "Hide header details" : "Show header details";
+        const lab = chromeBtn.querySelector(".chrome-toggle-label");
+        if (lab) lab.textContent = chromeOpen ? "Less" : "More";
       });
     }
 

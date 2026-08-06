@@ -4231,6 +4231,20 @@
     );
   }
 
+  function defaultChromeOpen() {
+    try {
+      const stored = localStorage.getItem("uavsim.chromeOpen");
+      if (stored === "0") return false;
+      if (stored === "1") return true;
+    } catch (_) {
+      /* ignore */
+    }
+    if (typeof window !== "undefined" && window.matchMedia) {
+      return !window.matchMedia("(max-width: 900px)").matches;
+    }
+    return true;
+  }
+
   function App() {
     const [doc, setDoc] = useState(null);
     const [err, setErr] = useState(null);
@@ -4238,6 +4252,7 @@
     const [runId, setRunId] = useState(null);
     const [missionId, setMissionId] = useState(null);
     const [aboutOpen, setAboutOpen] = useState(false);
+    const [chromeOpen, setChromeOpen] = useState(defaultChromeOpen);
 
     useEffect(() => {
       fetch("./data/showcase.json")
@@ -4495,140 +4510,208 @@
         missionId: missionId,
       });
 
+    function toggleChrome() {
+      setChromeOpen(function (prev) {
+        const next = !prev;
+        try {
+          localStorage.setItem("uavsim.chromeOpen", next ? "1" : "0");
+        } catch (_) {
+          /* ignore */
+        }
+        return next;
+      });
+    }
+
     return e(
       "div",
       { className: "app-shell" },
       e(
-        "header",
-        { className: "app-header sticky-header" },
+        "div",
+        {
+          className:
+            "sticky-chrome" + (chromeOpen ? "" : " is-collapsed"),
+        },
         e(
-          "div",
-          { className: "header-top" },
-          e("div", { className: "header-brand" },
-            e("h1", null, displayTitle),
-            e("p", { className: "value-prop" }, valueProp),
-            e(
-              "nav",
-              {
-                className: "site-demos",
-                "aria-label": "uavsim demos",
-              },
-              e("span", { className: "site-demos-label" }, "Demos"),
-              e(
-                "a",
-                {
-                  href: "./",
-                  className: "site-demo-link is-current",
-                  "aria-current": "page",
-                },
-                "Portfolio showcase"
-              ),
-              e(
-                "a",
-                {
-                  href: "./intercept/",
-                  className: "site-demo-link",
-                  title: "Online intercept · pad climb · MEKF · plant MC",
-                },
-                "Intercept dashboard"
-              )
-            ),
-            e(
-              "button",
-              {
-                type: "button",
-                className: "about-toggle",
-                "aria-expanded": aboutOpen ? "true" : "false",
-                onClick: function () {
-                  setAboutOpen(!aboutOpen);
-                },
-              },
-              aboutOpen ? "Hide study details" : "About this study"
-            ),
-            aboutOpen
-              ? e(
-                  "div",
-                  { className: "about-panel" },
-                  (
-                    (doc.ui && doc.ui.about_paragraphs) ||
-                    ABOUT_PARAGRAPHS
-                  ).map(function (para, i) {
-                    return e("p", { key: i }, para);
-                  }),
-                  e(
-                    "p",
-                    { className: "desktop-note" },
-                    "Best on a wide display — the matrix and envelope tables are dense by design."
-                  ),
-                  e(
-                    "p",
-                    { className: "desktop-note" },
-                    "Also on this site: ",
-                    e(
-                      "a",
-                      { href: "./intercept/" },
-                      "intercept dashboard"
-                    ),
-                    " (online pursue, battery, plant MC)."
-                  )
-                )
-              : null
-          ),
+          "header",
+          { className: "app-header sticky-header" },
           e(
             "div",
-            { className: "header-controls" },
-            e(MissionSelector, {
-              doc: doc,
-              missionId: missionId,
-              onChange: selectMission,
-              className: "header-mission",
-              showHint: true,
-            }),
+            { className: "chrome-bar" },
             e(
               "div",
-              { className: "meta" },
-              "v",
-              doc.uavsim_version || "?",
-              doc.generated_at ? " · " + String(doc.generated_at).slice(0, 10) : "",
-              " · SIL"
+              { className: "chrome-bar-main" },
+              e("h1", { className: "chrome-title" }, displayTitle)
+            ),
+            e(
+              "div",
+              { className: "chrome-bar-actions" },
+              e(MissionSelector, {
+                doc: doc,
+                missionId: missionId,
+                onChange: selectMission,
+                className: "header-mission chrome-mission",
+                showHint: false,
+              }),
+              e(
+                "button",
+                {
+                  type: "button",
+                  className: "chrome-toggle",
+                  "aria-expanded": chromeOpen ? "true" : "false",
+                  "aria-controls": "chrome-details",
+                  title: chromeOpen
+                    ? "Hide header details"
+                    : "Show header details",
+                  onClick: toggleChrome,
+                },
+                e(
+                  "span",
+                  { className: "chrome-toggle-label" },
+                  chromeOpen ? "Less" : "More"
+                ),
+                e("span", {
+                  className: "chrome-chevron",
+                  "aria-hidden": "true",
+                })
+              )
             )
-          )
+          ),
+          chromeOpen
+            ? e(
+                "div",
+                { className: "chrome-details", id: "chrome-details" },
+                e(
+                  "div",
+                  { className: "header-top" },
+                  e(
+                    "div",
+                    { className: "header-brand" },
+                    e("p", { className: "value-prop" }, valueProp),
+                    e(
+                      "nav",
+                      {
+                        className: "site-demos",
+                        "aria-label": "uavsim demos",
+                      },
+                      e(
+                        "span",
+                        { className: "site-demos-label" },
+                        "Demos"
+                      ),
+                      e(
+                        "a",
+                        {
+                          href: "./",
+                          className: "site-demo-link is-current",
+                          "aria-current": "page",
+                        },
+                        "Portfolio showcase"
+                      ),
+                      e(
+                        "a",
+                        {
+                          href: "./intercept/",
+                          className: "site-demo-link",
+                          title:
+                            "Online intercept · pad climb · MEKF · plant MC",
+                        },
+                        "Intercept dashboard"
+                      )
+                    ),
+                    e(
+                      "button",
+                      {
+                        type: "button",
+                        className: "about-toggle",
+                        "aria-expanded": aboutOpen ? "true" : "false",
+                        onClick: function () {
+                          setAboutOpen(!aboutOpen);
+                        },
+                      },
+                      aboutOpen ? "Hide study details" : "About this study"
+                    ),
+                    aboutOpen
+                      ? e(
+                          "div",
+                          { className: "about-panel" },
+                          (
+                            (doc.ui && doc.ui.about_paragraphs) ||
+                            ABOUT_PARAGRAPHS
+                          ).map(function (para, i) {
+                            return e("p", { key: i }, para);
+                          }),
+                          e(
+                            "p",
+                            { className: "desktop-note" },
+                            "Best on a wide display — the matrix and envelope tables are dense by design."
+                          ),
+                          e(
+                            "p",
+                            { className: "desktop-note" },
+                            "Also on this site: ",
+                            e(
+                              "a",
+                              { href: "./intercept/" },
+                              "intercept dashboard"
+                            ),
+                            " (online pursue, battery, plant MC)."
+                          )
+                        )
+                      : null
+                  ),
+                  e(
+                    "div",
+                    { className: "header-controls" },
+                    e(
+                      "div",
+                      { className: "meta" },
+                      "v",
+                      doc.uavsim_version || "?",
+                      doc.generated_at
+                        ? " · " + String(doc.generated_at).slice(0, 10)
+                        : "",
+                      " · SIL"
+                    )
+                  )
+                ),
+                e(StoryStrip, {
+                  activeTab: tab,
+                  onNavigate: function (id) {
+                    setTab(id);
+                  },
+                })
+              )
+            : null
         ),
-        e(StoryStrip, {
-          activeTab: tab,
-          onNavigate: function (id) {
-            setTab(id);
+        e(
+          "nav",
+          {
+            className: "tabs sticky-tabs",
+            role: "tablist",
+            "aria-label": "Showcase sections",
           },
-        })
-      ),
-      e(
-        "nav",
-        {
-          className: "tabs",
-          role: "tablist",
-          "aria-label": "Showcase sections",
-        },
-        tabs.map(function (pair) {
-          const id = pair[0];
-          const label = pair[1];
-          const selected = tab === id;
-          return e(
-            "button",
-            {
-              key: id,
-              type: "button",
-              role: "tab",
-              id: "tab-" + id,
-              "aria-selected": selected ? "true" : "false",
-              "aria-controls": "panel-" + id,
-              className: selected ? "active" : "",
-              onClick: function () {
-                setTab(id);
+          tabs.map(function (pair) {
+            const id = pair[0];
+            const label = pair[1];
+            const selected = tab === id;
+            return e(
+              "button",
+              {
+                key: id,
+                type: "button",
+                role: "tab",
+                id: "tab-" + id,
+                "aria-selected": selected ? "true" : "false",
+                "aria-controls": "panel-" + id,
+                className: selected ? "active" : "",
+                onClick: function () {
+                  setTab(id);
+                },
               },
-            },
-            label
-          );
-        })
+              label
+            );
+          })
+        )
       ),
       e(
         "main",

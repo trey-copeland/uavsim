@@ -55,9 +55,94 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+/* Slim always-visible row; details expand below */
+.chrome-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem 0.75rem;
+}
+.chrome-bar-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.65rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.chrome-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.55rem;
+  flex: 0 0 auto;
+}
+h1.chrome-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", "Segoe UI Mono", Menlo, monospace;
+  line-height: 1.25;
+  max-width: min(100%, 28rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chrome-badge {
+  flex-shrink: 0;
+}
+.chrome-case-seg button {
+  padding: 0.28rem 0.55rem;
+  font-size: 0.78rem;
+}
+.chrome-toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #14181e;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.28rem 0.65rem;
+  cursor: pointer;
+}
+.chrome-toggle:hover {
+  border-color: var(--accent);
+}
+.chrome-chevron {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  margin-top: -0.15rem;
+  transition: transform 0.15s ease;
+}
+.sticky-chrome:not(.is-collapsed) .chrome-chevron {
+  transform: rotate(-135deg);
+  margin-top: 0.15rem;
+}
+.chrome-details {
+  margin-top: 0.65rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(42, 47, 54, 0.85);
+}
+.chrome-details[hidden] {
+  display: none !important;
+}
+.sticky-chrome.is-collapsed header.app-header {
+  padding-bottom: 0.45rem;
+}
+
 /* ── Header ─────────────────────────────────────────── */
 header.app-header {
-  padding: 1rem 1.5rem 0.75rem;
+  padding: 0.65rem 1rem 0.55rem;
   background: transparent;
 }
 
@@ -334,14 +419,28 @@ main {
 .transport {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.55rem 0.9rem;
+  gap: 0.45rem 0.65rem;
   align-items: center;
-  padding: 0.55rem 1.5rem 0.75rem;
+  padding: 0.45rem 1rem 0.55rem;
   margin: 0;
   background: transparent;
   border: none;
   border-top: 1px solid var(--border);
   border-radius: 0;
+}
+
+@media (max-width: 600px) {
+  .transport .scrub-wrap {
+    flex: 1 1 100%;
+    order: 10;
+  }
+  .chrome-title {
+    max-width: 12rem;
+    font-size: 0.85rem;
+  }
+  .chrome-toggle-label {
+    /* icon-only on very narrow — label still in a11y title */
+  }
 }
 
 /* SOC strip in transport */
