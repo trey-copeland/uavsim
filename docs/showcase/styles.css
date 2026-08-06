@@ -796,13 +796,13 @@ table.controller-matrix th.th-teach .col-label {
   color: var(--accent);
 }
 
-/* Sticky header + story strip */
+/* Sticky chrome: compact bar + collapsible details + sticky tabs */
 .app-shell {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
-.sticky-header {
+.sticky-chrome {
   position: sticky;
   top: 0;
   z-index: 40;
@@ -810,12 +810,116 @@ table.controller-matrix th.th-teach .col-label {
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
+.sticky-header {
+  /* nested under .sticky-chrome — not independently sticky */
+  position: relative;
+  top: auto;
+  z-index: auto;
+  background: transparent;
+  backdrop-filter: none;
+  border-bottom: none;
+}
+.chrome-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem 0.75rem;
+  padding: 0.55rem 1rem 0.45rem;
+}
+.chrome-bar-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+.chrome-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.55rem;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+h1.chrome-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", "Segoe UI Mono", Menlo, monospace;
+  line-height: 1.25;
+  max-width: min(100%, 36rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chrome-mission {
+  margin: 0;
+}
+.chrome-mission .mission-hint {
+  display: none;
+}
+.chrome-toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #14181e;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.28rem 0.65rem;
+  cursor: pointer;
+}
+.chrome-toggle:hover {
+  border-color: var(--accent);
+}
+.chrome-chevron {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  margin-top: -0.15rem;
+  transition: transform 0.15s ease;
+}
+.sticky-chrome:not(.is-collapsed) .chrome-chevron {
+  transform: rotate(-135deg);
+  margin-top: 0.15rem;
+}
+.chrome-details {
+  padding: 0 1rem 0.65rem;
+  border-top: 1px solid rgba(42, 47, 54, 0.85);
+}
+.sticky-tabs {
+  /* keep section tabs under compact chrome when scrolling */
+  background: rgba(17, 19, 21, 0.96);
+  border-top: 1px solid rgba(42, 47, 54, 0.65);
+  padding: 0.45rem 0.75rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.sticky-tabs button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+header.app-header {
+  padding: 0;
+  border-bottom: none;
+}
 .header-top {
   display: flex;
   flex-wrap: wrap;
   gap: 0.85rem 1.5rem;
   align-items: flex-start;
   justify-content: space-between;
+  padding-top: 0.65rem;
 }
 .header-brand {
   flex: 1 1 18rem;
@@ -1431,5 +1535,25 @@ table.stack-matrix td {
   }
   .bd-legend {
     gap: 0.25rem 0.65rem;
+  }
+  h1.chrome-title {
+    max-width: 11rem;
+    font-size: 0.85rem;
+  }
+  .chrome-bar {
+    padding: 0.45rem 0.75rem 0.35rem;
+  }
+  .chrome-details {
+    padding: 0 0.75rem 0.55rem;
+  }
+  main {
+    padding: 0.75rem 0.75rem 2rem;
+  }
+  .sticky-tabs {
+    padding: 0.35rem 0.5rem;
+  }
+  nav.tabs button {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.8rem;
   }
 }
