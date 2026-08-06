@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|--------|
-| **Status** | **T-GUIDE-ONLINE + T-ENERGY shipped** on intercept branch; T0 + full track polish deferred to a separate tutorials branch |
+| **Status** | **In progress on `feature/tutorials`** — T0 first-run shipped; T-GUIDE-ONLINE + T-ENERGY already on main; T-GUIDE-PLUGIN next |
 | **Goal** | Ship **runnable configs**, **developer Markdown where useful**, and **interactive hosted demos** (GitHub Pages) that teach how to use and extend `uavsim` |
 | **Priority product** | Online intercept + battery + live demo — [`ONLINE_INTERCEPT_AND_BATTERY.md`](ONLINE_INTERCEPT_AND_BATTERY.md) |
 | **Airframe for hero demo** | **Sized-up X-quadrotor** (not trirotor) |
@@ -60,7 +60,7 @@ Layer A is **required** for the intercept epic done criteria. Layer B supports �
 | **D-INTERCEPT** | Live interactive intercept demo | ONLINE_INTERCEPT_AND_BATTERY Phases B–E | **Hero — must ship** |
 | **T-GUIDE-ONLINE** | Markdown: online guidance / G-6 / config | Same product | **Done** — `docs/tutorials/01_online_intercept.md` |
 | **T-ENERGY** | Markdown: battery opt-in / proxies | Battery phase | **Done** — `docs/tutorials/02_battery_energy.md` |
-| **T0** | First run CLI (Markdown) | Nothing | **Deferred** — separate tutorial-track branch |
+| **T0** | First run CLI (Markdown) | Nothing | **Done** — `docs/tutorials/00_first_run.md` |
 | **T-VEH-YAML** | Optional short: “point a study at a new quad YAML” | Nothing | Optional contrast; **not** a layout plugin story — may fold into intercept vehicle section of T-GUIDE-ONLINE |
 | **T-GUIDE-PLUGIN** | How intercept (or a stub) registers as guidance | G-5 preferred | Extension appendix |
 | ~~T-EXT-AIR trirotor~~ | Multi-layout extension map | — | **Out of this track** (revisit only under a future airframe plan) |
@@ -208,12 +208,12 @@ ONLINE_INTERCEPT_AND_BATTERY          TUTORIALS / DEMOS
 - [x] Local re-run recipes (tutorials + demo README)  
 - [x] **T-GUIDE-ONLINE** + **T-ENERGY** Markdown guides  
 - [x] Developer docs / LIMITATIONS synced  
-- [ ] T0 first-run tutorial (deferred to tutorials branch)  
+- [x] T0 first-run tutorial (`docs/tutorials/00_first_run.md` on `feature/tutorials`)  
+- [ ] T-GUIDE-PLUGIN (guidance registry / extension walkthrough)  
 - [ ] Pages live + smoke tests polish  
 
 ### Not required / deferred
 
-- T0 first-run (separate branch)  
 - Trirotor tutorial  
 - Jupyter  
 - Full showcase refactor  

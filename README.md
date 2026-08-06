@@ -123,7 +123,7 @@ uv run uavsim --help
 | [Extensibility backlog](docs/developer/EXTENSIBILITY_TODO.md) | What works today vs TODO |
 | [Visualization](docs/viz.md) | Report figure pack (§11A) |
 | [Showcase / Pages](docs/showcase/README.md) | React demo hosting + study matrix |
-| [Tutorials](docs/tutorials/README.md) | Online intercept + battery guides |
+| [Tutorials](docs/tutorials/README.md) | First run · online intercept · battery |
 | [Intercept demo](docs/demos/intercept/README.md) | SPA + export pack for `/intercept/` |
 | [Containers](docs/containers.md) | Docker + sharded MC |
 
@@ -156,7 +156,8 @@ uv run uavsim --help
 
 ## Quickstart
 
-Requires [uv](https://docs.astral.sh/uv/) and Python 3.11+.
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.11+.  
+**Walkthrough:** [docs/tutorials/00_first_run.md](docs/tutorials/00_first_run.md) (install → simulate → report).
 
 ```bash
 uv sync --extra dev
